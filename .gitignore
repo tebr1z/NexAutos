@@ -14,5 +14,4 @@ uploads
 apps/web/.next
 apps/api/dist
 apps/api/generated
-apps/api/package-lock.json
 prisma/*.db
