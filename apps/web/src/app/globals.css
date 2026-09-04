@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-silver: var(--silver);
+  --color-royal: var(--royal);
+  --color-royal-soft: var(--royal-soft);
+  --color-line: var(--line);
+  --color-glass: var(--glass);
+  --color-card: var(--card);
+  --font-sans: var(--font-inter), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-geist-sans), "SF Pro Display", var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
+  --shadow-glass: 0 8px 40px rgba(0, 0, 0, 0.12);
+  --shadow-glow: 0 0 80px var(--royal-glow);
+}
+
+:root {
+  --bg: #f6f6f7;
+  --fg: #0b0b0d;
+  --muted: #5d5d68;
+  --silver: #8b929e;
+  --royal: #1d4ed8;
+  --royal-soft: #3b6ff0;
+  --royal-glow: rgba(29, 78, 216, 0.28);
+  --line: rgba(11, 11, 13, 0.08);
+  --glass: rgba(255, 255, 255, 0.62);
+  --card: #ffffff;
+}
+
+.dark {
+  --bg: #070708;
+  --fg: #f3f3f4;
+  --muted: #a4a4ad;
+  --silver: #c4c9d2;
+  --royal: #3b82f6;
+  --royal-soft: #60a5fa;
+  --royal-glow: rgba(59, 130, 246, 0.35);
+  --line: rgba(255, 255, 255, 0.08);
+  --glass: rgba(16, 16, 18, 0.55);
+  --card: #101012;
+}
+
+* {
+  border-color: var(--line);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+body {
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--royal) 35%, transparent);
+  color: var(--fg);
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
+}
+
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid var(--line);
+}
+
+.nav-scrolled {
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 10px 40px color-mix(in srgb, var(--fg) 6%, transparent);
+}
+
+.dark .nav-scrolled {
+  background: color-mix(in srgb, var(--bg) 82%, #000 18%);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.metallic-line {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--silver) 20%, transparent),
+    var(--silver),
+    color-mix(in srgb, var(--silver) 20%, transparent),
+    transparent
+  );
+}
+
+.royal-gradient {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 45%, #93c5fd 100%);
+}
+
+.text-gradient {
+  background: linear-gradient(180deg, var(--fg) 0%, color-mix(in srgb, var(--fg) 55%, var(--silver)) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.45'/%3E%3C/svg%3E");
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
