@@ -1,0 +1,102 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-autonex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-autonex}
+      POSTGRES_DB: ${POSTGRES_DB:-autonex}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-autonex}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-autonex}:${POSTGRES_PASSWORD:-autonex}@postgres:5432/${POSTGRES_DB:-autonex}?schema=public
+      REDIS_URL: redis://redis:6379
+      API_PORT: 4000
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-to-another-long-random-secret}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://nex.autos}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://nex.autos}
+      VEXIRA_WHATSAPP_KEY: ${VEXIRA_WHATSAPP_KEY:-}
+      VEXIRA_WHATSAPP_URL: ${VEXIRA_WHATSAPP_URL:-https://api.vexirahost.com/api/v1/whatsapp/messages}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-Auto Nex <auto@nex.autos>}
+      CONTRACT_REVEAL_OTP: ${CONTRACT_REVEAL_OTP:-false}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-Auto Nex}
+      ADMIN_PHONE: ${ADMIN_PHONE:-994709668111}
+      AISSTREAM_API_KEY: ${AISSTREAM_API_KEY:-}
+      AIS_API_KEY: ${AIS_API_KEY:-}
+    ports:
+      - "4000:4000"
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://nex.autos}
+        NEXT_PUBLIC_WHATSAPP: ${NEXT_PUBLIC_WHATSAPP:-994709668111}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://nex.autos}
+      INTERNAL_API_URL: http://api:4000/api/v1
+      VEXIRA_WHATSAPP_KEY: ${VEXIRA_WHATSAPP_KEY:-}
+      VEXIRA_WHATSAPP_URL: ${VEXIRA_WHATSAPP_URL:-https://api.vexirahost.com/api/v1/whatsapp/messages}
+      CONTRACT_REVEAL_OTP: ${CONTRACT_REVEAL_OTP:-false}
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+      - api
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    profiles:
+      - production
+
+volumes:
+  pgdata:

@@ -1,0 +1,416 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  STAFF
+  CUSTOMER
+}
+
+enum AuctionHouse {
+  COPART
+  IAAI
+  MANHEIM
+  OTHER
+}
+
+enum ShipmentStatus {
+  PURCHASED
+  AUCTION_PAID
+  PICKED_UP
+  EXPORT_DOCUMENTS
+  ARRIVED_PORT
+  LOADED_CONTAINER
+  SHIP_DEPARTED
+  IN_TRANSIT
+  DESTINATION_PORT
+  CUSTOMS_CLEARANCE
+  READY_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum FuelType {
+  GASOLINE
+  DIESEL
+  HYBRID
+  ELECTRIC
+  PLUGIN_HYBRID
+  OTHER
+}
+
+enum Transmission {
+  AUTOMATIC
+  MANUAL
+  CVT
+  DCT
+  OTHER
+}
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  passwordHash     String
+  name             String
+  phone            String?
+  role             Role      @default(CUSTOMER)
+  locale           String    @default("az")
+  avatarUrl        String?
+  isActive         Boolean   @default(true)
+  twoFactorEnabled Boolean   @default(false)
+  twoFactorSecret  String?
+  lastLoginAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  ordersCreated Order[]        @relation("OrderCreator")
+  customer      Customer?
+  notifications Notification[]
+  messagesSent  Message[]      @relation("MessageSender")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  userId    String?  @unique
+  user      User?    @relation(fields: [userId], references: [id])
+  name      String
+  email     String
+  phone     String
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders        Order[]
+  savedVehicles SavedVehicle[]
+  messages      Message[]      @relation("CustomerMessages")
+  contracts     Contract[]
+
+  @@index([email])
+  @@index([phone])
+}
+
+model Vehicle {
+  id            String         @id @default(cuid())
+  vin           String         @unique
+  make          String?
+  model         String?
+  year          Int?
+  engine        String?
+  mileage       Int?
+  fuel          FuelType?
+  transmission  Transmission?
+  exteriorColor String?
+  interiorColor String?
+  bodyStyle     String?
+  auctionHouse  AuctionHouse?
+  saleDate      DateTime?
+  lotNumber     String?
+  damageHistory String?
+  specs         Json?
+  photos        String[]
+  auctionPhotos String[]
+  status        String?
+  source        String         @default("manual")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  orders  Order[]
+  savedBy SavedVehicle[]
+
+  @@index([make, model])
+}
+
+model Order {
+  id              String          @id @default(cuid())
+  trackingCode    String          @unique
+  customerId      String
+  customer        Customer        @relation(fields: [customerId], references: [id])
+  vehicleId       String?
+  vehicle         Vehicle?        @relation(fields: [vehicleId], references: [id])
+  vin             String
+  auctionHouse    AuctionHouse
+  containerNumber String?
+  carrierCode     String?
+  carrierName     String?
+  vesselName      String?
+  vesselImo       String?
+  voyageNumber    String?
+  carrierTrackingUrl String?
+  containerStatus String?
+  originPort      String?
+  destinationPort String?
+  currentCountry  String?
+  currentPort     String?
+  transitPorts    Json?
+  eta             DateTime?
+  currentStatus   ShipmentStatus  @default(PURCHASED)
+  deliveredAt     DateTime?
+  amountUsd       Decimal?        @db.Decimal(12, 2)
+  paidUsd         Decimal?        @db.Decimal(12, 2)
+  notes           String?
+  adminNotes      String?
+  createdById     String?
+  createdBy       User?           @relation("OrderCreator", fields: [createdById], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  events    TrackingEvent[]
+  documents Document[]
+  photos    OrderPhoto[]
+  invoices  Invoice[]
+  contracts Contract[]
+
+  @@index([trackingCode])
+  @@index([currentStatus])
+  @@index([vin])
+}
+
+model ContactInquiry {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model TrackingEvent {
+  id          String          @id @default(cuid())
+  orderId     String
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status      ShipmentStatus
+  title       String
+  description String?
+  country     String?
+  port        String?
+  occurredAt  DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+
+  @@index([orderId, occurredAt])
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  title     String
+  type      String
+  url       String
+  createdAt DateTime @default(now())
+}
+
+model OrderPhoto {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  url       String
+  caption   String?
+  category  String  @default("auction")
+  createdAt DateTime @default(now())
+}
+
+model Invoice {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  number    String   @unique
+  amountUsd Decimal  @db.Decimal(12, 2)
+  status    String   @default("issued")
+  issuedAt  DateTime @default(now())
+  pdfUrl    String?
+}
+
+model SavedVehicle {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vehicleId  String
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([customerId, vehicleId])
+}
+
+model Testimonial {
+  id          String   @id @default(cuid())
+  name        String
+  role        String?
+  rating      Int      @default(5)
+  body        String
+  locale      String   @default("az")
+  avatarUrl   String?
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model BlogPost {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  excerpt   String
+  content   String
+  coverUrl  String?
+  locale    String   @default("en")
+  published Boolean  @default(false)
+  seoTitle  String?
+  seoDesc   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Message {
+  id         String    @id @default(cuid())
+  customerId String?
+  customer   Customer? @relation("CustomerMessages", fields: [customerId], references: [id])
+  senderId   String?
+  sender     User?     @relation("MessageSender", fields: [senderId], references: [id])
+  body       String
+  isRead     Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+}
+
+model Notification {
+  id     String   @id @default(cuid())
+  userId String?
+  user   User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel String
+  title  String
+  body   String
+  sentAt DateTime @default(now())
+  meta   Json?
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  ip        String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+}
+
+model Setting {
+  key   String @id
+  value Json
+}
+
+enum ContractStatus {
+  DRAFT
+  SENT
+  PHONE_VERIFIED
+  READ
+  SIGNED
+  VOID
+}
+
+enum ContractOtpPurpose {
+  PHONE_VERIFY
+  SIGN_CONFIRM
+}
+
+model Contract {
+  id     String         @id @default(cuid())
+  number String         @unique
+  token  String         @unique
+  status ContractStatus @default(DRAFT)
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  orderId    String?
+  order      Order?    @relation(fields: [orderId], references: [id])
+
+  customerName      String
+  customerPhone     String
+  customerEmail     String?
+  customerAddress   String?
+  customerIdNumber  String?
+
+  trackingCode String?
+  vin          String?
+  make         String?
+  model        String?
+  year         Int?
+  origin       String?
+  amountUsd    Decimal? @db.Decimal(12, 2)
+  amountAzn    Decimal? @db.Decimal(12, 2)
+  paymentNote  String?
+  extraTerms   String?  @db.Text
+  locale       String   @default("az")
+  version      String   @default("2026.1")
+
+  bodySnapshot Json
+
+  phoneVerifiedAt DateTime?
+  readAt          DateTime?
+  signedAt        DateTime?
+  voidedAt        DateTime?
+
+  signaturePng    String? @db.Text
+  documentHash    String?
+  signerIp        String?
+  signerUserAgent String?
+
+  sessionTokenHash String?
+  sessionExpiresAt DateTime?
+  lastOtpPreview   String?
+
+  pdfBytes Bytes?
+
+  sentWhatsappAt DateTime?
+  sentEmailAt    DateTime?
+  notifyMeta     Json?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  otps ContractOtp[]
+
+  @@index([status])
+  @@index([customerPhone])
+  @@index([createdAt])
+}
+
+model ContractOtp {
+  id         String             @id @default(cuid())
+  contractId String
+  contract   Contract           @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  purpose    ContractOtpPurpose
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int                @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime           @default(now())
+
+  @@index([contractId, purpose])
+}
