@@ -159,7 +159,6 @@ export async function createContract(input: Record<string, string | number | und
   const whatsapp = await sendPlainMessage(phone, text);
   const row: StoredContract = {
     id: crypto.randomUUID(),
-    number,
     token,
     status: "SENT",
     ...fields,

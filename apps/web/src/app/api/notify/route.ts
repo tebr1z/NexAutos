@@ -12,6 +12,12 @@ export async function POST(req: Request) {
   if (!body?.trackingCode || !body?.status) {
     return NextResponse.json({ sent: false, error: "invalid" }, { status: 400 });
   }
-  const result = await sendStatusSms(body);
+  const result = await sendStatusSms({
+    phone: body.phone,
+    trackingCode: body.trackingCode,
+    status: body.status,
+    make: body.make,
+    model: body.model,
+  });
   return NextResponse.json(result);
 }

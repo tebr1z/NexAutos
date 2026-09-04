@@ -27,7 +27,9 @@ export function isPhotoCategory(value?: string | null): value is PhotoCategory {
 export type PhotosByCategory = Record<PhotoCategory, string[]>;
 
 export function emptyPhotos(): PhotosByCategory {
-  return Object.fromEntries(PHOTO_CATEGORIES.map((c) => [c, []])) as PhotosByCategory;
+  const photos = {} as PhotosByCategory;
+  for (const category of PHOTO_CATEGORIES) photos[category] = [];
+  return photos;
 }
 
 export function flattenPhotos(photos: PhotosByCategory) {
