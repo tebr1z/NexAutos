@@ -1,6 +1,13 @@
-import { AuctionHouse, Prisma } from '@prisma/client';
+import type { AuctionHouse, Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsArray, IsEmail, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
+
+const AUCTION_HOUSES = {
+  COPART: 'COPART',
+  IAAI: 'IAAI',
+  MANHEIM: 'MANHEIM',
+  OTHER: 'OTHER',
+} as const;
 
 export class CreateOrderDto {
   @IsString()
@@ -18,7 +25,7 @@ export class CreateOrderDto {
   vin: string;
 
   @IsOptional()
-  @IsEnum(AuctionHouse)
+  @IsEnum(AUCTION_HOUSES)
   auctionHouse?: AuctionHouse;
 
   @IsOptional()
