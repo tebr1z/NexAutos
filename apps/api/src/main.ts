@@ -9,7 +9,7 @@ async function bootstrap() {
   jwtSecret();
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('api/v1');
-  app.use(helmet());
+  app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   const origins = (process.env.CORS_ORIGIN ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000')
     .split(',')
     .map((item) => item.trim())
