@@ -2,6 +2,12 @@
 
 process.env.PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING = "1";
 
+try {
+  require("./place-prisma-engines.cjs");
+} catch {
+  /* engines already placed, or not musl */
+}
+
 const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");

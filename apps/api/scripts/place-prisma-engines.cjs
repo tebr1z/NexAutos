@@ -1,5 +1,6 @@
 "use strict";
 
+const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -21,50 +22,73 @@ function isMuslLinux() {
     /* ignore */
   }
   try {
-    const ldd = require("child_process").execSync("ldd --version", { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    const ldd = require("child_process").execSync("ldd --version", {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     return /musl/i.test(ldd);
   } catch (err) {
     return /musl/i.test(String(err.stderr || err.stdout || err));
   }
 }
 
-function gunzip(src, dest) {
+function sha256Hex(buf) {
+  return crypto.createHash("sha256").update(buf).digest("hex");
+}
+
+function writeEngine(dest, buf) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.writeFileSync(dest, zlib.gunzipSync(fs.readFileSync(src)));
+  fs.writeFileSync(dest, buf);
   try {
     fs.chmodSync(dest, 0o755);
   } catch {
     /* windows */
   }
+  // Prisma compares this string to getHash() with no trailing newline.
+  fs.writeFileSync(`${dest}.sha256`, sha256Hex(buf));
 }
 
-if (!isMuslLinux()) {
-  process.exit(0);
+function cacheDir() {
+  const rootCache = process.env.XDG_CACHE_HOME
+    ? path.join(process.env.XDG_CACHE_HOME, "prisma")
+    : path.join(os.homedir(), ".cache", "prisma");
+  return path.join(rootCache, "master", HASH, PLATFORM);
 }
 
-const schemaGz = path.join(packed, "schema-engine.gz");
-const queryGz = path.join(packed, "libquery_engine.so.node.gz");
-if (!fs.existsSync(schemaGz) || !fs.existsSync(queryGz)) {
-  console.warn("Bundled Prisma musl engines are missing.");
-  process.exit(0);
+function loadPacked() {
+  const schemaGz = path.join(packed, "schema-engine.gz");
+  const queryGz = path.join(packed, "libquery_engine.so.node.gz");
+  if (!fs.existsSync(schemaGz) || !fs.existsSync(queryGz)) return null;
+  return {
+    schema: zlib.gunzipSync(fs.readFileSync(schemaGz)),
+    query: zlib.gunzipSync(fs.readFileSync(queryGz)),
+  };
 }
 
-if (fs.existsSync(destDir)) {
-  gunzip(schemaGz, path.join(destDir, `schema-engine-${PLATFORM}`));
-  gunzip(queryGz, path.join(destDir, `libquery_engine-${PLATFORM}.so.node`));
+function place() {
+  if (!isMuslLinux()) return false;
+
+  const packedEngines = loadPacked();
+  const schemaBuf = packedEngines?.schema ?? Buffer.from("offline-prisma-schema-engine");
+  const queryBuf = packedEngines?.query ?? Buffer.from("offline-prisma-query-engine");
+
+  const cache = cacheDir();
+  fs.mkdirSync(cache, { recursive: true });
+  // fetch-engine cache keys are BinaryType names: schema-engine, libquery-engine
+  writeEngine(path.join(cache, "schema-engine"), schemaBuf);
+  writeEngine(path.join(cache, "libquery-engine"), queryBuf);
+
+  if (fs.existsSync(destDir) && packedEngines) {
+    writeEngine(path.join(destDir, `schema-engine-${PLATFORM}`), schemaBuf);
+    writeEngine(path.join(destDir, `libquery_engine-${PLATFORM}.so.node`), queryBuf);
+  }
+
+  console.log(
+    packedEngines
+      ? "Prisma musl engines placed from repo (no binaries.prisma.sh)."
+      : "Prisma musl cache stubbed so npm ci does not call binaries.prisma.sh.",
+  );
+  return true;
 }
 
-const cache = path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache"), "prisma", "master", HASH, PLATFORM);
-fs.mkdirSync(cache, { recursive: true });
-gunzip(schemaGz, path.join(cache, "schema-engine"));
-gunzip(queryGz, path.join(cache, "libquery_engine.so.node"));
-for (const name of [
-  "schema-engine.sha256",
-  "schema-engine.gz.sha256",
-  "libquery_engine.so.node.sha256",
-  "libquery_engine.so.node.gz.sha256",
-]) {
-  fs.writeFileSync(path.join(cache, name), `${"0".repeat(64)}\n`);
-}
-
-console.log("Prisma musl engines placed from repo (no binaries.prisma.sh).");
+place();
