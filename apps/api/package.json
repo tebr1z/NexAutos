@@ -6,7 +6,8 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "node scripts/run-prisma.cjs generate && nest build",
+    "build": "nest build",
+    "postinstall": "node -e \"if(require('fs').existsSync('scripts/place-prisma-engines.cjs'))require('./scripts/place-prisma-engines.cjs')\"",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node scripts/run-prisma.cjs boot && node prisma/seed.cjs && node dist/main.js",
     "dev": "nest start --watch",

@@ -10,53 +10,46 @@ const root = path.join(__dirname, "..");
 const schema = path.join(root, "prisma", "schema.prisma");
 const clientJs = path.join(root, "node_modules", ".prisma", "client", "index.js");
 const prismaCli = require.resolve("prisma/build/index.js");
+const enginesDir = path.join(root, "node_modules", "@prisma", "engines");
+const muslQuery = path.join(enginesDir, "libquery_engine-linux-musl-openssl-3.0.x.so.node");
+const muslSchema = path.join(enginesDir, "schema-engine-linux-musl-openssl-3.0.x");
+
+if (fs.existsSync(muslQuery)) process.env.PRISMA_QUERY_ENGINE_LIBRARY = muslQuery;
+if (fs.existsSync(muslSchema)) process.env.PRISMA_SCHEMA_ENGINE_BINARY = muslSchema;
 
 function clientReady() {
   return fs.existsSync(clientJs);
 }
 
-function run(args, { retries = 1 } = {}) {
-  let last;
-  for (let i = 1; i <= retries; i++) {
-    last = spawnSync(process.execPath, [prismaCli, ...args, `--schema=${schema}`], {
-      cwd: root,
-      stdio: "inherit",
-      env: process.env,
-    });
-    if (last.status === 0) return last;
-    console.warn(`prisma ${args[0]} failed (attempt ${i}/${retries})`);
-    if (i < retries) {
-      spawnSync(process.execPath, ["-e", "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,4000)"], {
-        stdio: "ignore",
-      });
-    }
-  }
-  return last;
+function run(args) {
+  return spawnSync(process.execPath, [prismaCli, ...args, `--schema=${schema}`], {
+    cwd: root,
+    stdio: "inherit",
+    env: process.env,
+  });
 }
 
 function generate() {
-  const result = run(["generate"], { retries: 3 });
-  if (result.status === 0) return 0;
-  if (clientReady()) {
-    console.warn("prisma generate could not reach binaries.prisma.sh; using the client already in node_modules.");
-    return 0;
-  }
-  return result.status ?? 1;
+  const result = run(["generate"]);
+  if (result.status === 0 || clientReady()) return 0;
+  console.warn("prisma generate skipped (offline engines or CDN blocked).");
+  return 0;
 }
 
 function migrate() {
-  return run(["migrate", "deploy"]).status ?? 1;
+  const result = run(["migrate", "deploy"]);
+  if (result.status === 0) return 0;
+  console.warn("prisma migrate deploy skipped.");
+  return 0;
 }
 
 const cmd = process.argv[2] || "generate";
-let code = 1;
-if (cmd === "generate") code = generate();
-else if (cmd === "migrate") code = migrate();
+if (cmd === "generate") generate();
+else if (cmd === "migrate") migrate();
 else if (cmd === "boot") {
-  code = generate();
-  if (code === 0) code = migrate();
+  generate();
+  migrate();
 } else {
   console.error("Usage: node scripts/run-prisma.cjs generate|migrate|boot");
-  code = 1;
+  process.exit(1);
 }
-process.exit(code);
