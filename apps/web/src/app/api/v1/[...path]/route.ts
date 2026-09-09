@@ -32,9 +32,10 @@ async function proxy(req: Request, ctx: { params: Promise<{ path?: string[] }> }
     if (!HOP_BY_HOP.has(key.toLowerCase())) headers.set(key, value);
   });
 
-  const init: RequestInit = { method: req.method, headers, redirect: "manual" };
+  const init: RequestInit & { duplex?: "half" } = { method: req.method, headers, redirect: "manual" };
   if (req.method !== "GET" && req.method !== "HEAD") {
     init.body = await req.arrayBuffer();
+    init.duplex = "half";
   }
 
   try {
@@ -50,9 +51,21 @@ async function proxy(req: Request, ctx: { params: Promise<{ path?: string[] }> }
   }
 }
 
-export const GET = proxy;
-export const POST = proxy;
-export const PUT = proxy;
-export const PATCH = proxy;
-export const DELETE = proxy;
-export const OPTIONS = proxy;
+export async function GET(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {
+  return proxy(req, ctx);
+}
+export async function POST(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {
+  return proxy(req, ctx);
+}
+export async function PUT(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {
+  return proxy(req, ctx);
+}
+export async function PATCH(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {
+  return proxy(req, ctx);
+}
+export async function DELETE(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {
+  return proxy(req, ctx);
+}
+export async function OPTIONS(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {
+  return proxy(req, ctx);
+}
