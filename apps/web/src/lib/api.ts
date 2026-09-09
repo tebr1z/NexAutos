@@ -82,9 +82,11 @@ export type PublicContract = {
 };
 
 const API =
-  process.env.INTERNAL_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window === "undefined" ? "http://127.0.0.1:4000/api/v1" : "/api/v1");
+  typeof window === "undefined"
+    ? process.env.INTERNAL_API_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "http://127.0.0.1:4000/api/v1"
+    : process.env.NEXT_PUBLIC_API_URL || "https://api.nex.autos/api/v1";
 
 export type VesselHit = {
   name: string;
