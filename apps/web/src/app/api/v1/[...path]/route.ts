@@ -1,3 +1,5 @@
+import { nestApiBase } from "@/lib/nest-url";
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -13,14 +15,6 @@ const HOP_BY_HOP = new Set([
   "host",
   "content-length",
 ]);
-
-function nestApiBase() {
-  for (const raw of [process.env.INTERNAL_API_URL, process.env.API_PROXY_URL, process.env.NEXT_PUBLIC_API_URL]) {
-    const value = raw?.trim();
-    if (value && /^https?:\/\//i.test(value)) return value.replace(/\/$/, "");
-  }
-  return "https://api.nex.autos/api/v1";
-}
 
 async function proxy(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {
   const { path = [] } = await ctx.params;

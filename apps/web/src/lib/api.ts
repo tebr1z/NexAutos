@@ -1,3 +1,4 @@
+import { browserApiBase, nestApiBase } from "./nest-url";
 import type { TrackingShipment, VinRecord, AuthUser } from "./types";
 
 export type Inquiry = {
@@ -81,12 +82,7 @@ export type PublicContract = {
   step: "otp" | "read" | "sign" | "done" | "void";
 };
 
-const API =
-  typeof window === "undefined"
-    ? process.env.INTERNAL_API_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      "http://127.0.0.1:4000/api/v1"
-    : process.env.NEXT_PUBLIC_API_URL || "https://api.nex.autos/api/v1";
+const API = typeof window === "undefined" ? nestApiBase() : browserApiBase();
 
 export type VesselHit = {
   name: string;
@@ -202,6 +198,7 @@ export const api = {
       delivered: number;
     }>("/stats"),
   orders: () => request<TrackingShipment[]>("/orders"),
+  myOrders: () => request<TrackingShipment[]>("/orders/mine"),
   createOrder: (payload: Record<string, unknown>) =>
     request<TrackingShipment>("/orders", { method: "POST", body: JSON.stringify(payload) }),
   updateOrderStatus: (id: string, status: string, note?: string, currentTransitIndex?: number) =>

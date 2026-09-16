@@ -1,3 +1,4 @@
+import { nestApiBase } from "@/lib/nest-url";
 import {
   adminPdfHtml,
   contractHtml,
@@ -31,7 +32,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ path?: string[]
         const html = await contractHtml(path[1], true);
         return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
       } catch (err) {
-        const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
+        const api = nestApiBase();
         const res = await fetch(`${api}/contracts/public/${path[1]}/pdf`);
         if (res.ok) {
           return new Response(res.body, {

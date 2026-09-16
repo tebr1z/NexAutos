@@ -4,6 +4,8 @@
   "version": "1.0.0",
   "description": "Auto Nex – Premium car import and shipment tracking platform",
   "scripts": {
+    "build": "node scripts/build-all.cjs",
+    "start": "node scripts/start-all.cjs",
     "dev:web": "npm run dev --prefix apps/web",
     "dev:api": "npm run start:dev --prefix apps/api",
     "build:web": "npm run build --prefix apps/web",
@@ -11,5 +13,8 @@
     "db:generate": "npm run prisma:generate --prefix apps/api",
     "db:migrate": "npm run prisma:migrate --prefix apps/api",
     "db:seed": "npm run prisma:seed --prefix apps/api"
+  },
+  "engines": {
+    "node": ">=18.18"
   }
 }

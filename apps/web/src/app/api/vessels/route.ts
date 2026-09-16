@@ -1,8 +1,9 @@
+import { nestApiBase } from "@/lib/nest-url";
 import { lookupPositionByImo } from "@/lib/imo-position";
 
 export async function GET(req: Request) {
   const imo = new URL(req.url).searchParams.get("imo") ?? "";
-  const nest = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
+  const nest = nestApiBase();
   try {
     const res = await fetch(`${nest}/vessels?imo=${encodeURIComponent(imo.replace(/\D/g, ""))}`, {
       cache: "no-store",
