@@ -7,12 +7,12 @@
     "build": "node scripts/build-all.cjs",
     "start": "node scripts/start-all.cjs",
     "dev:web": "npm run dev --prefix apps/web",
-    "dev:api": "npm run start:dev --prefix apps/api",
+    "dev:api": "npm run start:dev --prefix apps/web/api",
     "build:web": "npm run build --prefix apps/web",
-    "build:api": "npm run build --prefix apps/api",
-    "db:generate": "npm run prisma:generate --prefix apps/api",
-    "db:migrate": "npm run prisma:migrate --prefix apps/api",
-    "db:seed": "npm run prisma:seed --prefix apps/api"
+    "build:api": "npm run build --prefix apps/web/api",
+    "db:generate": "npm run prisma:generate --prefix apps/web/api",
+    "db:migrate": "npm run prisma:migrate --prefix apps/web/api",
+    "db:seed": "npm run prisma:seed --prefix apps/web/api"
   },
   "engines": {
     "node": ">=18.18"

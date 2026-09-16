@@ -12,9 +12,9 @@ Premium avtomobil idxalı və göndəriş izləmə — ABŞ, Koreya və Çin. Co
 
 ```bash
 cp .env.example .env
-# apps/api/.env və apps/web/.env.local-ə eyni açarları yazın
+# apps/web/api/.env və apps/web/.env.local-ə eyni açarları yazın
 docker compose up -d postgres redis
-cd apps/api
+cd apps/web/api
 npx prisma migrate deploy
 npx prisma db seed
 npm run start:dev

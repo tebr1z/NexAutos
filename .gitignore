@@ -12,6 +12,6 @@ apps/web/.data
 uploads
 .DS_Store
 apps/web/.next
-apps/api/dist
-apps/api/generated
+apps/web/api/dist
+apps/web/api/generated
 prisma/*.db
