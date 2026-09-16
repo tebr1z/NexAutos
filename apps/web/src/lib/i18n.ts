@@ -101,7 +101,7 @@ export const dictionaries: Record<Locale, Dict> = {
       kicker: "FAQ",
       intro:
         "How Auto Nex buys, ships, tracks and contracts a car — from Copart, IAAI and Manheim to Baku. Times follow the vessel; the legal pages are on the site.",
-      more: "Still unclear? WhatsApp 070 966 81 11 · auto@nex.autos · Bakıxanov, Baku. Full rules: Terms and Privacy.",
+      more: "For further assistance, contact us via WhatsApp at 070 966 81 11 or email auto@nex.autos. See our Terms and Privacy Policy for full details.",
       items: [
         {
           q: "Which auctions do you buy from?",
@@ -113,7 +113,7 @@ export const dictionaries: Record<Locale, Dict> = {
         },
         {
           q: "Can I track my car without an account?",
-          a: "Yes. There is no customer login. Open Track, enter the code we issued (customer and car initials plus five digits). The same link can be sent by WhatsApp or SMS when a stage changes.",
+          a: "Yes. Enter the secure tracking code provided for your shipment. You can also follow all active orders from your customer account. Status notifications may be shared by WhatsApp or SMS.",
         },
         {
           q: "Do you inspect before purchase?",
@@ -194,7 +194,7 @@ export const dictionaries: Record<Locale, Dict> = {
       placeholder: "Enter VIN — e.g. 5YJ3E1EA8MF123456",
       search: "Decode VIN",
       invalid: "VIN must be 17 characters.",
-      notFound: "No record found. Our team can add this VIN from the admin panel.",
+      notFound: "No verified record was found for this VIN. Please contact our team for assistance.",
       photos: "Car Photos",
       auctionPhotos: "Auction Photos",
       damage: "Damage History",
@@ -202,7 +202,7 @@ export const dictionaries: Record<Locale, Dict> = {
     },
     track: {
       title: "Track Shipment",
-      subtitle: "Enter the code we sent you — your initial, car initial and 5 digits. No account.",
+      subtitle: "Enter your secure shipment code to view the latest status, route and delivery updates.",
       placeholder: "Tracking code",
       search: "Track",
       notFound: "No shipment found for this code.",
@@ -216,7 +216,7 @@ export const dictionaries: Record<Locale, Dict> = {
       notes: "Updates",
       invoice: "Invoice",
       customs: "Customs Status",
-      demo: "Try the live demo code",
+      demo: "Explore shipment tracking",
       carrier: "Carrier",
       vessel: "Vessel",
       imo: "IMO",
@@ -239,7 +239,7 @@ export const dictionaries: Record<Locale, Dict> = {
     },
     vessel: {
       title: "Vessel AIS",
-      subtitle: "Search by ship name or 9-digit MMSI. Live position is served by the Auto Nex API.",
+      subtitle: "Search by vessel name or 9-digit MMSI to view the latest available AIS position.",
       placeholder: "Ship name or MMSI — e.g. WILSON or 311001769",
       search: "Find vessel",
       notFound: "No vessel in Baltic AIS. For worldwide tracking enter a 9-digit MMSI.",
@@ -385,7 +385,7 @@ export const dictionaries: Record<Locale, Dict> = {
       kicker: "FAQ",
       intro:
         "Auto Nex avtomobili necə alır, daşıyır, izləyir və müqavilələşdirir — Copart, IAAI, Manheim-dən Bakıya. Müddət gəmiyə bağlıdır; tam qaydalar Şərtlər və Məxfilik səhifələrindədir.",
-      more: "Qaldı? WhatsApp 070 966 81 11 · auto@nex.autos · Bakıxanov, Bakı. Tam mətn: İstifadə şərtləri və Məxfilik siyasəti.",
+      more: "Əlavə məlumat üçün 070 966 81 11 nömrəsi ilə WhatsApp vasitəsilə və ya auto@nex.autos ünvanından bizimlə əlaqə saxlayın. Ətraflı məlumat İstifadə şərtləri və Məxfilik siyasətində təqdim olunur.",
       items: [
         {
           q: "Hansı hərraclardan alırsınız?",
@@ -397,7 +397,7 @@ export const dictionaries: Record<Locale, Dict> = {
         },
         {
           q: "Hesab açmadan izləyə bilərəm?",
-          a: "Bəli. Müştəri girişi yoxdur. İzləmə səhifəsinə verdiyimiz kodu yazın (müştəri və maşın baş hərfləri + 5 rəqəm). Eyni keçid mərhələ dəyişəndə WhatsApp və ya SMS ilə də gedə bilər.",
+          a: "Bəli. Göndərişiniz üçün təqdim olunan təhlükəsiz izləmə kodunu daxil edin. Aktiv sifarişlərinizi müştəri kabinetindən də izləyə bilərsiniz. Status bildirişləri WhatsApp və ya SMS vasitəsilə göndərilə bilər.",
         },
         {
           q: "Alışdan əvvəl yoxlama aparırsınız?",
@@ -478,7 +478,7 @@ export const dictionaries: Record<Locale, Dict> = {
       placeholder: "VIN daxil edin — məs. 5YJ3E1EA8MF123456",
       search: "VIN oxu",
       invalid: "VIN 17 simvol olmalıdır.",
-      notFound: "Qeyd tapılmadı. Komandamız bu VIN-i admin paneldən əlavə edə bilər.",
+      notFound: "Bu VIN üzrə təsdiqlənmiş məlumat tapılmadı. Dəstək üçün komandamızla əlaqə saxlayın.",
       photos: "Avtomobil fotoları",
       auctionPhotos: "Hərrac fotoları",
       damage: "Zədə tarixçəsi",
@@ -486,7 +486,7 @@ export const dictionaries: Record<Locale, Dict> = {
     },
     track: {
       title: "Göndərişi izlə",
-      subtitle: "Sizə verdiyi kodu yazın — adınızın baş hərfi + maşının baş hərfi + 5 rəqəm. Hesab lazım deyil.",
+      subtitle: "Göndərişinizin cari vəziyyətini, marşrutunu və çatdırılma yeniliklərini görmək üçün təhlükəsiz izləmə kodunu daxil edin.",
       placeholder: "İzləmə kodu",
       search: "İzlə",
       notFound: "Bu kod üzrə göndəriş tapılmadı.",
@@ -500,7 +500,7 @@ export const dictionaries: Record<Locale, Dict> = {
       notes: "Yeniləmələr",
       invoice: "Faktura",
       customs: "Gömrük statusu",
-      demo: "Canlı demo kodunu yoxlayın",
+      demo: "İzləmə imkanları ilə tanış olun",
       carrier: "Daşıyıcı",
       vessel: "Gəmi",
       imo: "IMO",
@@ -523,7 +523,7 @@ export const dictionaries: Record<Locale, Dict> = {
     },
     vessel: {
       title: "Gəmi AIS",
-      subtitle: "Gəmi adı və ya 9 rəqəmli MMSI ilə axtarın. Mövqe Auto Nex API-dən gəlir.",
+      subtitle: "Gəmi adı və ya 9 rəqəmli MMSI ilə axtararaq mövcud olan ən son AIS mövqeyinə baxın.",
       placeholder: "Gəmi adı və ya MMSI — məs. WILSON və ya 311001769",
       search: "Gəmini tap",
       notFound: "Baltic AIS-də tapılmadı. Dünya üçün 9 rəqəmli MMSI yazın.",
@@ -669,7 +669,7 @@ export const dictionaries: Record<Locale, Dict> = {
       kicker: "FAQ",
       intro:
         "Как Auto Nex покупает, везёт, отслеживает и оформляет договор — от Copart, IAAI и Manheim до Баку. Срок зависит от судна; полные правила — в Условиях и Политике конфиденциальности.",
-      more: "Остались вопросы? WhatsApp 070 966 81 11 · auto@nex.autos · Бакиханов, Баку. Полный текст: Условия и Конфиденциальность.",
+      more: "Для дополнительной консультации свяжитесь с нами через WhatsApp по номеру 070 966 81 11 или по адресу auto@nex.autos. Подробная информация приведена в Условиях и Политике конфиденциальности.",
       items: [
         {
           q: "С каких аукционов вы покупаете?",
@@ -681,7 +681,7 @@ export const dictionaries: Record<Locale, Dict> = {
         },
         {
           q: "Можно отследить без аккаунта?",
-          a: "Да. Входа клиента нет. На странице трекинга введите выданный код (инициалы клиента и машины + пять цифр). Та же ссылка может уйти в WhatsApp или SMS при смене этапа.",
+          a: "Да. Введите защищённый код, предоставленный для вашего отправления. Все активные заказы также доступны в личном кабинете. Уведомления о статусе могут отправляться через WhatsApp или SMS.",
         },
         {
           q: "Вы проверяете авто до покупки?",
@@ -762,7 +762,7 @@ export const dictionaries: Record<Locale, Dict> = {
       placeholder: "Введите VIN — например 5YJ3E1EA8MF123456",
       search: "Расшифровать",
       invalid: "VIN должен содержать 17 символов.",
-      notFound: "Запись не найдена. Команда может добавить VIN в админ-панели.",
+      notFound: "Подтверждённые данные по этому VIN не найдены. Обратитесь к нашей команде за поддержкой.",
       photos: "Фото автомобиля",
       auctionPhotos: "Фото с аукциона",
       damage: "История повреждений",
@@ -770,7 +770,7 @@ export const dictionaries: Record<Locale, Dict> = {
     },
     track: {
       title: "Отследить груз",
-      subtitle: "Введите код — ваша инициал, первая буква машины и 5 цифр. Аккаунт не нужен.",
+      subtitle: "Введите защищённый код отправления, чтобы увидеть актуальный статус, маршрут и информацию о доставке.",
       placeholder: "Код отслеживания",
       search: "Отследить",
       notFound: "Груз с таким кодом не найден.",
@@ -784,7 +784,7 @@ export const dictionaries: Record<Locale, Dict> = {
       notes: "Обновления",
       invoice: "Счёт",
       customs: "Таможня",
-      demo: "Попробуйте демо-код",
+      demo: "Ознакомьтесь с возможностями отслеживания",
       carrier: "Перевозчик",
       vessel: "Судно",
       imo: "IMO",
@@ -807,7 +807,7 @@ export const dictionaries: Record<Locale, Dict> = {
     },
     vessel: {
       title: "AIS судно",
-      subtitle: "Поиск по имени судна или 9-значному MMSI. Позиция приходит из Auto Nex API.",
+      subtitle: "Найдите судно по названию или 9-значному MMSI и просмотрите последнюю доступную позицию AIS.",
       placeholder: "Имя или MMSI — например WILSON или 311001769",
       search: "Найти судно",
       notFound: "Нет в Baltic AIS. Для мирового поиска введите 9-значный MMSI.",
@@ -953,7 +953,7 @@ export const dictionaries: Record<Locale, Dict> = {
       kicker: "SSS",
       intro:
         "Auto Nex arabayı nasıl alır, taşır, takip eder ve sözleşmeye bağlar — Copart, IAAI, Manheim’den Bakü’ye. Süre gemiye bağlıdır; tam kurallar Şartlar ve Gizlilik sayfalarındadır.",
-      more: "Kaldı mı? WhatsApp 070 966 81 11 · auto@nex.autos · Bakıxanov, Bakü. Tam metin: Kullanım şartları ve Gizlilik.",
+      more: "Ek bilgi için 070 966 81 11 numaralı WhatsApp hattından veya auto@nex.autos adresinden bize ulaşın. Ayrıntılar Kullanım Şartları ve Gizlilik Politikası'nda yer almaktadır.",
       items: [
         {
           q: "Hangi açık artırmalardan alıyorsunuz?",
@@ -965,7 +965,7 @@ export const dictionaries: Record<Locale, Dict> = {
         },
         {
           q: "Hesap açmadan takip edebilir miyim?",
-          a: "Evet. Müşteri girişi yoktur. Takip sayfasına verdiğimiz kodu yazın (müşteri ve araç baş harfleri + 5 rakam). Aynı bağlantı aşama değişince WhatsApp veya SMS ile de gidebilir.",
+          a: "Evet. Gönderiniz için sağlanan güvenli takip kodunu girin. Aktif siparişlerinizi müşteri hesabınızdan da takip edebilirsiniz. Durum bildirimleri WhatsApp veya SMS üzerinden iletilebilir.",
         },
         {
           q: "Satın almadan önce ekspertiz yapıyor musunuz?",
@@ -1046,7 +1046,7 @@ export const dictionaries: Record<Locale, Dict> = {
       placeholder: "VIN girin — örn. 5YJ3E1EA8MF123456",
       search: "VIN çöz",
       invalid: "VIN 17 karakter olmalıdır.",
-      notFound: "Kayıt bulunamadı. Ekibimiz VIN'i admin panelden ekleyebilir.",
+      notFound: "Bu VIN için doğrulanmış kayıt bulunamadı. Destek için ekibimizle iletişime geçin.",
       photos: "Araç fotoğrafları",
       auctionPhotos: "Açık artırma fotoğrafları",
       damage: "Hasar geçmişi",
@@ -1054,7 +1054,7 @@ export const dictionaries: Record<Locale, Dict> = {
     },
     track: {
       title: "Sevkiyat takip",
-      subtitle: "Size verilen kodu yazın — adınızın baş harfi + araç baş harfi + 5 rakam. Hesap gerekmez.",
+      subtitle: "Gönderinizin güncel durumunu, rotasını ve teslimat bilgilerini görüntülemek için güvenli takip kodunu girin.",
       placeholder: "Takip kodu",
       search: "Takip et",
       notFound: "Bu koda ait sevkiyat bulunamadı.",
@@ -1068,7 +1068,7 @@ export const dictionaries: Record<Locale, Dict> = {
       notes: "Güncellemeler",
       invoice: "Fatura",
       customs: "Gümrük durumu",
-      demo: "Canlı demo kodunu deneyin",
+      demo: "Takip özelliklerini inceleyin",
       carrier: "Taşıyıcı",
       vessel: "Gemi",
       imo: "IMO",
@@ -1091,7 +1091,7 @@ export const dictionaries: Record<Locale, Dict> = {
     },
     vessel: {
       title: "Gemi AIS",
-      subtitle: "Gemi adı veya 9 haneli MMSI ile arayın. Konum Auto Nex API üzerinden gelir.",
+      subtitle: "Gemi adı veya 9 haneli MMSI ile arama yaparak mevcut en güncel AIS konumunu görüntüleyin.",
       placeholder: "Gemi adı veya MMSI — örn. WILSON veya 311001769",
       search: "Gemiyi bul",
       notFound: "Baltic AIS'te yok. Dünya için 9 haneli MMSI girin.",

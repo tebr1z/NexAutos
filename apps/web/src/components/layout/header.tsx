@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { Menu, Moon, Search, Sun, X } from "lucide-react";
+import { Menu, Moon, Search, Sun, UserRound, X } from "lucide-react";
 import { useTheme } from "@/providers/theme-provider";
 import { Logo } from "@/components/brand/logo";
 import { CurrencySwitcher, LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { useI18n } from "@/providers/i18n-provider";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/providers/auth-provider";
 
 function NavTrackForm({
   compact,
@@ -71,6 +72,7 @@ function NavTrackForm({
 export function Header() {
   const { t } = useI18n();
   const { setTheme, resolvedTheme } = useTheme();
+  const { user } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -135,6 +137,13 @@ export function Header() {
           >
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
+          <Link
+            href={user?.role === "CUSTOMER" ? "/account" : user ? "/admin" : "/login"}
+            className={cn("rounded-full p-2 transition", onDarkHero ? "text-white hover:bg-white/15" : "text-fg hover:bg-fg/10")}
+            aria-label={user ? "Hesabım" : "Daxil ol"}
+          >
+            <UserRound size={17} />
+          </Link>
           <NavTrackForm
             onDarkHero={onDarkHero}
             label={t.nav.find}
@@ -143,15 +152,12 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2 lg:hidden">
-          <NavTrackForm
-            compact
-            onDarkHero={onDarkHero}
-            label={t.nav.find}
-            placeholder={t.track.placeholder}
-          />
+          <div className="hidden sm:block">
+            <NavTrackForm compact onDarkHero={onDarkHero} label={t.nav.find} placeholder={t.track.placeholder} />
+          </div>
           <button
             type="button"
-            className={cn(onDarkHero ? "text-white" : "text-fg")}
+            className={cn("rounded-full p-2", onDarkHero ? "text-white hover:bg-white/15" : "text-fg hover:bg-fg/10")}
             onClick={() => setOpen((v) => !v)}
             aria-label="Menu"
           >
@@ -174,6 +180,9 @@ export function Header() {
                 {l.label}
               </Link>
             ))}
+            <Link href={user?.role === "CUSTOMER" ? "/account" : user ? "/admin" : "/login"} onClick={() => setOpen(false)}>
+              {user ? "Hesabım" : "Daxil ol / Qeydiyyat"}
+            </Link>
             <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
               <LocaleSwitcher tone="bar" />
               <CurrencySwitcher tone="bar" />

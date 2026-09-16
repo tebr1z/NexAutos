@@ -183,6 +183,17 @@ export class OrdersService {
     return orders.map(mapOrder);
   }
 
+  async findMine(userId: string) {
+    await this.purgeExpiredArchive();
+    const orders = await this.prisma.order.findMany({
+      where: { customer: { userId } },
+      include: ORDER_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return orders.map(mapOrder);
+  }
+
   async findByCode(code: string) {
     await this.purgeExpiredArchive();
     const raw = code.toUpperCase();

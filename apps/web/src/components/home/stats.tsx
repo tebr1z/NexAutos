@@ -37,16 +37,16 @@ export function Stats() {
 
   return (
     <section ref={root} className="border-y border-line bg-card/40">
-      <div className="mx-auto grid max-w-7xl grid-cols-3 gap-4 px-5 py-14 md:px-8">
+      <div className="mx-auto grid max-w-7xl grid-cols-3 gap-2 px-4 py-10 sm:gap-4 sm:px-5 sm:py-14 md:px-8">
         {ITEMS.map((item) => (
           <div key={item.key} className="text-center">
-            <p className="font-display text-3xl md:text-5xl">
+            <p className="font-display text-2xl sm:text-3xl md:text-5xl">
               <span className="stat-num" data-value={item.value}>
                 0
               </span>
               {item.suffix}
             </p>
-            <p className="mt-2 text-xs text-muted md:text-sm">{t.stats[item.key]}</p>
+            <p className="mt-2 text-[11px] leading-tight text-muted sm:text-xs md:text-sm">{t.stats[item.key]}</p>
           </div>
         ))}
       </div>

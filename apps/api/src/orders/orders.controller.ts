@@ -24,6 +24,12 @@ export class OrdersController {
     return this.orders.findAll();
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('orders/mine')
+  mine(@CurrentUser() user: { id: string }) {
+    return this.orders.findMine(user.id);
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...STAFF)
   @Post('orders')

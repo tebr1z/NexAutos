@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { api } from "@/lib/api";
 import { getLocalOrder, overlayLocal } from "@/lib/local-orders";
@@ -13,6 +14,18 @@ import { useI18n } from "@/providers/i18n-provider";
 import { groupPhotos } from "@/lib/photo-categories";
 import { journeyPosition, normalizeTransits } from "@/lib/journey";
 import { ShippingNotice } from "@/components/layout/shipping-notice";
+import {
+  ArrowRight,
+  CalendarClock,
+  CarFront,
+  Check,
+  Container,
+  Download,
+  FileText,
+  MapPin,
+  Navigation,
+  Ship,
+} from "lucide-react";
 
 async function pinFromImo(shipment: TrackingShipment): Promise<TrackingShipment> {
   const imo = shipment.vesselImo?.replace(/\D/g, "") ?? "";
@@ -147,8 +160,13 @@ export function TrackingDetail({ code }: { code: string }) {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-2xl px-5 pt-32 pb-24">
-        <p className="text-muted">{error}</p>
+      <div className="mx-auto max-w-2xl px-5 pt-32 pb-24 text-center">
+        <div className="rounded-3xl border border-line bg-card px-6 py-14">
+          <MapPin className="mx-auto text-muted" size={30} />
+          <h1 className="font-display mt-5 text-3xl">Göndəriş tapılmadı</h1>
+          <p className="mt-3 text-muted">{error}</p>
+          <Link href="/track" className="mt-7 inline-flex rounded-full bg-fg px-6 py-3 text-sm text-bg">Yenidən axtar</Link>
+        </div>
       </div>
     );
   }
@@ -170,60 +188,56 @@ export function TrackingDetail({ code }: { code: string }) {
   const vessel = [data.vesselName, data.vesselImo ? `IMO ${data.vesselImo}` : ""].filter(Boolean).join(" · ");
 
   return (
-    <div className="mx-auto max-w-3xl px-5 pt-32 pb-24 md:px-8">
+    <div className="mx-auto max-w-7xl px-5 pt-32 pb-24 md:px-8 md:pt-36">
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <p className="font-mono text-sm text-royal">{data.trackingCode}</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="font-mono text-sm text-royal">{data.trackingCode}</p>
+            <span className="rounded-full bg-royal/10 px-3 py-1 text-xs font-medium text-royal">{currentLabel}</span>
+          </div>
           <h1 className="font-display mt-2 text-4xl md:text-5xl">
-            {data.year} {data.make} {data.model}
+            {[data.year, data.make, data.model].filter(Boolean).join(" ") || "Avtomobiliniz"}
           </h1>
-          <p className="mt-2 text-muted">VIN {data.vin}</p>
+          <p className="mt-2 font-mono text-sm text-muted">VIN {data.vin}</p>
         </div>
-        <div className="glass rounded-2xl p-4">
-          <QRCodeSVG value={`${SITE.url}/track/${data.trackingCode}`} size={96} bgColor="transparent" fgColor="currentColor" />
+        <div className="glass hidden items-center gap-4 rounded-2xl p-3 sm:flex">
+          <div className="pl-2 text-right"><p className="text-xs text-muted">Telefonda aç</p><p className="mt-1 text-sm">QR kodu oxudun</p></div>
+          <QRCodeSVG value={`${SITE.url}/track/${data.trackingCode}`} size={72} bgColor="transparent" fgColor="currentColor" />
         </div>
       </div>
 
-      <div className="mt-10">
+      <div className="mt-10 rounded-3xl border border-line bg-card p-5 sm:p-7">
         <div className="mb-2 flex justify-between text-sm">
-          <span>{t.track.status}</span>
-          <span className="text-royal">{currentLabel}</span>
+          <span className="text-muted">Ümumi irəliləyiş</span>
+          <span className="font-medium text-royal">{Math.round(progress)}%</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-fg/10">
+        <div className="h-2 overflow-hidden rounded-full bg-fg/10">
           <div className="h-full royal-gradient" style={{ width: `${progress}%` }} />
         </div>
+        <div className="mt-4 flex items-center gap-2 text-sm"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-royal text-white"><Navigation size={13} /></span><span>{currentLabel}</span></div>
       </div>
 
-      <ShippingNotice className="mt-8" />
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <InfoCard icon={MapPin} label="Hazırkı yer" value={location || "Dəqiqləşdirilir"} />
+        <InfoCard icon={Ship} label="Gəmi" value={data.vesselName || "Təyin edilməyib"} detail={data.vesselImo ? `IMO ${data.vesselImo}` : undefined} />
+        <InfoCard icon={Container} label="Konteyner" value={data.containerNumber || "Təyin edilməyib"} detail={data.carrierName} mono />
+        <InfoCard icon={CalendarClock} label="Təxmini çatma" value={data.eta ? formatDate(data.eta) : "Dəqiqləşdirilir"} />
+      </div>
+
+      <ShippingNotice className="mt-6" />
 
       {(route || location || vessel || data.containerNumber || data.eta) && (
-        <div className="mt-8 space-y-2 text-sm">
-          {route && <p>{route}</p>}
-          {location && <p className="text-muted">{t.track.location}: {location}</p>}
-          {vessel && <p className="text-muted">{vessel}</p>}
-          {data.containerNumber && (
-            <p className="font-mono text-muted">
-              {t.track.container} {data.containerNumber}
-            </p>
-          )}
-          {data.eta && (
-            <p className="text-muted">
-              {t.track.eta}: {formatDate(data.eta)}
-            </p>
-          )}
+        <div className="mt-8 rounded-3xl border border-line bg-card p-6">
+          <div className="flex items-center gap-3"><Navigation size={19} className="text-royal" /><div><h2 className="font-medium">Daşınma marşrutu</h2><p className="mt-1 text-xs text-muted">Başlanğıcdan təyinat nöqtəsinə qədər</p></div></div>
+          {route ? <p className="mt-6 flex flex-wrap items-center gap-2 text-sm">{[data.originPort, ...stops.map((s) => s.place), data.destinationPort].filter(Boolean).map((place, index, all) => <span key={`${place}-${index}`} className="contents"><span className="rounded-full bg-bg px-3 py-2">{place}</span>{index < all.length - 1 && <ArrowRight size={14} className="text-muted" />}</span>)}</p> : <p className="mt-5 text-sm text-muted">Marşrut məlumatı hazırlanır.</p>}
           {aisPending && <p className="text-muted">IMO üzrə AIS mövqeyi axtarılır…</p>}
         </div>
       )}
 
-      {data.lat != null && data.lng != null && (
-        <iframe
-          title={data.vesselName ?? t.track.location}
-          className="mt-8 h-[280px] w-full rounded-2xl border-0"
-          src={`https://www.openstreetmap.org/export/embed.html?bbox=${data.lng - 2.2}%2C${data.lat - 1.3}%2C${data.lng + 2.2}%2C${data.lat + 1.3}&layer=mapnik&marker=${data.lat}%2C${data.lng}`}
-        />
-      )}
-
-      <ol className="mt-14 space-y-0">
+      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,.95fr)]">
+        <section className="rounded-3xl border border-line bg-card p-6 sm:p-8">
+          <div className="flex items-center gap-3"><CarFront size={20} className="text-royal" /><div><h2 className="text-xl font-medium">Göndəriş mərhələləri</h2><p className="mt-1 text-xs text-muted">Tam status ardıcıllığı</p></div></div>
+      <ol className="mt-8 space-y-0">
         {items.map((item, i) => {
           const event = item.kind === "step" ? data.events.find((e) => e.status === item.key) : undefined;
           const when = item.kind === "transit" ? item.occurredAt : event?.occurredAt;
@@ -232,11 +246,11 @@ export function TrackingDetail({ code }: { code: string }) {
           return (
             <li key={item.id} className="grid grid-cols-[28px_1fr] gap-4">
               <div className="flex flex-col items-center">
-                <span className={`h-3 w-3 rounded-full ${done ? "bg-royal" : "bg-fg/20"} ${current ? "ring-4 ring-royal/25" : ""}`} />
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full ${done ? "bg-royal text-white" : "bg-fg/10 text-muted"} ${current ? "ring-4 ring-royal/20" : ""}`}>{done ? <Check size={13} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}</span>
                 {i < items.length - 1 && <span className={`w-px flex-1 ${done ? "bg-royal/50" : "bg-line"}`} />}
               </div>
-              <div className="pb-8">
-                <p className={current ? "text-fg" : done ? "text-fg/80" : "text-muted"}>{item.label}</p>
+              <div className="pb-7">
+                <p className={current ? "font-medium text-royal" : done ? "text-fg/80" : "text-muted"}>{item.label}</p>
                 {when ? (
                   <p className="mt-1 text-xs text-muted">{formatDate(when)}</p>
                 ) : null}
@@ -245,11 +259,24 @@ export function TrackingDetail({ code }: { code: string }) {
           );
         })}
       </ol>
+        </section>
+
+        <div className="space-y-6">
+          <section className="overflow-hidden rounded-3xl border border-line bg-card">
+            <div className="flex items-center justify-between p-5"><div><h2 className="font-medium">Canlı mövqe</h2><p className="mt-1 text-xs text-muted">{location || vessel || "Mövqe gözlənilir"}</p></div><MapPin size={20} className="text-royal" /></div>
+            {data.lat != null && data.lng != null ? <iframe title={data.vesselName ?? t.track.location} className="h-[320px] w-full border-0" src={`https://www.openstreetmap.org/export/embed.html?bbox=${data.lng - 2.2}%2C${data.lat - 1.3}%2C${data.lng + 2.2}%2C${data.lat + 1.3}&layer=mapnik&marker=${data.lat}%2C${data.lng}`} /> : <div className="flex h-52 items-center justify-center bg-bg text-sm text-muted">Koordinatlar yenilənir</div>}
+          </section>
+
+          {(data.invoice || data.documents.length > 0) && <section className="rounded-3xl border border-line bg-card p-6"><div className="flex items-center gap-3"><FileText size={19} className="text-royal" /><h2 className="font-medium">Sənədlər və ödəniş</h2></div>{data.invoice && <div className="mt-5 rounded-2xl bg-bg p-4 text-sm"><div className="flex justify-between gap-4"><span className="text-muted">Faktura {data.invoice.number}</span><span className="font-medium">${data.invoice.amountUsd.toLocaleString()}</span></div><p className="mt-2 text-xs text-royal">{data.invoice.status}</p></div>}<div className="mt-3 space-y-2">{data.documents.map((doc) => <a key={doc.url} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-line px-4 py-3 text-sm transition hover:bg-bg"><span>{doc.title}</span><Download size={15} className="text-muted" /></a>)}</div></section>}
+        </div>
+      </div>
+
+      {data.events.length > 0 && <section className="mt-8 rounded-3xl border border-line bg-card p-6 sm:p-8"><h2 className="text-xl font-medium">Yenilənmə tarixçəsi</h2><div className="mt-6 grid gap-3 md:grid-cols-2">{[...data.events].reverse().map((event, index) => <div key={`${event.occurredAt}-${index}`} className="rounded-2xl bg-bg p-4"><div className="flex items-start justify-between gap-3"><p className="text-sm font-medium">{event.title}</p><time className="shrink-0 text-xs text-muted">{formatDate(event.occurredAt)}</time></div>{event.description && <p className="mt-2 text-sm leading-6 text-muted">{event.description}</p>}{(event.port || event.country) && <p className="mt-2 text-xs text-royal">{[event.port, event.country].filter(Boolean).join(", ")}</p>}</div>)}</div></section>}
 
       {groupPhotos(data.photos).map((group) => (
-        <div key={group.key} className="mt-10">
-          <h2 className="text-sm uppercase tracking-widest text-muted">{t.photoCats[group.key] ?? t.track.photos}</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <section key={group.key} className="mt-8 rounded-3xl border border-line bg-card p-6 sm:p-8">
+          <h2 className="text-lg font-medium">{t.photoCats[group.key] ?? t.track.photos}</h2>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {group.items.map((p) => (
               <div key={p.url} className="relative aspect-[16/10] overflow-hidden rounded-2xl">
                 {p.url.startsWith("data:") || p.url.startsWith("blob:") ? (
@@ -261,8 +288,12 @@ export function TrackingDetail({ code }: { code: string }) {
               </div>
             ))}
           </div>
-        </div>
+        </section>
       ))}
     </div>
   );
+}
+
+function InfoCard({ icon: Icon, label, value, detail, mono = false }: { icon: typeof MapPin; label: string; value: string; detail?: string; mono?: boolean }) {
+  return <div className="rounded-3xl border border-line bg-card p-5"><div className="flex items-center gap-2 text-xs text-muted"><Icon size={16} className="text-royal" />{label}</div><p className={`mt-4 truncate text-sm font-medium ${mono ? "font-mono" : ""}`}>{value}</p>{detail && <p className="mt-1 truncate text-xs text-muted">{detail}</p>}</div>;
 }

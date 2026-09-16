@@ -16,7 +16,7 @@ export const PRIVACY: Record<Locale, LegalDoc> = {
         paragraphs: [
           "Fərdi məlumatların operatoru (emal edən tərəf) Auto Nex-dir. Fəaliyyət ünvanı: Bakı şəhəri, Bakıxanov qəsəbəsi. Rəsmi e-poçt: auto@nex.autos. Əsas WhatsApp və telefon xətti: 070 966 81 11. Digər xətlər: 070 964 64 66, 099 730 03 13.",
           "Fərdi məlumatlarla bağlı müraciət, düzəliş, məhdudlaşdırma, silinmə və ya etiraz üçün yazılı sorğu auto@nex.autos ünvanına və ya yuxarıdakı telefon/WhatsApp xətlərinə göndərilir. Operator sorğunu qanunla nəzərdə tutulan müddətdə, bir qayda olaraq otuz gün ərzində nəzərdən keçirir; mürəkkəb hallarda bu müddət uzadıla bilər və sizə məlumat verilir.",
-          "Bu siyasət nex.autos və əlaqəli domenlərə, izləmə səhifəsinə, admin panelinə, məsləhət (inquiry) formasına, SMS/WhatsApp bildirişlərinə və Auto Nex əməkdaşları ilə yazışmalara şamil olunur.",
+          "Bu siyasət nex.autos və əlaqəli domenlərə, izləmə xidmətinə, təhlükəsiz idarəetmə sisteminə, müraciət formasına, SMS/WhatsApp bildirişlərinə və Auto Nex əməkdaşları ilə yazışmalara şamil olunur.",
         ],
       },
       {
@@ -203,7 +203,7 @@ export const PRIVACY: Record<Locale, LegalDoc> = {
         paragraphs: [
           "The operator of personal data is Auto Nex. Place of business: Bakıxanov, Baku. Official email: auto@nex.autos. Primary WhatsApp and telephone: 070 966 81 11. Other lines: 070 964 64 66, 099 730 03 13.",
           "Requests for access, correction, restriction, erasure or objection are sent in writing to auto@nex.autos or via the telephone/WhatsApp lines above. The operator reviews the request within the period provided by law, as a rule within thirty days; complex cases may take longer, and you will be informed.",
-          "This policy covers nex.autos and related domains, tracking, the admin panel, the consultation form, SMS/WhatsApp notices and correspondence with Auto Nex staff.",
+          "This policy covers nex.autos and related domains, shipment tracking, secure management systems, the consultation form, SMS/WhatsApp notices and correspondence with Auto Nex staff.",
         ],
       },
       {
@@ -260,7 +260,7 @@ export const PRIVACY: Record<Locale, LegalDoc> = {
         title: "7. Cookies and local storage",
         paragraphs: [
           "The site uses functional cookies and browser storage. The “theme” cookie and localStorage keep light/dark mode (about 12 months). “anx_locale” stores language, “anx_currency” stores currency. They are not used to build an advertising profile.",
-          "The admin panel stores “anx_token” for sign-in. It is removed on logout. “anx_local_orders” may hold a local copy of a shipment; it may be cleared after the archive period following delivery.",
+          "The secure staff portal uses a session credential for sign-in, which is removed on logout. A limited local shipment copy may be retained temporarily and cleared after the post-delivery archive period.",
           "You may restrict cookies in the browser. Disabling functional cookies may affect language, theme and some tracking convenience. Advertising or tracking-network cookies are not installed; if that changes, this policy will be updated and consent sought where required.",
         ],
       },

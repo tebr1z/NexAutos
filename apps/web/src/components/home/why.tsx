@@ -1,9 +1,6 @@
 "use client";
 
-import { useRef } from "react";
 import { ShieldCheck, Search, Lock, Landmark, Truck, Radio } from "lucide-react";
-import gsap from "gsap";
-import { useGSAP } from "@gsap/react";
 import { useI18n } from "@/providers/i18n-provider";
 
 const CARDS = [
@@ -16,29 +13,14 @@ const CARDS = [
 ] as const;
 
 export function Why() {
-  const root = useRef<HTMLElement>(null);
   const { t } = useI18n();
 
-  useGSAP(
-    () => {
-      gsap.from(".why-card", {
-        y: 36,
-        autoAlpha: 0,
-        stagger: 0.08,
-        duration: 0.8,
-        ease: "power3.out",
-        scrollTrigger: { trigger: root.current, start: "top 75%" },
-      });
-    },
-    { scope: root },
-  );
-
   return (
-    <section ref={root} className="mx-auto max-w-7xl px-5 py-24 md:px-8">
+    <section className="mx-auto max-w-7xl px-5 py-20 md:px-8 md:py-24">
       <p className="text-[11px] uppercase tracking-[0.4em] text-muted">{t.pages.whyKicker}</p>
       <h2 className="font-display mt-3 text-4xl md:text-5xl">{t.why.title}</h2>
       <p className="mt-4 max-w-2xl text-muted">{t.why.subtitle}</p>
-      <div className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-10 grid gap-5 md:mt-14 md:grid-cols-2 lg:grid-cols-3">
         {CARDS.map((card) => (
           <article
             key={card.title}

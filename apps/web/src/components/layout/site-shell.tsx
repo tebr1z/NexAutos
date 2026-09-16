@@ -21,7 +21,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SmoothScroll>
-      <Preloader />
+      {pathname === "/" && <Preloader />}
       <Cursor />
       <Header />
       <main className="flex-1">{children}</main>

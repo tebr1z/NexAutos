@@ -37,7 +37,7 @@ export function Hero() {
   );
 
   return (
-    <section ref={root} className="relative h-[100svh] min-h-[640px] overflow-hidden">
+    <section ref={root} className="relative min-h-[620px] h-[100svh] overflow-hidden">
       <div className="hero-video absolute inset-0 h-[115%] w-full will-change-transform">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -56,30 +56,30 @@ export function Hero() {
           <source src={HERO_VIDEO} type="video/mp4" />
         </video>
       </div>
-      <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/80" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/35 to-black/90" />
       <div className="noise pointer-events-none absolute inset-0 opacity-[0.12]" />
 
-      <div className="relative z-10 mx-auto flex h-full max-w-7xl flex-col justify-end px-5 pb-24 md:px-8 md:pb-28">
-        <p className="hero-kicker text-[11px] uppercase tracking-[0.48em] text-zinc-300">{t.hero.kicker}</p>
-        <h1 className="hero-title font-display mt-5 max-w-4xl text-4xl leading-[1.05] text-white sm:text-6xl lg:text-7xl">
+      <div className="relative z-10 mx-auto flex h-full max-w-7xl flex-col justify-end px-5 pb-12 sm:pb-20 md:px-8 md:pb-24">
+        <p className="hero-kicker max-w-full text-[10px] uppercase tracking-[0.35em] text-zinc-300 sm:text-[11px] sm:tracking-[0.48em]">{t.hero.kicker}</p>
+        <h1 className="hero-title font-display mt-5 max-w-4xl text-[2.5rem] leading-[1.03] text-white sm:text-6xl lg:text-7xl">
           {t.hero.title}
         </h1>
         <p className="hero-sub mt-6 max-w-xl text-lg text-zinc-300 md:text-xl">{t.hero.subtitle}</p>
-        <div className="mt-10 flex flex-wrap items-center gap-3">
+        <div className="mt-8 grid gap-3 sm:mt-10 sm:flex sm:flex-wrap sm:items-center">
           <Link
             href="/track"
-            className="hero-cta inline-flex items-center gap-2 rounded-full bg-white px-8 py-4 text-base font-semibold text-black transition hover:bg-zinc-200"
+            className="hero-cta inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-4 text-base font-semibold text-black transition hover:bg-zinc-200"
           >
             {t.hero.track}
           </Link>
           <Link
             href="/cars"
-            className="hero-cta glass rounded-full px-7 py-3.5 text-sm text-white"
+            className="hero-cta glass rounded-full px-7 py-3.5 text-center text-sm text-white"
           >
             {t.hero.find}
           </Link>
         </div>
-        <div className="hero-scroll mt-16 flex items-center gap-3 text-[11px] uppercase tracking-[0.4em] text-zinc-400">
+        <div className="hero-scroll mt-8 hidden items-center gap-3 text-[11px] uppercase tracking-[0.4em] text-zinc-400 sm:flex lg:mt-12">
           <span className="h-10 w-px bg-zinc-500" />
           {t.hero.scroll}
         </div>

@@ -105,6 +105,8 @@ export default function AdminHomePage() {
   const [liveOcean, setLiveOcean] = useState<OceanLookup | null>(null);
   const [contracts, setContracts] = useState<ContractRecord[]>([]);
   const [contractId, setContractId] = useState("");
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   const editingOrder = editingCode ? orders.find((row) => row.trackingCode === editingCode) : null;
   const preview = previewTrackingCode(form.customerName, form.make, form.model);
@@ -169,6 +171,13 @@ export default function AdminHomePage() {
 
   const activeOrders = orders.filter((o) => !isDelivered(o.currentStatus));
   const archivedOrders = orders.filter((o) => isDelivered(o.currentStatus) && daysLeftInArchive(o.deliveredAt) > 0);
+  const filteredActiveOrders = activeOrders.filter((order) => {
+    const haystack = [order.trackingCode, order.customerName, order.vin, order.make, order.model, order.containerNumber]
+      .filter(Boolean)
+      .join(" ")
+      .toLocaleLowerCase("az");
+    return haystack.includes(query.trim().toLocaleLowerCase("az")) && (statusFilter === "ALL" || order.currentStatus === statusFilter);
+  });
 
   const signedContracts = contracts.filter((row) => row.status === "SIGNED");
   const waitingContracts = signedContracts.filter((row) => !row.trackingCode);
@@ -589,8 +598,12 @@ export default function AdminHomePage() {
       );
     }
 
+    const previewStage = parseJourney(journey, voyage.transitPorts.length);
+    const previewJourney = journeyPosition(previewStage.status, voyage.transitPorts, previewStage.transitIndex, "az");
+    const previewLabel = previewJourney.items[previewJourney.cursor]?.label ?? previewStage.status;
+
     return (
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-4xl">
         <button type="button" onClick={goList} className="text-sm text-zinc-400 hover:text-white">
           ← Siyahı
         </button>
@@ -603,6 +616,12 @@ export default function AdminHomePage() {
         {notice && (
           <p className="mt-6 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-200">{notice}</p>
         )}
+
+        <div className="mt-7 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-[0.2em] text-zinc-500">İzləmə önizləməsi</p><p className="mt-2 text-lg text-white">{previewLabel}</p></div><Link href={`/track/${editingOrder.trackingCode}`} target="_blank" className="rounded-full border border-white/15 px-4 py-2 text-xs text-sky-300">Müştəri görünüşünü aç ↗</Link></div>
+          <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-sky-400 transition-all" style={{ width: `${previewJourney.progress}%` }} /></div>
+          <div className="mt-4 grid gap-3 text-xs sm:grid-cols-3"><div className="rounded-xl bg-black/20 p-3"><p className="text-zinc-500">Hazırkı yer</p><p className="mt-1 text-zinc-200">{[voyage.currentPort, voyage.currentCountry].filter(Boolean).join(", ") || "—"}</p></div><div className="rounded-xl bg-black/20 p-3"><p className="text-zinc-500">Gəmi / IMO</p><p className="mt-1 text-zinc-200">{[voyage.vesselName, voyage.vesselImo].filter(Boolean).join(" · ") || "—"}</p></div><div className="rounded-xl bg-black/20 p-3"><p className="text-zinc-500">Konteyner</p><p className="mt-1 font-mono text-zinc-200">{form.containerNumber || "—"}</p></div></div>
+        </div>
 
         <form
           className="mt-8 space-y-6"
@@ -636,6 +655,13 @@ export default function AdminHomePage() {
               ))}
             </select>
           </label>
+
+          <div>
+            <p className="text-xs text-zinc-500">Sürətli mərhələ seçimi</p>
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+              {TRACKING_STEPS.map((step) => <button key={step.key} type="button" onClick={() => setJourney(`step:${step.key}`)} className={`shrink-0 rounded-full border px-3 py-2 text-xs ${previewStage.status === step.key ? "border-sky-400 bg-sky-400/10 text-sky-300" : "border-white/10 text-zinc-500 hover:text-white"}`}>{step.az}</button>)}
+            </div>
+          </div>
 
           <VoyageFields value={voyage} onChange={setVoyage} />
           <PhotoFields value={photos} onChange={setPhotos} />
@@ -681,7 +707,16 @@ export default function AdminHomePage() {
         <p className="mt-6 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-200">{notice}</p>
       )}
 
-      <OrdersTable orders={activeOrders} archived={false} onEdit={goEdit} onDeliver={markDelivered} />
+      <div className="mt-8 grid gap-3 rounded-2xl border border-white/10 bg-white/[0.025] p-3 sm:grid-cols-[1fr_220px]">
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Kod, müştəri, VIN, marka və ya konteyner axtar…" className={inp} />
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-sm text-white">
+          <option value="ALL">Bütün mərhələlər</option>
+          {TRACKING_STEPS.map((step) => <option key={step.key} value={step.key}>{step.az}</option>)}
+        </select>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-500"><span>{activeOrders.length} aktiv sifariş</span><span>·</span><span>{archivedOrders.length} arxiv</span>{query || statusFilter !== "ALL" ? <><span>·</span><span className="text-sky-300">{filteredActiveOrders.length} nəticə</span></> : null}</div>
+
+      <OrdersTable orders={filteredActiveOrders} archived={false} onEdit={goEdit} onDeliver={markDelivered} />
 
       <h2 id="arxiv" className="mt-16 scroll-mt-24 text-lg">
         Arxiv
@@ -769,6 +804,9 @@ function OrdersTable({
   onEdit: (order: TrackingShipment) => void;
   onDeliver: (order: TrackingShipment) => void;
 }) {
+  if (orders.length === 0) {
+    return <div className="mt-6 rounded-2xl border border-dashed border-white/10 px-6 py-12 text-center text-sm text-zinc-500">Bu seçimə uyğun maşın tapılmadı.</div>;
+  }
   return (
     <div className="mt-6 overflow-x-auto">
       <table className="w-full text-left text-sm">

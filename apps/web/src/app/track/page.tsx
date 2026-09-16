@@ -3,7 +3,7 @@ import { TrackForm } from "@/components/tracking/track-form";
 
 export const metadata: Metadata = {
   title: "Track Shipment",
-  description: "Track your Auto Nex vehicle with a unique code. No login required.",
+  description: "View your Auto Nex vehicle's latest shipment status, route and delivery updates with a secure tracking code.",
 };
 
 export default function TrackPage() {

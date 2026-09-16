@@ -89,7 +89,7 @@ export const TERMS: Record<Locale, LegalDoc> = {
         id: "izleme",
         title: "9. İzləmə kodu",
         paragraphs: [
-          "Hər göndərişə unikal izləmə kodu verilir (məsələn, müştəri və avtomobil baş hərfi + rəqəmlər). Hesab açmaq tələb olunmur.",
+          "Hər göndəriş üçün təhlükəsiz və unikal izləmə kodu təqdim olunur. Müştəri bu kodla və ya şəxsi kabinet vasitəsilə aktual status məlumatlarına baxa bilər.",
           "Koddakı mərhələlər, tarixlər, tranzitlər, foto və qeydlər məlumat məqsədlidir. Onlar gəmi AIS siqnalı və ya liman statusu ilə eyni anda sinxron olmaya bilər.",
           "Kodu üçüncü şəxslə paylaşmaq müştərinin məsuliyyətidir. Kodun itirilməsi barədə Auto Nex-ə yazılı məlumat verilməlidir.",
         ],
@@ -243,7 +243,7 @@ export const TERMS: Record<Locale, LegalDoc> = {
         id: "track",
         title: "9. Tracking code",
         paragraphs: [
-          "Each shipment receives a unique tracking code (for example client and vehicle initials plus digits). No account is required.",
+          "Each shipment receives a secure, unique tracking code. Customers can view current status information with this code or through their customer account.",
           "Stages, dates, transits, photos and notes are informational. They may not match live AIS or terminal status at every moment.",
           "Sharing the code with third parties is the client’s responsibility. Loss of the code should be notified to Auto Nex in writing.",
         ],
@@ -279,7 +279,7 @@ export const TERMS: Record<Locale, LegalDoc> = {
         title: "13. Data and privacy",
         paragraphs: [
           "Name, contact, VIN, shipment events and documents are processed only to import, track and deliver. See the Privacy page.",
-          "Tracking codes work without an account. The admin panel is for Auto Nex staff only.",
+          "Tracking codes can be used without signing in. Customer accounts provide access to active orders, while internal management systems are restricted to authorised Auto Nex personnel.",
         ],
       },
       {
@@ -397,7 +397,7 @@ export const TERMS: Record<Locale, LegalDoc> = {
         id: "track",
         title: "9. Трек-код",
         paragraphs: [
-          "Каждой отгрузке присваивается уникальный код (например, инициалы клиента и автомобиля плюс цифры). Аккаунт не требуется.",
+          "Каждому отправлению присваивается защищённый уникальный код. Актуальный статус доступен по этому коду или в личном кабинете клиента.",
           "Этапы, даты, транзиты, фото и заметки носят информационный характер и могут не совпадать с живым AIS или статусом терминала в каждый момент.",
           "Передача кода третьим лицам — ответственность клиента. Об утрате кода следует письменно сообщить Auto Nex.",
         ],
@@ -551,7 +551,7 @@ export const TERMS: Record<Locale, LegalDoc> = {
         id: "track",
         title: "9. Takip kodu",
         paragraphs: [
-          "Her sevkiyata benzersiz bir kod verilir (örneğin müşteri ve araç baş harfi artı rakamlar). Hesap açmak gerekmez.",
+          "Her gönderi için güvenli ve benzersiz bir takip kodu sağlanır. Müşteriler güncel durumu bu kodla veya müşteri hesapları üzerinden görüntüleyebilir.",
           "Aşamalar, tarihler, transitler, fotoğraflar ve notlar bilgilendirme amaçlıdır; canlı AIS veya terminal durumuyla her an örtüşmeyebilir.",
           "Kodun üçüncü kişilerle paylaşılması müşterinin sorumluluğundadır. Kayıp yazılı olarak Auto Nex’e bildirilmelidir.",
         ],

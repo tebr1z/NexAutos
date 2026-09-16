@@ -52,12 +52,18 @@ html,
 body {
   background: var(--bg);
   color: var(--fg);
+  overflow-x: clip;
 }
 
 body {
   font-family: var(--font-sans);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--royal);
+  outline-offset: 3px;
 }
 
 ::selection {

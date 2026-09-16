@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/providers/auth-provider";
 
 export default function LoginPage() {
@@ -13,8 +14,9 @@ export default function LoginPage() {
 
   return (
     <div className="mx-auto max-w-md px-5 pt-32 pb-24">
-      <h1 className="font-display text-4xl">Admin</h1>
-      <p className="mt-3 text-sm text-muted">Yalnız Auto Nex əməkdaşı. Müştəri hesabı yoxdur — izləmə kodu kifayətdir.</p>
+      <p className="text-[11px] uppercase tracking-[0.35em] text-royal">Təhlükəsiz giriş</p>
+      <h1 className="font-display mt-3 text-4xl">Hesabınıza daxil olun</h1>
+      <p className="mt-3 text-sm text-muted">Müştərilər sifarişlərini, əməkdaşlar isə idarəetmə panelini aça bilər.</p>
       <form
         className="mt-8 space-y-4"
         onSubmit={async (e) => {
@@ -22,11 +24,7 @@ export default function LoginPage() {
           setError("");
           try {
             const user = await login(email, password);
-            if (user.role === "CUSTOMER") {
-              setError("Müştəri girişi bağlıdır. İzləmə kodunu /track səhifəsinə yazın.");
-              return;
-            }
-            router.push("/admin");
+            router.push(user.role === "CUSTOMER" ? "/account" : "/admin");
           } catch (err) {
             setError(err instanceof Error ? err.message : "Giriş olmadı");
           }
@@ -40,7 +38,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="mt-1 w-full rounded-xl border border-line bg-transparent px-4 py-3 text-sm"
-            placeholder="admin@nex.autos"
+            placeholder="email@example.com"
           />
         </label>
         <label className="block text-xs text-muted">
@@ -57,6 +55,10 @@ export default function LoginPage() {
         {error && <p className="text-sm text-red-400">{error}</p>}
         <button className="w-full rounded-full bg-fg py-3 text-sm text-bg">Daxil ol</button>
       </form>
+      <p className="mt-6 text-center text-sm text-muted">
+        Müştəri hesabınız yoxdur?{" "}
+        <Link href="/register" className="text-fg underline underline-offset-4">Qeydiyyatdan keçin</Link>
+      </p>
     </div>
   );
 }
