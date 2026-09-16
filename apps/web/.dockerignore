@@ -4,5 +4,9 @@ node_modules
 .env
 .env.*
 api/dist
+api/node_modules
+api/test
+api/coverage
+**/*.spec.ts
 *.md
 .git
