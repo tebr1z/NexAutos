@@ -2,7 +2,7 @@ export const TRACKING_STEPS = [
   { key: "PURCHASED", en: "Purchased", az: "Alınıb", ru: "Куплено", tr: "Satın alındı" },
   { key: "AUCTION_PAID", en: "Auction Paid", az: "Hərrac ödənilib", ru: "Аукцион оплачен", tr: "Açık artırma ödendi" },
   { key: "PICKED_UP", en: "Picked Up", az: "Götürülüb", ru: "Забрано", tr: "Teslim alındı" },
-  { key: "EXPORT_DOCUMENTS", en: "Export Documents", az: "İxrac sənədləri", ru: "Экспортные документы", tr: "İhracat evrakları" },
+  { key: "EXPORT_DOCUMENTS", en: "Export documents ready", az: "İxrac sənədləri hazırdır", ru: "Экспортные документы готовы", tr: "İhracat evrakları hazır" },
   { key: "ARRIVED_PORT", en: "Arrived Port", az: "Limana çatıb", ru: "Прибыло в порт", tr: "Limana vardı" },
   { key: "LOADED_CONTAINER", en: "Loaded Container", az: "Konteynerə yüklənib", ru: "Загружено в контейнер", tr: "Konteynere yüklendi" },
   { key: "SHIP_DEPARTED", en: "Ship Departed", az: "Gəmi yola düşüb", ru: "Судно отправилось", tr: "Gemi yola çıktı" },
@@ -18,6 +18,23 @@ export const TRACKING_STEPS = [
 ] as const;
 
 export type ShipmentStatus = (typeof TRACKING_STEPS)[number]["key"] | "CANCELLED";
+
+/** WhatsApp/SMS yalnız bu mərhələlərdə — qalanları izləmə səhifəsində görünür, mesaj getmir. */
+export const SMS_NOTIFY_STATUSES = [
+  "PURCHASED",
+  "EXPORT_DOCUMENTS",
+  "LOADED_CONTAINER",
+  "SHIP_DEPARTED",
+  "DESTINATION_PORT",
+  "TIR_BAKU_CUSTOMS",
+  "READY_FOR_DELIVERY",
+  "DELIVERED",
+  "CANCELLED",
+] as const;
+
+export function shouldNotifyStatus(status: string) {
+  return (SMS_NOTIFY_STATUSES as readonly string[]).includes(status);
+}
 
 export const DESTINATION_PORTS = [
   { value: "Batumi", az: "Batum", en: "Batumi", ru: "Батуми", tr: "Batum", country: "Georgia" },

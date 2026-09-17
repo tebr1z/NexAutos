@@ -5,7 +5,7 @@ const STATUS_AZ: Record<string, string> = {
   PURCHASED: 'Alınıb',
   AUCTION_PAID: 'Hərrac ödənilib',
   PICKED_UP: 'Götürülüb',
-  EXPORT_DOCUMENTS: 'İxrac sənədləri',
+  EXPORT_DOCUMENTS: 'İxrac sənədləri hazırdır',
   ARRIVED_PORT: 'Limana çatıb',
   LOADED_CONTAINER: 'Konteynerə yüklənib',
   SHIP_DEPARTED: 'Gəmi yola düşüb',
@@ -45,6 +45,22 @@ export function statusLabelAz(status: string) {
   return STATUS_AZ[status] ?? status.replaceAll('_', ' ');
 }
 
+const SMS_NOTIFY_STATUSES = new Set([
+  'PURCHASED',
+  'EXPORT_DOCUMENTS',
+  'LOADED_CONTAINER',
+  'SHIP_DEPARTED',
+  'DESTINATION_PORT',
+  'TIR_BAKU_CUSTOMS',
+  'READY_FOR_DELIVERY',
+  'DELIVERED',
+  'CANCELLED',
+]);
+
+export function shouldNotifyStatus(status: string) {
+  return SMS_NOTIFY_STATUSES.has(status);
+}
+
 export function statusSmsBody(input: {
   trackingCode: string;
   status: string;
@@ -79,6 +95,7 @@ export class NotifyService {
     make?: string | null;
     model?: string | null;
   }): Promise<NotifyResult> {
+    if (!shouldNotifyStatus(input.status)) return { sent: false, error: 'skipped' };
     const to = normalizePhone(input.phone);
     if (!to) return { sent: false, error: 'no_phone' };
     const body = statusSmsBody({ ...input, siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? process.env.CORS_ORIGIN });

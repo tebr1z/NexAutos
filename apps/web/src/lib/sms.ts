@@ -1,8 +1,10 @@
+import { shouldNotifyStatus } from "./constants";
+
 const STATUS_AZ: Record<string, string> = {
   PURCHASED: "Alınıb",
   AUCTION_PAID: "Hərrac ödənilib",
   PICKED_UP: "Götürülüb",
-  EXPORT_DOCUMENTS: "İxrac sənədləri",
+  EXPORT_DOCUMENTS: "İxrac sənədləri hazırdır",
   ARRIVED_PORT: "Limana çatıb",
   LOADED_CONTAINER: "Konteynerə yüklənib",
   SHIP_DEPARTED: "Gəmi yola düşüb",
@@ -62,6 +64,7 @@ export async function sendStatusSms(input: {
   make?: string | null;
   model?: string | null;
 }): Promise<NotifyResult> {
+  if (!shouldNotifyStatus(input.status)) return { sent: false, error: "skipped" };
   const to = normalizePhone(input.phone);
   if (!to) return { sent: false, error: "no_phone" };
   const body = statusSmsBody(input);

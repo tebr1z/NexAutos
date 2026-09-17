@@ -38,6 +38,7 @@ const EMPTY_FORM = {
 };
 
 function stageNotice(label: string, phone: string | undefined, notify?: NotifyInfo) {
+  if (notify?.error === "skipped") return `${label} yeniləndi. Bu mərhələ üçün WhatsApp/SMS getmir.`;
   if (!normalizePhone(phone)) return `${label} yeniləndi. WhatsApp nömrəsi yoxdur — SMS getmədi.`;
   if (notify?.sent) return `${label} yeniləndi. Müştəriyə SMS göndərildi.`;
   if (notify?.error === "not_configured") {
