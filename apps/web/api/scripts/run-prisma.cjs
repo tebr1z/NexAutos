@@ -52,8 +52,15 @@ function generate() {
 function migrate() {
   const result = run(["migrate", "deploy"]);
   if (result.status === 0) return 0;
-  console.warn("prisma migrate deploy skipped.");
-  return 0;
+  console.warn("prisma migrate deploy failed; applying SQL with the query engine.");
+  const fallback = spawnSync(process.execPath, [path.join(__dirname, "apply-sql.cjs")], {
+    cwd: root,
+    stdio: "inherit",
+    env: process.env,
+  });
+  if (fallback.status === 0) return 0;
+  console.error("Database tables were not created. Login will fail with P2021 until migrations apply.");
+  return fallback.status || 1;
 }
 
 const cmd = process.argv[2] || "generate";

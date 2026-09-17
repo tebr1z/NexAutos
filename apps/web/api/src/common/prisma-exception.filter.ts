@@ -29,11 +29,15 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     if (prismaError) {
       const code = "code" in exception && exception.code ? String(exception.code) : "PRISMA";
       console.error("Prisma error", code, exception.message);
+      const message =
+        code === "P2021"
+          ? "Cədvəllər yoxdur — miqrasiya tətbiq olunmayıb"
+          : "Verilənlər bazası əlçatan deyil";
       return res.status(HttpStatus.SERVICE_UNAVAILABLE).json({
         statusCode: HttpStatus.SERVICE_UNAVAILABLE,
         error: "Database unavailable",
         code,
-        message: "Verilənlər bazası əlçatan deyil",
+        message,
       });
     }
 
