@@ -1,5 +1,5 @@
-const HTTP_TIMEOUT_MS = 12_000;
-const AISSTREAM_WAIT_MS = 90_000;
+const HTTP_TIMEOUT_MS = 8_000;
+const AISSTREAM_WAIT_MS = 75_000;
 const VESSEL_CACHE_TTL_MS = 180_000;
 const POSITION_CACHE_TTL_MS = 15 * 60_000;
 const AISSTREAM_URL = 'wss://stream.aisstream.io/v0/stream';
@@ -72,6 +72,7 @@ type DigitraffficVessel = {
 let vesselCache: { at: number; rows: DigitraffficVessel[] } = { at: 0, rows: [] };
 let aisstreamDownUntil = 0;
 const positionCache = new Map<string, { at: number; pos: VesselPosition }>();
+const inflight = new Map<string, Promise<VesselPosition>>();
 
 export function emptyPosition(mmsi: number, extra?: Partial<VesselPosition>): VesselPosition {
   return {
@@ -394,32 +395,49 @@ function positionFromAisStream(mmsi: string, apiKey: string): Promise<VesselPosi
   });
 }
 
-export async function fetchVesselPosition(mmsi: string, aisstreamKey?: string): Promise<VesselPosition> {
+export function peekVesselPosition(mmsi: string): VesselPosition | null {
   const cached = positionCache.get(mmsi);
   if (cached && Date.now() - cached.at < POSITION_CACHE_TTL_MS && cached.pos.hasCoordinates) {
     return cached.pos;
   }
+  return null;
+}
 
-  const remember = (pos: VesselPosition) => {
-    if (pos.hasCoordinates) positionCache.set(mmsi, { at: Date.now(), pos });
-    return pos;
-  };
+function rememberPosition(mmsi: string, pos: VesselPosition) {
+  if (pos.hasCoordinates) positionCache.set(mmsi, { at: Date.now(), pos });
+  return pos;
+}
 
+async function resolveLivePosition(mmsi: string, aisstreamKey?: string): Promise<VesselPosition> {
   const key = aisstreamKey?.trim();
   if (key && Date.now() > aisstreamDownUntil) {
     try {
-      return remember(await positionFromAisStream(mmsi, key));
+      return rememberPosition(mmsi, await positionFromAisStream(mmsi, key));
     } catch (err) {
       const aisErr = err as AisError;
       if (aisErr.status === 401) throw aisErr;
-      // Timeout (504) = gəmi hələ paket göndərməyib. AISStream-i söndürmə.
       if (aisErr.status === 502) aisstreamDownUntil = Date.now() + 60_000;
     }
   }
 
   const fallback = await positionDigitraffic(mmsi).catch(() => null);
-  if (fallback?.hasCoordinates) return remember(fallback);
-  if (cached?.pos.hasCoordinates) return cached.pos;
+  if (fallback?.hasCoordinates) return rememberPosition(mmsi, fallback);
+  const cached = peekVesselPosition(mmsi);
+  if (cached) return cached;
   if (fallback) return fallback;
   return emptyPosition(Number(mmsi), { source: 'ais' });
+}
+
+/** HTTP-ni 90s saxlama — AIS arxada doldurulur, növbəti sorğu keşdən gəlir. */
+export function warmVesselPosition(mmsi: string, aisstreamKey?: string) {
+  if (!mmsi || peekVesselPosition(mmsi) || inflight.has(mmsi)) return;
+  const job = resolveLivePosition(mmsi, aisstreamKey).finally(() => inflight.delete(mmsi));
+  inflight.set(mmsi, job);
+}
+
+export async function fetchVesselPosition(mmsi: string, aisstreamKey?: string): Promise<VesselPosition> {
+  const cached = peekVesselPosition(mmsi);
+  if (cached) return cached;
+  warmVesselPosition(mmsi, aisstreamKey);
+  return emptyPosition(Number(mmsi), { source: 'ais-pending' });
 }

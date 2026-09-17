@@ -89,6 +89,27 @@ async function locateShipment(shipment: TrackingShipment) {
   return pinFromPorts({ ...shipment, lat: undefined, lng: undefined });
 }
 
+async function refreshImoUntilPinned(
+  shipment: TrackingShipment,
+  onUpdate: (next: TrackingShipment) => void,
+  cancelled: () => boolean,
+) {
+  let current = await locateShipment(shipment);
+  if (cancelled()) return current;
+  onUpdate(current);
+  if (!current.vesselImo || current.lat != null || !isLiveVesselMapStatus(current.currentStatus)) {
+    return current;
+  }
+  for (let i = 0; i < 12 && !cancelled(); i++) {
+    await new Promise((r) => setTimeout(r, 5000));
+    if (cancelled()) return current;
+    current = await pinFromImo(current);
+    onUpdate(current);
+    if (current.lat != null) break;
+  }
+  return current;
+}
+
 function seedShipment(code: string) {
   return getLocalOrder(code);
 }
@@ -141,7 +162,7 @@ export function TrackingDetail({ code }: { code: string }) {
         const merged = overlayLocal(shipment, code);
         setData(merged);
         if (merged.vesselImo) setAisPending(true);
-        const withImo = await locateShipment(merged);
+        const withImo = await refreshImoUntilPinned(merged, (next) => setData(next), () => cancelled);
         if (cancelled) return;
         setAisPending(false);
         setData(withImo);
@@ -158,7 +179,7 @@ export function TrackingDetail({ code }: { code: string }) {
         if (seed) {
           if (cancelled) return;
           if (seed.vesselImo) setAisPending(true);
-          const withImo = await locateShipment(seed);
+          const withImo = await refreshImoUntilPinned(seed, (next) => setData(next), () => cancelled);
           if (cancelled) return;
           setAisPending(false);
           setData(withImo);

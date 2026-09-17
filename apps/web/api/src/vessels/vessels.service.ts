@@ -1,6 +1,6 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AisError, emptyPosition, fetchVesselPosition, searchVesselsByImo, searchVesselsByName, type VesselHit, type VesselPosition } from './ais';
+import { AisError, emptyPosition, peekVesselPosition, warmVesselPosition, searchVesselsByImo, searchVesselsByName, type VesselHit, type VesselPosition } from './ais';
 import { mmsiFromWikidata } from './imo-lookup';
 
 @Injectable()
@@ -25,7 +25,10 @@ export class VesselsService {
 
   async position(mmsi: string): Promise<VesselPosition> {
     try {
-      return await fetchVesselPosition(mmsi, this.aisKey());
+      const cached = peekVesselPosition(mmsi);
+      warmVesselPosition(mmsi, this.aisKey());
+      if (cached) return cached;
+      return emptyPosition(Number(mmsi), { source: 'ais-pending' });
     } catch (err) {
       this.rethrow(err);
     }
@@ -66,18 +69,15 @@ export class VesselsService {
       return name ? emptyPosition(0, { source: 'imo', name, imo: Number(digits) }) : null;
     }
 
-    try {
-      const pos = await this.position(mmsi);
-      return {
-        ...pos,
-        imo: Number(digits),
-        name: pos.name || name,
-        mmsi: Number(mmsi),
-      };
-    } catch (err) {
-      if (err instanceof AisError && err.status === 401) this.rethrow(err);
-      return emptyPosition(Number(mmsi), { source: 'imo', name, imo: Number(digits) });
-    }
+    const cached = peekVesselPosition(mmsi);
+    warmVesselPosition(mmsi, this.aisKey());
+    const pos = cached ?? emptyPosition(Number(mmsi), { source: 'imo', name, imo: Number(digits) });
+    return {
+      ...pos,
+      imo: Number(digits),
+      name: pos.name || name,
+      mmsi: Number(mmsi),
+    };
   }
 
   private rethrow(err: unknown): never {
