@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { api } from "@/lib/api";
-import { getLocalOrder, overlayLocal } from "@/lib/local-orders";
 import { SITE, TRACKING_STEPS, isLiveVesselMapStatus } from "@/lib/constants";
 import type { TrackingShipment } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
@@ -27,14 +26,22 @@ import {
   Ship,
 } from "lucide-react";
 
+function withManualPin(shipment: TrackingShipment): TrackingShipment {
+  if (shipment.lat != null && shipment.lng != null) return shipment;
+  if (shipment.mapLat != null && shipment.mapLng != null) {
+    return { ...shipment, lat: shipment.mapLat, lng: shipment.mapLng };
+  }
+  return shipment;
+}
+
 async function pinFromImo(shipment: TrackingShipment): Promise<TrackingShipment> {
   const imo = shipment.vesselImo?.replace(/\D/g, "") ?? "";
-  if (imo.length !== 7) return shipment;
+  if (imo.length !== 7) return withManualPin(shipment);
   try {
     const pos = await api.vesselByImo(imo);
     const name = pos?.name?.trim() || shipment.vesselName;
     if (!pos?.hasCoordinates || pos.latitude == null || pos.longitude == null) {
-      return { ...shipment, vesselName: name, vesselImo: shipment.vesselImo || imo };
+      return withManualPin({ ...shipment, vesselName: name, vesselImo: shipment.vesselImo || imo });
     }
     return {
       ...shipment,
@@ -44,7 +51,7 @@ async function pinFromImo(shipment: TrackingShipment): Promise<TrackingShipment>
       vesselImo: shipment.vesselImo || (pos.imo ? String(pos.imo) : imo),
     };
   } catch {
-    return shipment;
+    return withManualPin(shipment);
   }
 }
 
@@ -80,13 +87,14 @@ async function pinFromPorts(shipment: TrackingShipment): Promise<TrackingShipmen
 }
 
 async function locateShipment(shipment: TrackingShipment) {
-  if (shipment.vesselImo && isLiveVesselMapStatus(shipment.currentStatus)) {
-    return pinFromImo(shipment);
+  const seeded = withManualPin(shipment);
+  if (seeded.vesselImo && isLiveVesselMapStatus(seeded.currentStatus)) {
+    const live = await pinFromImo(seeded);
+    if (live.lat != null && live.lng != null) return live;
+    return pinFromPorts(withManualPin(live));
   }
-  if (shipment.mapLat != null && shipment.mapLng != null) {
-    return { ...shipment, lat: shipment.mapLat, lng: shipment.mapLng };
-  }
-  return pinFromPorts({ ...shipment, lat: undefined, lng: undefined });
+  if (seeded.mapLat != null && seeded.mapLng != null) return seeded;
+  return pinFromPorts({ ...seeded, lat: undefined, lng: undefined });
 }
 
 async function refreshImoUntilPinned(
@@ -94,24 +102,30 @@ async function refreshImoUntilPinned(
   onUpdate: (next: TrackingShipment) => void,
   cancelled: () => boolean,
 ) {
-  let current = await locateShipment(shipment);
+  let current = withManualPin(shipment);
   if (cancelled()) return current;
   onUpdate(current);
-  if (!current.vesselImo || current.lat != null || !isLiveVesselMapStatus(current.currentStatus)) {
-    return current;
-  }
+  current = await locateShipment(current);
+  if (cancelled()) return current;
+  onUpdate(current);
+  const waitingAis =
+    Boolean(current.vesselImo) &&
+    isLiveVesselMapStatus(current.currentStatus) &&
+    current.mapLat != null &&
+    current.lat === current.mapLat;
+  if (!current.vesselImo || !isLiveVesselMapStatus(current.currentStatus)) return current;
+  if (current.lat != null && !waitingAis) return current;
   for (let i = 0; i < 12 && !cancelled(); i++) {
     await new Promise((r) => setTimeout(r, 5000));
     if (cancelled()) return current;
-    current = await pinFromImo(current);
-    onUpdate(current);
-    if (current.lat != null) break;
+    const next = await pinFromImo(current);
+    if (next.lat != null && next.lng != null) {
+      current = next;
+      onUpdate(current);
+      if (current.mapLat == null || current.lat !== current.mapLat) break;
+    }
   }
-  return current;
-}
-
-function seedShipment(code: string) {
-  return getLocalOrder(code);
+  return withManualPin(current);
 }
 
 function keepLocalRoute(prev: TrackingShipment, ocean: Partial<TrackingShipment>): TrackingShipment {
@@ -127,8 +141,14 @@ function keepLocalRoute(prev: TrackingShipment, ocean: Partial<TrackingShipment>
     destinationPort: prev.destinationPort || ocean.destinationPort,
     containerStatus: prev.containerStatus || ocean.containerStatus,
     eta: prev.eta || ocean.eta,
-    lat: prev.vesselImo && isLiveVesselMapStatus(prev.currentStatus) ? prev.lat : prev.lat ?? ocean.lat,
-    lng: prev.vesselImo && isLiveVesselMapStatus(prev.currentStatus) ? prev.lng : prev.lng ?? ocean.lng,
+    lat:
+      prev.vesselImo && isLiveVesselMapStatus(prev.currentStatus)
+        ? (prev.lat ?? prev.mapLat)
+        : (prev.lat ?? ocean.lat),
+    lng:
+      prev.vesselImo && isLiveVesselMapStatus(prev.currentStatus)
+        ? (prev.lng ?? prev.mapLng)
+        : (prev.lng ?? ocean.lng),
   };
 }
 
@@ -147,21 +167,19 @@ export function TrackingDetail({ code }: { code: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    const seed = seedShipment(code);
-    if (seed) {
-      setData(seed);
-      setError("");
-    } else {
-      setData(null);
-    }
+    setData(null);
+    setError("");
 
     api
       .track(code)
       .then(async (shipment) => {
         if (cancelled) return;
-        const merged = overlayLocal(shipment, code);
+        const merged = withManualPin(shipment);
         setData(merged);
-        if (merged.vesselImo) setAisPending(true);
+        setError("");
+        if (merged.vesselImo && isLiveVesselMapStatus(merged.currentStatus) && merged.mapLat == null) {
+          setAisPending(true);
+        }
         const withImo = await refreshImoUntilPinned(merged, (next) => setData(next), () => cancelled);
         if (cancelled) return;
         setAisPending(false);
@@ -175,16 +193,7 @@ export function TrackingDetail({ code }: { code: string }) {
           /* keep merged shipment */
         }
       })
-      .catch(async () => {
-        if (seed) {
-          if (cancelled) return;
-          if (seed.vesselImo) setAisPending(true);
-          const withImo = await refreshImoUntilPinned(seed, (next) => setData(next), () => cancelled);
-          if (cancelled) return;
-          setAisPending(false);
-          setData(withImo);
-          return;
-        }
+      .catch(() => {
         if (!cancelled) setError(t.track.notFound);
       });
 

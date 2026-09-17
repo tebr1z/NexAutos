@@ -194,7 +194,10 @@ async function requestWithLocal<T>(path: string, init?: RequestInit): Promise<T>
 }
 
 export const api = {
-  track: (code: string) => request<TrackingShipment>(`/tracking/${encodeURIComponent(code)}`),
+  track: (code: string) =>
+    request<TrackingShipment>(`/tracking/${encodeURIComponent(code)}`, {
+      signal: AbortSignal.timeout(12_000),
+    }),
   vin: (vin: string) => request<VinRecord>(`/vins/${encodeURIComponent(vin)}`),
   login: (email: string, password: string) =>
     request<{ accessToken: string; user: AuthUser }>("/auth/login", {
@@ -348,6 +351,24 @@ export const api = {
     ),
   publicContractPdfUrl: (token: string) => `/api/contracts/public/${encodeURIComponent(token)}/pdf`,
   catalog: () => request<CatalogCar[]>("/catalog"),
+  customsOptions: (lang: string) =>
+    request<{
+      AutoEngineTypes: { code: string; name: string; abbreviation2: string }[];
+      AutoCategories: { code: string; name: string }[];
+    }>(`/customs/auto-options?lang=${encodeURIComponent(lang)}`),
+  customsAutoDuty: (payload: Record<string, unknown>, lang: string) =>
+    request<{
+      usdCourse?: string;
+      autoDuty?: {
+        duties: { code: string; name: string; value: number }[];
+        total: { name: string; value: number };
+        customsCost: number;
+        usdCourse: number;
+      };
+    }>(`/customs/auto-duty?lang=${encodeURIComponent(lang)}`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   catalogManage: () => request<CatalogCar[]>("/catalog/manage"),
   createCatalogCar: (payload: Record<string, unknown>) =>
     request<CatalogCar>("/catalog", { method: "POST", body: JSON.stringify(payload) }),

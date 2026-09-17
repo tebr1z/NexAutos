@@ -3,7 +3,7 @@ import { ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ContainersService } from '../containers/containers.service';
 import { VesselsService } from '../vessels/vessels.service';
-import { attachPortCoords } from '../containers/registry';
+import { attachPortCoords, enrichKnownContainer, lookupCarrier } from '../containers/registry';
 import { CreateOrderDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { generateTrackingCode, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
 import { NotifyService, statusLabelAz } from '../notify/notify.service';
@@ -114,7 +114,9 @@ export class OrdersService {
       trackingCode = generateTrackingCode(dto.customerName, dto.make ?? '', dto.model, [...existing, trackingCode]);
     }
 
-    const ocean = dto.containerNumber ? await this.containers.lookup(dto.containerNumber) : null;
+    const ocean = dto.containerNumber
+      ? attachPortCoords(enrichKnownContainer(lookupCarrier(dto.containerNumber)))
+      : null;
 
     const order = await this.prisma.order.create({
       data: {
@@ -123,9 +125,9 @@ export class OrdersService {
         vehicleId: vehicle.id,
         vin: dto.vin.toUpperCase(),
         auctionHouse: dto.auctionHouse ?? 'OTHER',
-        containerNumber: ocean?.formatted ?? dto.containerNumber,
-        carrierCode: ocean?.carrierCode,
-        carrierName: ocean?.carrierName,
+        containerNumber: ocean?.containerNumber ?? dto.containerNumber,
+        carrierCode: ocean?.carrier?.code,
+        carrierName: ocean?.carrier?.name,
         vesselName: opt(dto.vesselName) ?? ocean?.vesselName,
         vesselImo: normalizeImo(dto.vesselImo),
         voyageNumber: ocean?.voyageNumber,
@@ -230,9 +232,9 @@ export class OrdersService {
 
   async findByCode(code: string) {
     await this.purgeExpiredArchive();
-    const raw = code.toUpperCase();
+    const raw = code.toUpperCase().replace(/\s+/g, '');
     const order = await this.prisma.order.findFirst({
-      where: { trackingCode: raw },
+      where: { trackingCode: { equals: raw, mode: 'insensitive' } },
       include: ORDER_INCLUDE,
     });
     if (!order) throw new NotFoundException('Göndəriş tapılmadı');
@@ -240,7 +242,7 @@ export class OrdersService {
     if (order.currentStatus === 'DELIVERED' && deliveredAt && Date.now() - deliveredAt.getTime() > ARCHIVE_MS) {
       throw new NotFoundException('Göndəriş tapılmadı');
     }
-    return this.withLivePin(order);
+    return mapOrder(order);
   }
 
   async updateVoyage(id: string, dto: UpdateVoyageDto, userId?: string) {
@@ -322,7 +324,7 @@ export class OrdersService {
         meta: { vesselName, vesselImo, currentPort, originPort, destinationPort, trackingCode },
       },
     });
-    return this.withLivePin(order);
+    return mapOrder(order);
   }
 
   private async withLivePin(order: Parameters<typeof mapOrder>[0] & {
@@ -354,8 +356,8 @@ export class OrdersService {
         destinationPort: mapped.destinationPort || ocean.destinationPort,
         containerStatus: mapped.containerStatus || ocean.containerStatus,
         eta: mapped.eta || ocean.eta,
-        lat: pin.lat ?? (liveImo ? undefined : mapped.lat ?? ocean.lat),
-        lng: pin.lng ?? (liveImo ? undefined : mapped.lng ?? ocean.lng),
+        lat: pin.lat ?? mapped.lat ?? (liveImo ? undefined : ocean.lat),
+        lng: pin.lng ?? mapped.lng ?? (liveImo ? undefined : ocean.lng),
       };
     } catch {
       return { ...mapped, ...pin, vesselName: pin.vesselName || mapped.vesselName };
@@ -381,13 +383,16 @@ export class OrdersService {
     if (order.vesselImo && isLiveVesselMapStatus(order.currentStatus)) {
       try {
         const pos = await this.vessels.positionByImo(order.vesselImo);
-        return {
-          lat: pos?.hasCoordinates ? pos.latitude ?? undefined : undefined,
-          lng: pos?.hasCoordinates ? pos.longitude ?? undefined : undefined,
-          vesselName: pos?.name ?? undefined,
-        };
+        if (pos?.hasCoordinates && pos.latitude != null && pos.longitude != null) {
+          return {
+            lat: pos.latitude,
+            lng: pos.longitude,
+            vesselName: pos.name ?? undefined,
+          };
+        }
+        return { ...(manual ?? {}), vesselName: pos?.name ?? undefined };
       } catch {
-        return {};
+        return manual ?? {};
       }
     }
 

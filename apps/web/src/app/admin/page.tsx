@@ -47,6 +47,32 @@ function parseCoord(raw?: string) {
   return Number.isFinite(n) ? n : undefined;
 }
 
+function createOrderBody(shipment: TrackingShipment) {
+  const trackingCode = shipment.trackingCode;
+  return {
+    customerName: shipment.customerName,
+    phone: shipment.customerPhone,
+    email: `${trackingCode.toLowerCase().replace(/[^a-z0-9]/g, "")}@autonex.local`,
+    vin: shipment.vin,
+    auctionHouse: "OTHER",
+    containerNumber: shipment.containerNumber,
+    make: shipment.make,
+    model: shipment.model,
+    trackingCode,
+    vesselName: shipment.vesselName,
+    vesselImo: shipment.vesselImo || undefined,
+    originPort: shipment.originPort,
+    destinationPort: shipment.destinationPort,
+    currentPort: shipment.currentPort,
+    currentCountry: shipment.currentCountry,
+    transitPorts: shipment.transitPorts,
+    currentTransitIndex: shipment.currentTransitIndex,
+    eta: shipment.eta,
+    mapLat: shipment.mapLat,
+    mapLng: shipment.mapLng,
+  };
+}
+
 function stageNotice(label: string, phone: string | undefined, notify?: NotifyInfo) {
   if (notify?.error === "skipped") return `${label} yeniləndi. Bu mərhələ üçün WhatsApp/SMS getmir.`;
   if (!normalizePhone(phone)) return `${label} yeniləndi. WhatsApp nömrəsi yoxdur — SMS getmədi.`;
@@ -431,6 +457,7 @@ export default function AdminHomePage() {
 
     persist(next, order.trackingCode);
     let saved = next;
+    let serverOk = Boolean(order.id);
 
     try {
       if (order.id) {
@@ -451,17 +478,28 @@ export default function AdminHomePage() {
         });
         saved = mergeRemotePreserveLocal(next, remote);
         persist({ ...saved, vesselImo: imo || undefined, vesselName: next.vesselName || saved.vesselName }, trackingCode);
+        serverOk = true;
+      } else {
+        const remote = await api.createOrder(createOrderBody(next));
+        saved = mergeRemotePreserveLocal(next, { ...remote, ...next, id: remote.id, trackingCode: remote.trackingCode || trackingCode });
+        persist(saved, trackingCode);
+        serverOk = true;
       }
-    } catch {
-      /* local copy remains — track page still reads it */
+    } catch (err) {
+      serverOk = false;
+      setNotice(
+        err instanceof Error
+          ? `Yalnız admin brauzerində qaldı. Müştəri görmür, çünki serverə yazılmadı: ${err.message}`
+          : "Yalnız admin brauzerində qaldı. Müştəri izləmə səhifəsini görmür — yenidən yadda saxlayın.",
+      );
     }
 
-    if (status !== saved.currentStatus || transitIndex !== (saved.currentTransitIndex ?? -1)) {
+    if (serverOk && (status !== saved.currentStatus || transitIndex !== (saved.currentTransitIndex ?? -1))) {
       await applyStage(saved, status, transitIndex);
     }
 
     setSaving(false);
-    setNotice("Yadda saxlanıldı. İzləmə səhifəsində görünür.");
+    if (serverOk) setNotice("Yadda saxlanıldı. Müştəri izləmə linkindən görə bilər.");
     setEditingCode(trackingCode);
   }
 
@@ -533,31 +571,20 @@ export default function AdminHomePage() {
     let saved = shipment;
     try {
       const remote = await api.createOrder({
-        customerName: shipment.customerName,
-        phone: form.phone.trim() || undefined,
-        email: `${trackingCode.toLowerCase().replace(/[^a-z0-9]/g, "")}@autonex.local`,
-        vin: shipment.vin,
-        auctionHouse: "OTHER",
+        ...createOrderBody(shipment),
+        phone: form.phone.trim() || shipment.customerPhone,
         containerNumber: form.containerNumber,
-        make: form.make,
-        model: form.model,
-        trackingCode,
-        vesselName: voyage.vesselName || undefined,
         vesselImo: createdImo,
-        originPort: voyage.originPort || undefined,
-        destinationPort: voyage.destinationPort || undefined,
-        currentPort: voyage.currentPort || undefined,
-        currentCountry: voyage.currentCountry || undefined,
-        transitPorts,
-        eta: voyage.eta || undefined,
-        mapLat: parseCoord(voyage.mapLat),
-        mapLng: parseCoord(voyage.mapLng),
       });
       saved = mergeRemotePreserveLocal(shipment, { ...remote, ...shipment, trackingCode: remote.trackingCode || trackingCode });
       persist(saved, trackingCode);
       setCreated(saved.trackingCode);
-    } catch {
-      /* already saved locally */
+    } catch (err) {
+      setNotice(
+        err instanceof Error
+          ? `Kod yerli siyahıdadır, amma izləmə səhifəsi üçün serverə yazılmadı: ${err.message}`
+          : "Kod yerli siyahıdadır, amma serverə yazılmadı. Yenidən yadda saxlayın.",
+      );
     }
 
     if (contract) {

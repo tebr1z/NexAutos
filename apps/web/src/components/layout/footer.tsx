@@ -28,6 +28,9 @@ export function Footer() {
           <Link href="/cars" className="block">
             {t.nav.cars}
           </Link>
+          <Link href="/customs" className="block">
+            {t.nav.customs}
+          </Link>
           <Link href="/track" className="block">
             {t.nav.track}
           </Link>
