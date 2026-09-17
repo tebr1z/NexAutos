@@ -36,9 +36,19 @@ export function shouldNotifyStatus(status: string) {
   return (SMS_NOTIFY_STATUSES as readonly string[]).includes(status);
 }
 
-/** Dəniz mərhələlərində xəritə gəmi IMO/AIS-dən; qalanında liman və ya əl pin. */
+/** TIR/gömrük/çatdırılma: xəritə liman/əl pin. Əks halda IMO varsa gəmi AIS birinci. */
+export function isRoadMapStatus(status: string) {
+  return (
+    status.startsWith("TIR_") ||
+    status === "CUSTOMS_CLEARANCE" ||
+    status === "READY_FOR_DELIVERY" ||
+    status === "DELIVERED" ||
+    status === "CANCELLED"
+  );
+}
+
 export function isLiveVesselMapStatus(status: string) {
-  return status === "LOADED_CONTAINER" || status === "SHIP_DEPARTED" || status === "IN_TRANSIT";
+  return !isRoadMapStatus(status);
 }
 
 export const DESTINATION_PORTS = [

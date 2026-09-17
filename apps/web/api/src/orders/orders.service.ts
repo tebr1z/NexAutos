@@ -55,7 +55,14 @@ function coord(value?: number | null) {
 }
 
 function isLiveVesselMapStatus(status?: string | null) {
-  return status === 'LOADED_CONTAINER' || status === 'SHIP_DEPARTED' || status === 'IN_TRANSIT';
+  if (!status) return true;
+  return !(
+    status.startsWith('TIR_') ||
+    status === 'CUSTOMS_CLEARANCE' ||
+    status === 'READY_FOR_DELIVERY' ||
+    status === 'DELIVERED' ||
+    status === 'CANCELLED'
+  );
 }
 
 function normalizeImo(raw?: string) {
@@ -323,13 +330,20 @@ export class OrdersService {
   }) {
     const mapped = mapOrder(order);
     const pin = await this.resolvePin(order);
-    if (!order.containerNumber) return { ...mapped, ...pin };
+    const liveImo = Boolean(order.vesselImo && isLiveVesselMapStatus(order.currentStatus));
+    if (!order.containerNumber) {
+      return {
+        ...mapped,
+        ...pin,
+        vesselName: pin.vesselName || mapped.vesselName,
+      };
+    }
 
     try {
       const ocean = await this.containers.lookup(order.containerNumber);
       return {
         ...mapped,
-        vesselName: mapped.vesselName || ocean.vesselName,
+        vesselName: pin.vesselName || mapped.vesselName || ocean.vesselName,
         voyageNumber: mapped.voyageNumber || ocean.voyageNumber,
         carrierName: mapped.carrierName || ocean.carrierName,
         carrierCode: mapped.carrierCode || ocean.carrierCode,
@@ -339,11 +353,11 @@ export class OrdersService {
         destinationPort: mapped.destinationPort || ocean.destinationPort,
         containerStatus: mapped.containerStatus || ocean.containerStatus,
         eta: mapped.eta || ocean.eta,
-        lat: pin.lat ?? mapped.lat ?? ocean.lat,
-        lng: pin.lng ?? mapped.lng ?? ocean.lng,
+        lat: pin.lat ?? (liveImo ? undefined : mapped.lat ?? ocean.lat),
+        lng: pin.lng ?? (liveImo ? undefined : mapped.lng ?? ocean.lng),
       };
     } catch {
-      return { ...mapped, ...pin };
+      return { ...mapped, ...pin, vesselName: pin.vesselName || mapped.vesselName };
     }
   }
 
@@ -363,22 +377,16 @@ export class OrdersService {
         ? { lat: order.mapLat, lng: order.mapLng }
         : null;
 
-    if (isLiveVesselMapStatus(order.currentStatus)) {
-      if (order.vesselImo) {
-        try {
-          const pos = await this.vessels.positionByImo(order.vesselImo);
-          if (pos?.hasCoordinates) return { lat: pos.latitude ?? undefined, lng: pos.longitude ?? undefined };
-        } catch {
-          /* IMO AIS optional */
-        }
-      }
-      if (order.vesselName) {
-        try {
-          const pos = await this.vessels.positionByName(order.vesselName);
-          if (pos?.hasCoordinates) return { lat: pos.latitude ?? undefined, lng: pos.longitude ?? undefined };
-        } catch {
-          /* name AIS optional */
-        }
+    if (order.vesselImo && isLiveVesselMapStatus(order.currentStatus)) {
+      try {
+        const pos = await this.vessels.positionByImo(order.vesselImo);
+        return {
+          lat: pos?.hasCoordinates ? pos.latitude ?? undefined : undefined,
+          lng: pos?.hasCoordinates ? pos.longitude ?? undefined : undefined,
+          vesselName: pos?.name ?? undefined,
+        };
+      } catch {
+        return {};
       }
     }
 

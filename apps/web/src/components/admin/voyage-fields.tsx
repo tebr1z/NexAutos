@@ -98,7 +98,14 @@ export function VoyageFields({
     setMapNotice("");
     try {
       const pos = await api.vesselByImo(imo);
-      if (!pos?.hasCoordinates || pos.latitude == null || pos.longitude == null) {
+      const nextName = pos?.name?.trim() || value.vesselName;
+      const live = pos?.hasCoordinates && pos.latitude != null && pos.longitude != null;
+      onChange({
+        ...value,
+        vesselName: nextName,
+        ...(live ? { mapLat: pos.latitude!.toFixed(5), mapLng: pos.longitude!.toFixed(5) } : {}),
+      });
+      if (!live) {
         setMapNotice(
           pos?.name
             ? `Gəmi tapıldı (${pos.name}). Canlı AIS hələ gəlməyib — 1-2 dəq sonra yenə basın və ya koordinatı əl ilə yazın.`
@@ -106,7 +113,7 @@ export function VoyageFields({
         );
         return;
       }
-      applyPin(pos.latitude, pos.longitude, `Gəmi AIS: ${pos.name || "IMO " + imo}`);
+      setMapNotice(`Gəmi AIS: ${pos.name || "IMO " + imo}`);
     } catch {
       setMapNotice("AIS-ə çıxılmadı. Koordinatı əl ilə yazın və ya limandan götürün.");
     } finally {

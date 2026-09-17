@@ -32,14 +32,15 @@ async function pinFromImo(shipment: TrackingShipment): Promise<TrackingShipment>
   if (imo.length !== 7) return shipment;
   try {
     const pos = await api.vesselByImo(imo);
+    const name = pos?.name?.trim() || shipment.vesselName;
     if (!pos?.hasCoordinates || pos.latitude == null || pos.longitude == null) {
-      return { ...shipment, vesselName: shipment.vesselName || pos?.name || undefined };
+      return { ...shipment, vesselName: name, vesselImo: shipment.vesselImo || imo };
     }
     return {
       ...shipment,
       lat: pos.latitude,
       lng: pos.longitude,
-      vesselName: shipment.vesselName || pos.name || undefined,
+      vesselName: name,
       vesselImo: shipment.vesselImo || (pos.imo ? String(pos.imo) : imo),
     };
   } catch {
@@ -79,17 +80,13 @@ async function pinFromPorts(shipment: TrackingShipment): Promise<TrackingShipmen
 }
 
 async function locateShipment(shipment: TrackingShipment) {
-  if (isLiveVesselMapStatus(shipment.currentStatus) && shipment.vesselImo) {
-    const withImo = await pinFromImo(shipment);
-    if (withImo.lat != null && withImo.lng != null) return withImo;
+  if (shipment.vesselImo && isLiveVesselMapStatus(shipment.currentStatus)) {
+    return pinFromImo(shipment);
   }
   if (shipment.mapLat != null && shipment.mapLng != null) {
     return { ...shipment, lat: shipment.mapLat, lng: shipment.mapLng };
   }
-  if (!isLiveVesselMapStatus(shipment.currentStatus)) {
-    return pinFromPorts({ ...shipment, lat: undefined, lng: undefined });
-  }
-  return pinFromPorts(shipment);
+  return pinFromPorts({ ...shipment, lat: undefined, lng: undefined });
 }
 
 function seedShipment(code: string) {
@@ -109,8 +106,8 @@ function keepLocalRoute(prev: TrackingShipment, ocean: Partial<TrackingShipment>
     destinationPort: prev.destinationPort || ocean.destinationPort,
     containerStatus: prev.containerStatus || ocean.containerStatus,
     eta: prev.eta || ocean.eta,
-    lat: prev.lat ?? ocean.lat,
-    lng: prev.lng ?? ocean.lng,
+    lat: prev.vesselImo && isLiveVesselMapStatus(prev.currentStatus) ? prev.lat : prev.lat ?? ocean.lat,
+    lng: prev.vesselImo && isLiveVesselMapStatus(prev.currentStatus) ? prev.lng : prev.lng ?? ocean.lng,
   };
 }
 
@@ -246,9 +243,10 @@ export function TrackingDetail({ code }: { code: string }) {
         <CalendarClock className="mt-4 hidden h-10 w-10 text-royal sm:mt-0 sm:block" />
       </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <InfoCard icon={MapPin} label={t.track.location} value={location || t.track.pending} />
-        <InfoCard icon={Ship} label={t.track.vessel} value={data.vesselName || t.track.unset} detail={data.vesselImo ? `IMO ${data.vesselImo}` : undefined} />
+        <InfoCard icon={Ship} label={t.track.vessel} value={data.vesselName || t.track.unset} />
+        <InfoCard icon={Ship} label={t.track.imo} value={data.vesselImo || t.track.unset} mono />
         <InfoCard icon={Container} label={t.track.container} value={data.containerNumber || t.track.unset} detail={data.carrierName} mono />
         <InfoCard icon={CalendarClock} label={t.track.eta} value={arrivalText(data, t.track.pending, locale)} />
       </div>
@@ -292,7 +290,7 @@ export function TrackingDetail({ code }: { code: string }) {
 
         <div className="space-y-6">
           <section className="overflow-hidden rounded-3xl border border-line bg-card">
-            <div className="flex items-center justify-between p-5"><div><h2 className="font-medium">{t.track.liveTitle}</h2><p className="mt-1 text-xs text-muted">{location || vessel || t.track.livePending}</p></div><MapPin size={20} className="text-royal" /></div>
+            <div className="flex items-center justify-between p-5"><div><h2 className="font-medium">{t.track.liveTitle}</h2><p className="mt-1 text-xs text-muted">{data.vesselImo ? [data.vesselName, `IMO ${data.vesselImo}`, t.track.aisMap].filter(Boolean).join(" · ") : location || vessel || t.track.livePending}</p></div><MapPin size={20} className="text-royal" /></div>
             {data.lat != null && data.lng != null ? <iframe title={data.vesselName ?? t.track.location} className="h-[320px] w-full border-0" src={`https://www.openstreetmap.org/export/embed.html?bbox=${data.lng - 2.2}%2C${data.lat - 1.3}%2C${data.lng + 2.2}%2C${data.lat + 1.3}&layer=mapnik&marker=${data.lat}%2C${data.lng}`} /> : <div className="flex h-52 items-center justify-center bg-bg text-sm text-muted">{t.track.coordsPending}</div>}
           </section>
 
