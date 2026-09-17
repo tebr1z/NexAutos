@@ -65,11 +65,12 @@ function isLiveVesselMapStatus(status?: string | null) {
   );
 }
 
-function normalizeImo(raw?: string) {
+function normalizeImo(raw?: string | null) {
   if (raw === undefined) return undefined;
-  const digits = raw.replace(/\D/g, '');
+  if (raw === null) return null;
+  const digits = String(raw).replace(/\D/g, '');
   if (!digits) return null;
-  if (digits.length !== 7) throw new BadRequestException('IMO must be 7 digits.');
+  if (digits.length !== 7) throw new BadRequestException('IMO 7 rəqəm olmalıdır.');
   return digits;
 }
 

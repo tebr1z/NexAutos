@@ -229,7 +229,7 @@ export function ContractsAdmin() {
               href={`/admin?contract=${encodeURIComponent(current.id)}`}
               className="rounded-xl bg-white px-4 py-2.5 text-sm text-black"
             >
-              {current.trackingCode ? "Maşını yenilə" : "Maşın al və təyin et"}
+              {current.trackingCode ? "Maşını yenilə" : "Maşın al / təyin et"}
             </a>
           )}
           {current.status === "SIGNED" && (

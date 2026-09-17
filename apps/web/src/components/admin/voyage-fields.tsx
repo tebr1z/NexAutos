@@ -102,6 +102,7 @@ export function VoyageFields({
       const live = pos?.hasCoordinates && pos.latitude != null && pos.longitude != null;
       onChange({
         ...value,
+        vesselImo: imo,
         vesselName: nextName,
         ...(live ? { mapLat: pos.latitude!.toFixed(5), mapLng: pos.longitude!.toFixed(5) } : {}),
       });
@@ -188,11 +189,14 @@ export function VoyageFields({
           className={field}
         />
         <input
-          placeholder="IMO — 7 rəqəm"
+          name="vesselImo"
+          placeholder="IMO — 7 rəqəm, dəyişmək olar"
           value={value.vesselImo}
           onChange={(e) => set("vesselImo", e.target.value.replace(/\D/g, "").slice(0, 7))}
           className={`${field} font-mono`}
           inputMode="numeric"
+          maxLength={7}
+          autoComplete="off"
         />
       </div>
       <div className="grid gap-3 md:grid-cols-2">

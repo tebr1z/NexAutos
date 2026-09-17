@@ -17,6 +17,16 @@ export function listLocalOrders(): TrackingShipment[] {
   }
 }
 
+/** Empty string means admin cleared IMO; otherwise keep a 7-digit code. */
+export function pickImo(preferred?: string | null, fallback?: string | null) {
+  if (preferred === "") return undefined;
+  const a = (preferred ?? "").replace(/\D/g, "");
+  const b = (fallback ?? "").replace(/\D/g, "");
+  if (a.length === 7) return a;
+  if (b.length === 7) return b;
+  return a || b || undefined;
+}
+
 function pickTransits(local?: TransitStop[], remote?: TransitStop[]) {
   const localTransits = normalizeTransits(local);
   const remoteTransits = normalizeTransits(remote);
@@ -44,6 +54,8 @@ export function mergeRemotePreserveLocal(
       ? (local.currentTransitIndex ?? -1)
       : (remote.currentTransitIndex ?? local.currentTransitIndex ?? -1),
     customerPhone: remote.customerPhone || local.customerPhone,
+    vesselName: local.vesselName || remote.vesselName,
+    vesselImo: pickImo(local.vesselImo, remote.vesselImo),
     events: (local.events?.length ?? 0) >= (remote.events?.length ?? 0) ? local.events : remote.events,
   };
 }
@@ -62,6 +74,8 @@ export function overlayLocal(remote: TrackingShipment, code: string): TrackingSh
     currentTransitIndex: picked.useLocal
       ? (local.currentTransitIndex ?? -1)
       : (remote.currentTransitIndex ?? local.currentTransitIndex),
+    vesselName: local.vesselName || remote.vesselName,
+    vesselImo: pickImo(local.vesselImo, remote.vesselImo),
     events: (local.events?.length ?? 0) >= (remote.events?.length ?? 0) ? local.events : remote.events,
   };
 }

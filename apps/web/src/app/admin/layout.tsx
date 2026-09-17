@@ -6,10 +6,11 @@ import { useEffect } from "react";
 import { Logo } from "@/components/brand/logo";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
-import { Archive, CarFront, FileSignature, LogOut, MessageSquareText } from "lucide-react";
+import { Archive, CarFront, FileSignature, Images, LogOut, MessageSquareText } from "lucide-react";
 
 const LINKS = [
   { href: "/admin", label: "Maşınlar", icon: CarFront },
+  { href: "/admin/catalog", label: "Kataloq", icon: Images },
   { href: "/admin/contracts", label: "Müqavilələr", icon: FileSignature },
   { href: "/admin#arxiv", label: "Arxiv", icon: Archive },
   { href: "/admin/inquiries", label: "Müraciətlər", icon: MessageSquareText },
@@ -59,7 +60,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
       <div className="min-w-0 flex-1">
         <header className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4 text-sm lg:px-8">
-          <div><p className="text-xs text-zinc-500">Auto Nex idarəetmə paneli</p><p className="mt-0.5 text-zinc-300">Əvvəl müqavilə, sonra avtomobil sifarişi</p></div>
+          <div><p className="text-xs text-zinc-500">Auto Nex idarəetmə paneli</p><p className="mt-0.5 text-zinc-300">Maşın alına bilər, müqavilə sonra təyin olunur</p></div>
           <div className="flex items-center gap-3"><p className="hidden sm:block">{user.name}</p><button type="button" onClick={logout} className="rounded-full border border-white/10 p-2 text-zinc-400 lg:hidden" aria-label="Çıxış"><LogOut size={16} /></button></div>
         </header>
         <nav className="flex gap-2 overflow-x-auto border-b border-white/10 px-4 py-3 lg:hidden">

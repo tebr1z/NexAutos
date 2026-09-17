@@ -27,6 +27,10 @@ type Screen = "list" | "create" | "edit";
 const inp =
   "w-full rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm text-white placeholder:text-zinc-500";
 
+function imoDigits(raw: string) {
+  return raw.replace(/\D/g, "").slice(0, 7);
+}
+
 const EMPTY_FORM = {
   customerName: "",
   phone: "",
@@ -237,7 +241,7 @@ export default function AdminHomePage() {
     });
     setVoyage({
       vesselName: order.vesselName ?? "",
-      vesselImo: order.vesselImo ?? "",
+      vesselImo: imoDigits(order.vesselImo ?? ""),
       originPort: order.originPort ?? "",
       destinationPort: order.destinationPort ?? "",
       currentPort: order.currentPort ?? "",
@@ -249,6 +253,42 @@ export default function AdminHomePage() {
     });
     setPhotos(photosFromList(order.photos ?? []));
     setNotice("");
+    const linked = contracts.find((row) => row.trackingCode === order.trackingCode && row.status === "SIGNED");
+    setContractId(linked?.id ?? "");
+  }
+
+  async function linkSignedContract(order: TrackingShipment, id: string) {
+    const contract = signedContracts.find((row) => row.id === id);
+    if (!contract) {
+      window.alert("İmzalanmış müqavilə seçin.");
+      return;
+    }
+    if (
+      contract.trackingCode &&
+      contract.trackingCode !== order.trackingCode &&
+      !window.confirm("Bu müqaviləyə artıq başqa maşın təyin olunub. Yenidən təyin edilsin?")
+    ) {
+      return;
+    }
+    try {
+      const next = await api.assignContract(contract.id, {
+        trackingCode: order.trackingCode,
+        vin: order.vin,
+        make: order.make,
+        model: order.model,
+        year: order.year,
+        orderId: order.id,
+      });
+      setContracts((list) => list.map((row) => (row.id === next.id ? { ...row, ...next } : row)));
+      setForm((current) => ({
+        ...current,
+        customerName: next.customerName || current.customerName,
+        phone: next.customerPhone || current.phone,
+      }));
+      setNotice("Müqavilə bu maşına təyin olundu.");
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Müqavilə təyin olunmadı.");
+    }
   }
 
   function persist(next: TrackingShipment, oldCode = next.trackingCode) {
@@ -357,6 +397,12 @@ export default function AdminHomePage() {
       return;
     }
     const location = locationForStatus(status, voyage.destinationPort);
+    const imo = imoDigits(voyage.vesselImo);
+    if (imo && imo.length !== 7) {
+      setSaving(false);
+      window.alert("IMO 7 rəqəm olmalıdır, və ya boş buraxın.");
+      return;
+    }
     const next: TrackingShipment = {
       ...order,
       trackingCode,
@@ -368,7 +414,7 @@ export default function AdminHomePage() {
       year: form.year ? Number(form.year) : undefined,
       containerNumber: form.containerNumber || undefined,
       vesselName: voyage.vesselName || undefined,
-      vesselImo: voyage.vesselImo.length === 7 ? voyage.vesselImo : undefined,
+      vesselImo: imo || "",
       originPort: voyage.originPort || undefined,
       destinationPort: voyage.destinationPort || undefined,
       currentPort: location.currentPort || voyage.currentPort || undefined,
@@ -390,21 +436,21 @@ export default function AdminHomePage() {
       if (order.id) {
         const remote = await api.updateVoyage(order.id, {
           trackingCode,
-          containerNumber: next.containerNumber,
-          vesselName: next.vesselName,
-          vesselImo: next.vesselImo,
-          originPort: next.originPort,
-          destinationPort: next.destinationPort,
-          currentPort: next.currentPort,
-          currentCountry: next.currentCountry,
+          containerNumber: next.containerNumber ?? "",
+          vesselName: next.vesselName ?? "",
+          vesselImo: imo,
+          originPort: next.originPort ?? "",
+          destinationPort: next.destinationPort ?? "",
+          currentPort: next.currentPort ?? "",
+          currentCountry: next.currentCountry ?? "",
           transitPorts,
           currentTransitIndex: transitIndex,
-          eta: next.eta,
+          eta: next.eta ?? "",
           mapLat: next.mapLat ?? null,
           mapLng: next.mapLng ?? null,
         });
         saved = mergeRemotePreserveLocal(next, remote);
-        persist(saved, trackingCode);
+        persist({ ...saved, vesselImo: imo || undefined, vesselName: next.vesselName || saved.vesselName }, trackingCode);
       }
     } catch {
       /* local copy remains — track page still reads it */
@@ -421,14 +467,19 @@ export default function AdminHomePage() {
 
   async function createCar(e: FormEvent) {
     e.preventDefault();
-    const contract = signedContracts.find((row) => row.id === contractId);
-    if (!contract) {
-      window.alert("Əvvəl imzalanmış müştəri müqaviləsini seçin. Maşın müqavilədən sonra alınır.");
+    const contract = contractId ? signedContracts.find((row) => row.id === contractId) : undefined;
+    if (contractId && !contract) {
+      window.alert("Seçilmiş müqavilə tapılmadı.");
       return;
     }
     if (!form.customerName.trim() || !form.vin.trim()) return;
+    const createdImo = imoDigits(voyage.vesselImo);
+    if (createdImo && createdImo.length !== 7) {
+      window.alert("IMO 7 rəqəm olmalıdır, və ya boş buraxın.");
+      return;
+    }
     if (
-      contract.trackingCode &&
+      contract?.trackingCode &&
       !window.confirm("Bu müqaviləyə artıq maşın təyin olunub. Yenidən təyin edilsin?")
     ) {
       return;
@@ -464,7 +515,7 @@ export default function AdminHomePage() {
       transitPorts,
       currentTransitIndex: -1,
       vesselName: voyage.vesselName || live?.vesselName || loaded?.vesselName,
-      vesselImo: voyage.vesselImo.length === 7 ? voyage.vesselImo : undefined,
+      vesselImo: createdImo || undefined,
       containerStatus: live?.containerStatus || loaded?.containerStatus,
       lat: live?.lat ?? loaded?.lat,
       lng: live?.lng ?? loaded?.lng,
@@ -492,7 +543,7 @@ export default function AdminHomePage() {
         model: form.model,
         trackingCode,
         vesselName: voyage.vesselName || undefined,
-        vesselImo: voyage.vesselImo.length === 7 ? voyage.vesselImo : undefined,
+        vesselImo: createdImo,
         originPort: voyage.originPort || undefined,
         destinationPort: voyage.destinationPort || undefined,
         currentPort: voyage.currentPort || undefined,
@@ -509,31 +560,33 @@ export default function AdminHomePage() {
       /* already saved locally */
     }
 
-    try {
-      await api.assignContract(contract.id, {
-        trackingCode: saved.trackingCode,
-        vin: saved.vin,
-        make: saved.make,
-        model: saved.model,
-        year: saved.year,
-        orderId: saved.id,
-      });
-      setContracts((list) =>
-        list.map((row) =>
-          row.id === contract.id
-            ? {
-                ...row,
-                trackingCode: saved.trackingCode,
-                vin: saved.vin,
-                make: saved.make,
-                model: saved.model,
-                year: saved.year,
-              }
-            : row,
-        ),
-      );
-    } catch {
-      /* car exists; assignment can be retried from the contract */
+    if (contract) {
+      try {
+        await api.assignContract(contract.id, {
+          trackingCode: saved.trackingCode,
+          vin: saved.vin,
+          make: saved.make,
+          model: saved.model,
+          year: saved.year,
+          orderId: saved.id,
+        });
+        setContracts((list) =>
+          list.map((row) =>
+            row.id === contract.id
+              ? {
+                  ...row,
+                  trackingCode: saved.trackingCode,
+                  vin: saved.vin,
+                  make: saved.make,
+                  model: saved.model,
+                  year: saved.year,
+                }
+              : row,
+          ),
+        );
+      } catch {
+        /* car exists; assignment can be retried from the contract or edit screen */
+      }
     }
   }
 
@@ -545,14 +598,16 @@ export default function AdminHomePage() {
         </button>
         <h1 className="font-display mt-4 text-3xl">Yeni maşın</h1>
         <p className="mt-2 text-sm text-zinc-400">
-          Yalnız imzalanmış müştəriyə. Müqavilə birinci addımdır — maşın sonra alınır və təyin olunur.
+          Maşını indi əlavə edin. Müqavilə varsa seçin, yoxdursa sonra müştəriyə təyin edin.
         </p>
 
         {created ? (
           <div className="mt-8 rounded-2xl border border-sky-500/40 bg-sky-500/10 p-6">
             <p className="text-xs uppercase tracking-widest text-sky-300">Müştəriyə verin</p>
             <p className="mt-2 font-display text-3xl tracking-wide">{created}</p>
-            <p className="mt-2 text-sm text-sky-200/80">Müqaviləyə təyin olundu.</p>
+            <p className="mt-2 text-sm text-sky-200/80">
+              {contractId ? "Müqaviləyə təyin olundu." : "Müqavilə sonra təyin oluna bilər."}
+            </p>
             <div className="mt-4 flex flex-wrap gap-3">
               <Link href={`/track/${created}`} className="text-sm text-sky-300 underline">
                 İzləmə səhifəsini aç
@@ -570,44 +625,42 @@ export default function AdminHomePage() {
           </div>
         ) : (
           <form className="mt-8 space-y-6" onSubmit={createCar}>
-            {signedContracts.length === 0 ? (
-              <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                İmzalanmış müştəri yoxdur. Əvvəl{" "}
+            <label className="block text-xs text-zinc-400">
+              Müqavilə — istəyə bağlı
+              <select
+                value={contractId}
+                onChange={(e) => pickContract(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-sm text-white"
+              >
+                <option value="">Sonra təyin et</option>
+                {waitingContracts.length > 0 && (
+                  <optgroup label="Maşın gözləyir">
+                    {waitingContracts.map((row) => (
+                      <option key={row.id} value={row.id}>
+                        {row.customerName} · {row.number} · {row.customerPhone}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {assignedContracts.length > 0 && (
+                  <optgroup label="Artıq maşın təyin olunub">
+                    {assignedContracts.map((row) => (
+                      <option key={row.id} value={row.id}>
+                        {row.customerName} · {row.number} · {row.trackingCode}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </label>
+            {signedContracts.length === 0 && (
+              <p className="text-xs text-zinc-500">
+                İmzalanmış müqavilə yoxdur. Maşını indi saxlayın, müqaviləni sonra{" "}
                 <Link href="/admin/contracts" className="underline">
-                  müqavilə yaradın
-                </Link>
-                , müştəri imzalasın, sonra maşın alın.
+                  Müqavilələr
+                </Link>{" "}
+                və ya bu maşının redaktəsindən təyin edin.
               </p>
-            ) : (
-              <label className="block text-xs text-zinc-400">
-                İmzalanmış müştəri *
-                <select
-                  required
-                  value={contractId}
-                  onChange={(e) => pickContract(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-sm text-white"
-                >
-                  <option value="">Müqavilə seçin</option>
-                  {waitingContracts.length > 0 && (
-                    <optgroup label="Maşın gözləyir">
-                      {waitingContracts.map((row) => (
-                        <option key={row.id} value={row.id}>
-                          {row.customerName} · {row.number} · {row.customerPhone}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {assignedContracts.length > 0 && (
-                    <optgroup label="Artıq maşın təyin olunub">
-                      {assignedContracts.map((row) => (
-                        <option key={row.id} value={row.id}>
-                          {row.customerName} · {row.number} · {row.trackingCode}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-              </label>
             )}
             <CarBasics form={form} onChange={setForm} lockCustomer={Boolean(contractId)} />
             <VoyageFields value={voyage} onChange={setVoyage} />
@@ -621,10 +674,7 @@ export default function AdminHomePage() {
             <p className="font-mono text-sm text-zinc-400">
               Kod: <span className="text-white">{preview}</span>
             </p>
-            <button
-              disabled={signedContracts.length === 0}
-              className="w-full rounded-xl bg-white py-3 text-sm font-medium text-black disabled:opacity-50"
-            >
+            <button className="w-full rounded-xl bg-white py-3 text-sm font-medium text-black">
               Yüklə və kod yarat
             </button>
           </form>
@@ -692,6 +742,47 @@ export default function AdminHomePage() {
             />
           </label>
 
+          <label className="block text-xs text-zinc-400">
+            IMO kodu
+            <input
+              value={voyage.vesselImo}
+              onChange={(e) => setVoyage({ ...voyage, vesselImo: imoDigits(e.target.value) })}
+              className={`${inp} mt-1 font-mono`}
+              placeholder="7 rəqəm — dəyişmək olar"
+              inputMode="numeric"
+              maxLength={7}
+              autoComplete="off"
+            />
+          </label>
+
+          <label className="block text-xs text-zinc-400">
+            Müqavilə — sonradan təyin
+            <select
+              value={contractId}
+              onChange={(e) => pickContract(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-sm text-white"
+            >
+              <option value="">Müqavilə seçin</option>
+              {waitingContracts.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.customerName} · {row.number} · {row.customerPhone}
+                </option>
+              ))}
+              {assignedContracts.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.customerName} · {row.number} · {row.trackingCode}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => void linkSignedContract(editingOrder, contractId)}
+            className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-zinc-200"
+          >
+            Müqaviləyə təyin et
+          </button>
+
           <CarBasics form={form} onChange={setForm} />
 
           <label className="block text-xs text-zinc-400">
@@ -748,7 +839,7 @@ export default function AdminHomePage() {
         <div>
           <h1 className="font-display text-3xl">Maşınlar</h1>
           <p className="mt-2 text-sm text-zinc-400">
-            Əvvəl müştəri müqaviləsi, sonra alış. Siyahıdan bir maşını açın.
+            Alınmış maşını əlavə edin, müqaviləni sonra müştəriyə təyin edin. Siyahıdan bir maşını açın.
           </p>
         </div>
         <button type="button" onClick={goCreate} className="rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black">

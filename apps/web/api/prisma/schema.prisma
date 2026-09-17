@@ -205,6 +205,26 @@ model ContactInquiry {
   @@index([createdAt])
 }
 
+model CatalogCar {
+  id          String   @id @default(cuid())
+  title       String
+  year        Int?
+  make        String?
+  model       String?
+  auction     String?
+  color       String?
+  priceUsd    Int?
+  priceLabel  String?
+  imageUrl    String
+  description String?
+  published   Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([published, sortOrder])
+}
+
 model TrackingEvent {
   id          String          @id @default(cuid())
   orderId     String

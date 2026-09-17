@@ -169,6 +169,7 @@ export const dictionaries: Record<Locale, Dict> = {
       carsTitle: "Inventory",
       carsSubtitle: "A living shortlist from official auctions. Request a bid.",
       carsEnquire: "Enquire",
+      carsEmpty: "No cars listed yet. Check back soon.",
       privacyTitle: "Privacy",
       privacyBody:
         "Auto Nex stores only the data required to import, track and deliver a vehicle: identity, contact, VIN, shipment events and documents. Tracking codes work without an account.",
@@ -514,6 +515,7 @@ export const dictionaries: Record<Locale, Dict> = {
       carsTitle: "Kataloq",
       carsSubtitle: "Rəsmi hərraclardan seçilmiş siyahı. Təklif istəyin.",
       carsEnquire: "Müraciət",
+      carsEmpty: "Hazırda siyahıda maşın yoxdur.",
       privacyTitle: "Məxfilik",
       privacyBody:
         "Auto Nex yalnız avtomobili idxal, izləmə və çatdırmaq üçün lazım olan məlumatı saxlayır: şəxsiyyət, əlaqə, VIN, göndəriş hadisələri və sənədlər. İzləmə kodu hesab olmadan işləyir.",
@@ -859,6 +861,7 @@ export const dictionaries: Record<Locale, Dict> = {
       carsTitle: "Каталог",
       carsSubtitle: "Живой шортлист с официальных аукционов. Запросите ставку.",
       carsEnquire: "Запрос",
+      carsEmpty: "Пока нет машин в каталоге.",
       privacyTitle: "Конфиденциальность",
       privacyBody:
         "Auto Nex хранит только данные, нужные для импорта, трекинга и доставки: личность, контакты, VIN, события отгрузки и документы. Трек-код работает без аккаунта.",
@@ -1204,6 +1207,7 @@ export const dictionaries: Record<Locale, Dict> = {
       carsTitle: "Envanter",
       carsSubtitle: "Resmi açık artırmalardan canlı kısa liste. Teklif isteyin.",
       carsEnquire: "Sor",
+      carsEmpty: "Şu anda listede araç yok.",
       privacyTitle: "Gizlilik",
       privacyBody:
         "Auto Nex yalnızca ithalat, takip ve teslimat için gereken veriyi saklar: kimlik, iletişim, VIN, sevkiyat olayları ve belgeler. Takip kodu hesap olmadan çalışır.",

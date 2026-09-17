@@ -1,6 +1,24 @@
 import { browserApiBase, nestApiBase } from "./nest-url";
 import type { TrackingShipment, VinRecord, AuthUser } from "./types";
 
+export type CatalogCar = {
+  id: string;
+  title: string;
+  year?: number | null;
+  make?: string | null;
+  model?: string | null;
+  auction?: string | null;
+  color?: string | null;
+  priceUsd?: number | null;
+  priceLabel?: string | null;
+  imageUrl: string;
+  description?: string | null;
+  published: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt?: string;
+};
+
 export type Inquiry = {
   id: string;
   name: string;
@@ -329,6 +347,13 @@ export const api = {
       { method: "POST", body: JSON.stringify(payload) },
     ),
   publicContractPdfUrl: (token: string) => `/api/contracts/public/${encodeURIComponent(token)}/pdf`,
+  catalog: () => request<CatalogCar[]>("/catalog"),
+  catalogManage: () => request<CatalogCar[]>("/catalog/manage"),
+  createCatalogCar: (payload: Record<string, unknown>) =>
+    request<CatalogCar>("/catalog", { method: "POST", body: JSON.stringify(payload) }),
+  updateCatalogCar: (id: string, payload: Record<string, unknown>) =>
+    request<CatalogCar>(`/catalog/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteCatalogCar: (id: string) => request<{ ok: boolean; id: string }>(`/catalog/${id}`, { method: "DELETE" }),
   markInquiryRead: async (id: string) => {
     try {
       return await request<Inquiry>(`/inquiries/${id}/read`, { method: "PATCH" });
