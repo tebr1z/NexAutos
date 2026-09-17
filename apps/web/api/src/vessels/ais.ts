@@ -1,6 +1,7 @@
 const HTTP_TIMEOUT_MS = 12_000;
-const AISSTREAM_WAIT_MS = 22_000;
+const AISSTREAM_WAIT_MS = 90_000;
 const VESSEL_CACHE_TTL_MS = 180_000;
+const POSITION_CACHE_TTL_MS = 15 * 60_000;
 const AISSTREAM_URL = 'wss://stream.aisstream.io/v0/stream';
 const DIGITRAFFIC_HOST = 'meri.digitraffic.fi';
 
@@ -70,6 +71,26 @@ type DigitraffficVessel = {
 
 let vesselCache: { at: number; rows: DigitraffficVessel[] } = { at: 0, rows: [] };
 let aisstreamDownUntil = 0;
+const positionCache = new Map<string, { at: number; pos: VesselPosition }>();
+
+export function emptyPosition(mmsi: number, extra?: Partial<VesselPosition>): VesselPosition {
+  return {
+    source: extra?.source ?? 'imo',
+    name: extra?.name ?? null,
+    imo: extra?.imo ?? null,
+    mmsi,
+    latitude: extra?.latitude ?? null,
+    longitude: extra?.longitude ?? null,
+    speed: extra?.speed ?? null,
+    course: extra?.course ?? null,
+    heading: extra?.heading ?? null,
+    destination: extra?.destination ?? null,
+    lastUpdate: extra?.lastUpdate ?? null,
+    aisStatus: extra?.aisStatus ?? null,
+    navStat: extra?.navStat ?? null,
+    hasCoordinates: extra?.latitude != null && extra?.longitude != null,
+  };
+}
 
 function nonempty(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -374,25 +395,31 @@ function positionFromAisStream(mmsi: string, apiKey: string): Promise<VesselPosi
 }
 
 export async function fetchVesselPosition(mmsi: string, aisstreamKey?: string): Promise<VesselPosition> {
-  const fallback = await positionDigitraffic(mmsi).catch(() => null);
-  if (fallback?.hasCoordinates) return fallback;
+  const cached = positionCache.get(mmsi);
+  if (cached && Date.now() - cached.at < POSITION_CACHE_TTL_MS && cached.pos.hasCoordinates) {
+    return cached.pos;
+  }
+
+  const remember = (pos: VesselPosition) => {
+    if (pos.hasCoordinates) positionCache.set(mmsi, { at: Date.now(), pos });
+    return pos;
+  };
 
   const key = aisstreamKey?.trim();
   if (key && Date.now() > aisstreamDownUntil) {
     try {
-      return await positionFromAisStream(mmsi, key);
+      return remember(await positionFromAisStream(mmsi, key));
     } catch (err) {
       const aisErr = err as AisError;
       if (aisErr.status === 401) throw aisErr;
-      if (aisErr.fallback) aisstreamDownUntil = Date.now() + 5 * 60_000;
-      if (fallback) {
-        fallback.source = 'digitraffic (AISStream fallback)';
-        return fallback;
-      }
-      throw aisErr;
+      // Timeout (504) = gəmi hələ paket göndərməyib. AISStream-i söndürmə.
+      if (aisErr.status === 502) aisstreamDownUntil = Date.now() + 60_000;
     }
   }
 
+  const fallback = await positionDigitraffic(mmsi).catch(() => null);
+  if (fallback?.hasCoordinates) return remember(fallback);
+  if (cached?.pos.hasCoordinates) return cached.pos;
   if (fallback) return fallback;
-  throw new AisError('No AIS record for this vessel.', 404);
+  return emptyPosition(Number(mmsi), { source: 'ais' });
 }

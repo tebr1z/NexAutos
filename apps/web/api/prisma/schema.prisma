@@ -167,6 +167,8 @@ model Order {
   destinationPort String?
   currentCountry  String?
   currentPort     String?
+  mapLat          Float?
+  mapLng          Float?
   transitPorts    Json?
   eta             DateTime?
   currentStatus   ShipmentStatus  @default(PURCHASED)

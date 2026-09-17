@@ -1,5 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import type { TransitStop } from "@/lib/types";
 import { DESTINATION_PORTS } from "@/lib/constants";
+import { findPortCoords } from "@/lib/carriers";
+import { api } from "@/lib/api";
 
 export type VoyageValues = {
   vesselName: string;
@@ -10,6 +15,8 @@ export type VoyageValues = {
   currentCountry: string;
   transitPorts: TransitStop[];
   eta: string;
+  mapLat: string;
+  mapLng: string;
 };
 
 export const EMPTY_VOYAGE: VoyageValues = {
@@ -21,6 +28,8 @@ export const EMPTY_VOYAGE: VoyageValues = {
   currentCountry: "",
   transitPorts: [],
   eta: "",
+  mapLat: "",
+  mapLng: "",
 };
 
 const field =
@@ -57,6 +66,9 @@ export function VoyageFields({
   value: VoyageValues;
   onChange: (next: VoyageValues) => void;
 }) {
+  const [mapBusy, setMapBusy] = useState("");
+  const [mapNotice, setMapNotice] = useState("");
+
   function set<K extends keyof VoyageValues>(key: K, next: VoyageValues[K]) {
     onChange({ ...value, [key]: next });
   }
@@ -65,6 +77,50 @@ export function VoyageFields({
     const next = [...value.transitPorts];
     next[index] = { ...next[index], ...patch };
     set("transitPorts", next);
+  }
+
+  function applyPin(lat: number, lng: number, notice: string) {
+    onChange({
+      ...value,
+      mapLat: lat.toFixed(5),
+      mapLng: lng.toFixed(5),
+    });
+    setMapNotice(notice);
+  }
+
+  async function pinFromImo() {
+    const imo = value.vesselImo.replace(/\D/g, "");
+    if (imo.length !== 7) {
+      setMapNotice("Əvvəl 7 rəqəmli IMO yazın.");
+      return;
+    }
+    setMapBusy("imo");
+    setMapNotice("");
+    try {
+      const pos = await api.vesselByImo(imo);
+      if (!pos?.hasCoordinates || pos.latitude == null || pos.longitude == null) {
+        setMapNotice(
+          pos?.name
+            ? `Gəmi tapıldı (${pos.name}). Canlı AIS hələ gəlməyib — 1-2 dəq sonra yenə basın və ya koordinatı əl ilə yazın.`
+            : "Bu IMO üçün canlı AIS tapılmadı. Koordinatı əl ilə yazın.",
+        );
+        return;
+      }
+      applyPin(pos.latitude, pos.longitude, `Gəmi AIS: ${pos.name || "IMO " + imo}`);
+    } catch {
+      setMapNotice("AIS-ə çıxılmadı. Koordinatı əl ilə yazın və ya limandan götürün.");
+    } finally {
+      setMapBusy("");
+    }
+  }
+
+  function pinFromPort() {
+    const hit = findPortCoords(value.currentPort) ?? findPortCoords(value.destinationPort) ?? findPortCoords(value.originPort);
+    if (!hit) {
+      setMapNotice("Liman adı tanınmadı. Enlem/boylamı əl ilə yazın.");
+      return;
+    }
+    applyPin(hit.lat, hit.lng, `${hit.name} limanı`);
   }
 
   return (
@@ -132,6 +188,44 @@ export function VoyageFields({
           inputMode="numeric"
         />
       </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <input
+          placeholder="Xəritə enlem — 41.64900"
+          value={value.mapLat}
+          onChange={(e) => set("mapLat", e.target.value.replace(/[^\d.-]/g, ""))}
+          className={`${field} font-mono`}
+          inputMode="decimal"
+        />
+        <input
+          placeholder="Xəritə boylam — 41.63900"
+          value={value.mapLng}
+          onChange={(e) => set("mapLng", e.target.value.replace(/[^\d.-]/g, ""))}
+          className={`${field} font-mono`}
+          inputMode="decimal"
+        />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => void pinFromImo()}
+          disabled={mapBusy === "imo"}
+          className="rounded-lg border border-white/15 px-3 py-2 text-xs text-sky-300 disabled:opacity-50"
+        >
+          {mapBusy === "imo" ? "IMO axtarılır…" : "IMO-dan tap"}
+        </button>
+        <button
+          type="button"
+          onClick={pinFromPort}
+          className="rounded-lg border border-white/15 px-3 py-2 text-xs text-sky-300"
+        >
+          Limandan götür
+        </button>
+      </div>
+      <p className="text-[11px] text-zinc-500">
+        Dənizdə (konteyner/gəmi yoldadır) xəritə IMO ilə canlı gəmini göstərir. TIR və gömrükdə əl pin və ya liman
+        koordinatı işləyir. AIS tapılmasa da əl rəqəmləri qalır.
+      </p>
+      {mapNotice ? <p className="text-[11px] text-sky-300">{mapNotice}</p> : null}
       <div className="grid gap-3 md:grid-cols-2">
         <label className="text-[11px] text-zinc-500">
           Təxmini çatma vaxtı — tarix

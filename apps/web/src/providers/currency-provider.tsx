@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Currency } from "@/lib/constants";
+import { api } from "@/lib/api";
 
 type CurrencyContextValue = {
   currency: Currency;
@@ -21,11 +22,16 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const stored = window.localStorage.getItem("anx_currency") as Currency | null;
     if (stored) setCurrencyState(stored);
-    fetch("https://api.frankfurter.app/latest?from=USD&to=EUR,TRY")
-      .then((r) => r.json())
-      .then((data: { rates?: Record<string, number> }) => {
-        if (data.rates) {
-          setRates({ USD: 1, AZN: 1.7, EUR: data.rates.EUR ?? 0.92, TRY: data.rates.TRY ?? 34.2 });
+    api
+      .rates()
+      .then((data) => {
+        if (data && typeof data.USD === "number") {
+          setRates({
+            USD: 1,
+            AZN: data.AZN ?? 1.7,
+            EUR: data.EUR ?? 0.92,
+            TRY: data.TRY ?? 34.2,
+          });
         }
       })
       .catch(() => undefined);

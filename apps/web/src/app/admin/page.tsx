@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { api, type ContractRecord, type OceanLookup } from "@/lib/api";
-import { enrichKnownContainer, lookupCarrier, oceanFields } from "@/lib/carriers";
+import { enrichKnownContainer, lookupCarrier, oceanFields, findPortCoords } from "@/lib/carriers";
 import { generateTrackingCode, previewTrackingCode } from "@/lib/tracking-code";
 import {
   listLocalOrders,
@@ -13,7 +13,7 @@ import {
   mergeRemotePreserveLocal,
 } from "@/lib/local-orders";
 import type { TrackingShipment } from "@/lib/types";
-import { TRACKING_STEPS, locationForStatus, type ShipmentStatus } from "@/lib/constants";
+import { TRACKING_STEPS, locationForStatus, isLiveVesselMapStatus, type ShipmentStatus } from "@/lib/constants";
 import { normalizePhone } from "@/lib/sms";
 import { buildJourney, journeyPosition, selectedJourneyValue, transitLabel, normalizeTransits } from "@/lib/journey";
 import { EMPTY_VOYAGE, VoyageFields, type VoyageValues } from "@/components/admin/voyage-fields";
@@ -36,6 +36,12 @@ const EMPTY_FORM = {
   year: "",
   containerNumber: "",
 };
+
+function parseCoord(raw?: string) {
+  if (!raw?.trim()) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 function stageNotice(label: string, phone: string | undefined, notify?: NotifyInfo) {
   if (notify?.error === "skipped") return `${label} yeniləndi. Bu mərhələ üçün WhatsApp/SMS getmir.`;
@@ -238,6 +244,8 @@ export default function AdminHomePage() {
       currentCountry: order.currentCountry ?? "",
       transitPorts: normalizeTransits(order.transitPorts),
       eta: order.eta ?? "",
+      mapLat: order.mapLat != null ? String(order.mapLat) : "",
+      mapLng: order.mapLng != null ? String(order.mapLng) : "",
     });
     setPhotos(photosFromList(order.photos ?? []));
     setNotice("");
@@ -273,6 +281,15 @@ export default function AdminHomePage() {
         ? transitLabel(transits[transitIdx].place, "az")
         : (TRACKING_STEPS.find((s) => s.key === status)?.az ?? status);
     const location = locationForStatus(status, order.destinationPort);
+    const landPin = isLiveVesselMapStatus(status)
+      ? {}
+      : (() => {
+          const hit = findPortCoords(location.currentPort || order.currentPort);
+          return {
+            lat: order.mapLat ?? hit?.lat,
+            lng: order.mapLng ?? hit?.lng,
+          };
+        })();
     const event = {
       status,
       title: label,
@@ -284,6 +301,7 @@ export default function AdminHomePage() {
       currentTransitIndex: transitIdx,
       transitPorts: transits,
       ...location,
+      ...landPin,
       deliveredAt: status === "DELIVERED" ? new Date().toISOString() : order.deliveredAt,
       events: [...(order.events ?? []), event],
     };
@@ -356,6 +374,10 @@ export default function AdminHomePage() {
       currentPort: location.currentPort || voyage.currentPort || undefined,
       currentCountry: location.currentCountry || voyage.currentCountry || undefined,
       eta: voyage.eta || undefined,
+      mapLat: parseCoord(voyage.mapLat),
+      mapLng: parseCoord(voyage.mapLng),
+      lat: parseCoord(voyage.mapLat) ?? order.lat,
+      lng: parseCoord(voyage.mapLng) ?? order.lng,
       transitPorts,
       currentTransitIndex: transitIndex,
       photos: flattenPhotos(photos),
@@ -378,6 +400,8 @@ export default function AdminHomePage() {
           transitPorts,
           currentTransitIndex: transitIndex,
           eta: next.eta,
+          mapLat: next.mapLat ?? null,
+          mapLng: next.mapLng ?? null,
         });
         saved = mergeRemotePreserveLocal(next, remote);
         persist(saved, trackingCode);
@@ -445,6 +469,10 @@ export default function AdminHomePage() {
       lat: live?.lat ?? loaded?.lat,
       lng: live?.lng ?? loaded?.lng,
       eta: voyage.eta || live?.eta || loaded?.eta,
+      mapLat: parseCoord(voyage.mapLat),
+      mapLng: parseCoord(voyage.mapLng),
+      lat: parseCoord(voyage.mapLat) ?? live?.lat ?? loaded?.lat,
+      lng: parseCoord(voyage.mapLng) ?? live?.lng ?? loaded?.lng,
     };
 
     saveLocalOrder(shipment);
@@ -471,6 +499,8 @@ export default function AdminHomePage() {
         currentCountry: voyage.currentCountry || undefined,
         transitPorts,
         eta: voyage.eta || undefined,
+        mapLat: parseCoord(voyage.mapLat),
+        mapLng: parseCoord(voyage.mapLng),
       });
       saved = mergeRemotePreserveLocal(shipment, { ...remote, ...shipment, trackingCode: remote.trackingCode || trackingCode });
       persist(saved, trackingCode);

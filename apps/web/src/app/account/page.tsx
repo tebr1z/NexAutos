@@ -89,7 +89,7 @@ export default function AccountPage() {
               </div>
               <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-2xl bg-bg p-4"><p className="text-xs text-muted">{t.account.trackCode}</p><p className="mt-1 truncate font-mono">{order.trackingCode}</p></div>
-                <div className="rounded-2xl bg-bg p-4"><p className="text-xs text-muted">{t.track.eta}</p><p className="mt-1">{order.eta ? formatDate(order.eta) : t.track.pending}</p></div>
+                <div className="rounded-2xl bg-bg p-4"><p className="text-xs text-muted">{t.track.eta}</p><p className="mt-1">{order.currentStatus === "DELIVERED" ? (TRACKING_STEPS.find((step) => step.key === "DELIVERED")?.[locale] ?? t.track.pending) : order.eta ? formatDate(order.eta) : t.track.pending}</p></div>
               </div>
               <Link href={`/track/${order.trackingCode}`} className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-royal">{t.account.trackMore} <ArrowRight size={16} className="transition group-hover:translate-x-1" /></Link>
             </article>

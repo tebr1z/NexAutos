@@ -36,6 +36,11 @@ export function shouldNotifyStatus(status: string) {
   return (SMS_NOTIFY_STATUSES as readonly string[]).includes(status);
 }
 
+/** Dəniz mərhələlərində xəritə gəmi IMO/AIS-dən; qalanında liman və ya əl pin. */
+export function isLiveVesselMapStatus(status: string) {
+  return status === "LOADED_CONTAINER" || status === "SHIP_DEPARTED" || status === "IN_TRANSIT";
+}
+
 export const DESTINATION_PORTS = [
   { value: "Batumi", az: "Batum", en: "Batumi", ru: "Батуми", tr: "Batum", country: "Georgia" },
   { value: "Poti", az: "Poti", en: "Poti", ru: "Поти", tr: "Poti", country: "Georgia" },

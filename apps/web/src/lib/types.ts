@@ -47,6 +47,8 @@ export type TrackingShipment = {
   containerStatus?: string;
   lat?: number;
   lng?: number;
+  mapLat?: number;
+  mapLng?: number;
   originPort?: string;
   destinationPort?: string;
   currentCountry?: string;

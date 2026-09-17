@@ -58,6 +58,8 @@ export function mapOrder(order: {
   destinationPort: string | null;
   currentCountry: string | null;
   currentPort: string | null;
+  mapLat?: number | null;
+  mapLng?: number | null;
   transitPorts?: unknown;
   eta: Date | null;
   currentStatus: string;
@@ -98,6 +100,10 @@ export function mapOrder(order: {
     destinationPort: order.destinationPort,
     currentCountry: order.currentCountry,
     currentPort: order.currentPort,
+    mapLat: order.mapLat ?? undefined,
+    mapLng: order.mapLng ?? undefined,
+    lat: order.mapLat ?? undefined,
+    lng: order.mapLng ?? undefined,
     transitPorts: parseTransitRoute(order.transitPorts).stops,
     currentTransitIndex: parseTransitRoute(order.transitPorts).currentIndex,
     eta: order.eta?.toISOString(),

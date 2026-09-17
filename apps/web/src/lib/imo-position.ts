@@ -68,5 +68,22 @@ export async function lookupPositionByImo(imo: string): Promise<VesselPosition |
   if (digits.length !== 7) return null;
   const mmsi = await mmsiFromWikidata(digits);
   if (!mmsi) return null;
-  return positionDigitraffic(mmsi);
+  const pos = await positionDigitraffic(mmsi);
+  if (pos) return { ...pos, imo: Number(digits), mmsi: Number(mmsi) };
+  return {
+    source: "imo",
+    name: null,
+    imo: Number(digits),
+    mmsi: Number(mmsi),
+    latitude: null,
+    longitude: null,
+    speed: null,
+    course: null,
+    heading: null,
+    destination: null,
+    lastUpdate: null,
+    aisStatus: null,
+    navStat: null,
+    hasCoordinates: false,
+  };
 }

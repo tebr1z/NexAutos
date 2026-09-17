@@ -1,6 +1,6 @@
 import type { AuctionHouse, Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsArray, IsEmail, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
 
 const AUCTION_HOUSES = {
   COPART: 'COPART',
@@ -77,6 +77,16 @@ export class CreateOrderDto {
   eta?: string;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  mapLat?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  mapLng?: number;
+
+  @IsOptional()
   @IsString()
   notes?: string;
 
@@ -141,6 +151,16 @@ export class UpdateVoyageDto {
   @IsOptional()
   @IsString()
   eta?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  mapLat?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  mapLng?: number;
 
   @IsOptional()
   @IsString()

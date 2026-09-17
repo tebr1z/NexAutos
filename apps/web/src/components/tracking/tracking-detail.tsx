@@ -6,7 +6,7 @@ import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { api } from "@/lib/api";
 import { getLocalOrder, overlayLocal } from "@/lib/local-orders";
-import { SITE } from "@/lib/constants";
+import { SITE, TRACKING_STEPS, isLiveVesselMapStatus } from "@/lib/constants";
 import type { TrackingShipment } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { findPortCoords } from "@/lib/carriers";
@@ -79,7 +79,17 @@ async function pinFromPorts(shipment: TrackingShipment): Promise<TrackingShipmen
 }
 
 async function locateShipment(shipment: TrackingShipment) {
-  return pinFromPorts(await pinFromImo(shipment));
+  if (isLiveVesselMapStatus(shipment.currentStatus) && shipment.vesselImo) {
+    const withImo = await pinFromImo(shipment);
+    if (withImo.lat != null && withImo.lng != null) return withImo;
+  }
+  if (shipment.mapLat != null && shipment.mapLng != null) {
+    return { ...shipment, lat: shipment.mapLat, lng: shipment.mapLng };
+  }
+  if (!isLiveVesselMapStatus(shipment.currentStatus)) {
+    return pinFromPorts({ ...shipment, lat: undefined, lng: undefined });
+  }
+  return pinFromPorts(shipment);
 }
 
 function seedShipment(code: string) {
@@ -104,9 +114,16 @@ function keepLocalRoute(prev: TrackingShipment, ocean: Partial<TrackingShipment>
   };
 }
 
+function arrivalText(shipment: TrackingShipment, pending: string, locale: "az" | "en" | "ru" | "tr") {
+  if (shipment.currentStatus === "DELIVERED") {
+    return TRACKING_STEPS.find((step) => step.key === "DELIVERED")?.[locale] ?? pending;
+  }
+  return shipment.eta ? formatDate(shipment.eta) : pending;
+}
+
 export function TrackingDetail({ code }: { code: string }) {
   const { t, locale } = useI18n();
-  const [data, setData] = useState<TrackingShipment | null>(() => seedShipment(code));
+  const [data, setData] = useState<TrackingShipment | null>(null);
   const [error, setError] = useState("");
   const [aisPending, setAisPending] = useState(false);
 
@@ -221,8 +238,10 @@ export function TrackingDetail({ code }: { code: string }) {
       <div className="mt-5 rounded-3xl border border-royal/25 bg-royal/5 p-5 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:p-6">
         <div>
           <p className="text-[11px] uppercase tracking-[0.32em] text-royal">{t.track.eta}</p>
-          <p className="font-display mt-2 text-2xl sm:text-3xl">{data.eta ? formatDate(data.eta) : t.track.pending}</p>
-          <p className="mt-2 max-w-xl text-xs leading-5 text-muted">{t.track.etaHint}</p>
+          <p className="font-display mt-2 text-2xl sm:text-3xl">{arrivalText(data, t.track.pending, locale)}</p>
+          {data.currentStatus !== "DELIVERED" ? (
+            <p className="mt-2 max-w-xl text-xs leading-5 text-muted">{t.track.etaHint}</p>
+          ) : null}
         </div>
         <CalendarClock className="mt-4 hidden h-10 w-10 text-royal sm:mt-0 sm:block" />
       </div>
@@ -231,7 +250,7 @@ export function TrackingDetail({ code }: { code: string }) {
         <InfoCard icon={MapPin} label={t.track.location} value={location || t.track.pending} />
         <InfoCard icon={Ship} label={t.track.vessel} value={data.vesselName || t.track.unset} detail={data.vesselImo ? `IMO ${data.vesselImo}` : undefined} />
         <InfoCard icon={Container} label={t.track.container} value={data.containerNumber || t.track.unset} detail={data.carrierName} mono />
-        <InfoCard icon={CalendarClock} label={t.track.eta} value={data.eta ? formatDate(data.eta) : t.track.pending} />
+        <InfoCard icon={CalendarClock} label={t.track.eta} value={arrivalText(data, t.track.pending, locale)} />
       </div>
 
       <ShippingNotice className="mt-6" />

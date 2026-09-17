@@ -48,6 +48,16 @@ function normalizeTrackingCode(raw?: string) {
 
 const ARCHIVE_MS = 30 * 24 * 60 * 60 * 1000;
 
+function coord(value?: number | null) {
+  if (value === undefined) return undefined;
+  if (value === null || !Number.isFinite(Number(value))) return null;
+  return Number(value);
+}
+
+function isLiveVesselMapStatus(status?: string | null) {
+  return status === 'LOADED_CONTAINER' || status === 'SHIP_DEPARTED' || status === 'IN_TRANSIT';
+}
+
 function normalizeImo(raw?: string) {
   if (raw === undefined) return undefined;
   const digits = raw.replace(/\D/g, '');
@@ -116,6 +126,8 @@ export class OrdersService {
         destinationPort: opt(dto.destinationPort) ?? ocean?.destinationPort,
         currentCountry: opt(dto.currentCountry) ?? ocean?.currentCountry,
         currentPort: opt(dto.currentPort) ?? ocean?.currentPort,
+        mapLat: coord(dto.mapLat) ?? ocean?.lat ?? undefined,
+        mapLng: coord(dto.mapLng) ?? ocean?.lng ?? undefined,
         transitPorts: packTransits(undefined, dto.transitPorts, dto.currentTransitIndex),
         eta: dto.eta ? new Date(dto.eta) : ocean?.eta ? new Date(ocean.eta) : undefined,
         notes: dto.notes,
@@ -240,6 +252,8 @@ export class OrdersService {
     const voyageNumber = opt(dto.voyageNumber);
     const containerNumber = opt(dto.containerNumber);
     const trackingCode = normalizeTrackingCode(dto.trackingCode);
+    const mapLat = coord(dto.mapLat);
+    const mapLng = coord(dto.mapLng);
     const eta =
       dto.eta === undefined
         ? undefined
@@ -266,6 +280,8 @@ export class OrdersService {
         ...(voyageNumber !== undefined ? { voyageNumber } : {}),
         ...(trackingCode ? { trackingCode } : {}),
         ...(eta !== undefined ? { eta } : {}),
+        ...(mapLat !== undefined ? { mapLat } : {}),
+        ...(mapLng !== undefined ? { mapLng } : {}),
         events: {
           create: {
             status: existing.currentStatus,
@@ -323,8 +339,8 @@ export class OrdersService {
         destinationPort: mapped.destinationPort || ocean.destinationPort,
         containerStatus: mapped.containerStatus || ocean.containerStatus,
         eta: mapped.eta || ocean.eta,
-        lat: pin.lat ?? ocean.lat,
-        lng: pin.lng ?? ocean.lng,
+        lat: pin.lat ?? mapped.lat ?? ocean.lat,
+        lng: pin.lng ?? mapped.lng ?? ocean.lng,
       };
     } catch {
       return { ...mapped, ...pin };
@@ -332,29 +348,42 @@ export class OrdersService {
   }
 
   private async resolvePin(order: {
+    currentStatus?: string | null;
     vesselImo?: string | null;
     vesselName?: string | null;
     currentPort?: string | null;
     destinationPort?: string | null;
     originPort?: string | null;
     containerNumber?: string | null;
+    mapLat?: number | null;
+    mapLng?: number | null;
   }) {
-    if (order.vesselImo) {
-      try {
-        const pos = await this.vessels.positionByImo(order.vesselImo);
-        if (pos?.hasCoordinates) return { lat: pos.latitude ?? undefined, lng: pos.longitude ?? undefined };
-      } catch {
-        /* IMO AIS optional */
+    const manual =
+      order.mapLat != null && order.mapLng != null
+        ? { lat: order.mapLat, lng: order.mapLng }
+        : null;
+
+    if (isLiveVesselMapStatus(order.currentStatus)) {
+      if (order.vesselImo) {
+        try {
+          const pos = await this.vessels.positionByImo(order.vesselImo);
+          if (pos?.hasCoordinates) return { lat: pos.latitude ?? undefined, lng: pos.longitude ?? undefined };
+        } catch {
+          /* IMO AIS optional */
+        }
+      }
+      if (order.vesselName) {
+        try {
+          const pos = await this.vessels.positionByName(order.vesselName);
+          if (pos?.hasCoordinates) return { lat: pos.latitude ?? undefined, lng: pos.longitude ?? undefined };
+        } catch {
+          /* name AIS optional */
+        }
       }
     }
-    if (order.vesselName) {
-      try {
-        const pos = await this.vessels.positionByName(order.vesselName);
-        if (pos?.hasCoordinates) return { lat: pos.latitude ?? undefined, lng: pos.longitude ?? undefined };
-      } catch {
-        /* name AIS optional */
-      }
-    }
+
+    if (manual) return manual;
+
     const port = attachPortCoords({
       containerNumber: order.containerNumber || '',
       validFormat: false,

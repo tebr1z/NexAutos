@@ -1,6 +1,6 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AisError, fetchVesselPosition, searchVesselsByImo, searchVesselsByName, type VesselHit, type VesselPosition } from './ais';
+import { AisError, emptyPosition, fetchVesselPosition, searchVesselsByImo, searchVesselsByName, type VesselHit, type VesselPosition } from './ais';
 import { mmsiFromWikidata } from './imo-lookup';
 
 @Injectable()
@@ -44,23 +44,39 @@ export class VesselsService {
   async positionByImo(imo: string): Promise<VesselPosition | null> {
     const digits = String(imo).replace(/\D/g, '');
     if (digits.length !== 7) return null;
-    try {
-      const results = await searchVesselsByImo(digits);
-      const hit = results.find((row) => row.mmsi) ?? results[0];
-      if (hit?.mmsi) return this.position(String(hit.mmsi));
 
-      const wiki = await mmsiFromWikidata(digits);
-      if (wiki?.mmsi) {
-        const pos = await this.position(wiki.mmsi);
-        return {
-          ...pos,
-          imo: Number(digits),
-          name: pos.name || wiki.name,
-        };
+    const wiki = await mmsiFromWikidata(digits).catch(() => null);
+    let mmsi = wiki?.mmsi && wiki.mmsi.length === 9 ? wiki.mmsi : '';
+    let name = wiki?.name ?? null;
+
+    if (!mmsi) {
+      try {
+        const results = await searchVesselsByImo(digits);
+        const hit = results.find((row) => row.mmsi) ?? results[0];
+        if (hit?.mmsi) {
+          mmsi = String(hit.mmsi);
+          name = hit.name || name;
+        }
+      } catch {
+        /* Digitrafffic yalnız Baltikdir — IMO tapılmasa davam */
       }
-      return null;
+    }
+
+    if (!mmsi) {
+      return name ? emptyPosition(0, { source: 'imo', name, imo: Number(digits) }) : null;
+    }
+
+    try {
+      const pos = await this.position(mmsi);
+      return {
+        ...pos,
+        imo: Number(digits),
+        name: pos.name || name,
+        mmsi: Number(mmsi),
+      };
     } catch (err) {
-      this.rethrow(err);
+      if (err instanceof AisError && err.status === 401) this.rethrow(err);
+      return emptyPosition(Number(mmsi), { source: 'imo', name, imo: Number(digits) });
     }
   }
 
