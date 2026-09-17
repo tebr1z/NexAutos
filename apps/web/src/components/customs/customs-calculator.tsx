@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Locale } from "@/lib/constants";
@@ -153,6 +154,8 @@ function DateField({
 
 export function CustomsCalculator() {
   const { t, locale } = useI18n();
+  const search = useSearchParams();
+  const autoOnce = useRef(false);
   const [options, setOptions] = useState<Options | null>(null);
   const [autoType, setAutoType] = useState("");
   const [engineType, setEngineType] = useState("");
@@ -168,25 +171,33 @@ export function CustomsCalculator() {
 
   const engines = sortEngines(options?.AutoEngineTypes ?? []);
   const categories = options?.AutoCategories ?? [];
+  const query = search.toString();
 
   useEffect(() => {
+    const params = new URLSearchParams(query);
     api
       .customsOptions(locale)
       .then((data) => {
         const list = sortEngines(data.AutoEngineTypes ?? []);
         setOptions({ ...data, AutoEngineTypes: list });
-        setAutoType((current) => current || data.AutoCategories[0]?.code || "");
-        setEngineType((current) => {
-          if (current && list.some((row) => engineKey(row) === current)) return current;
-          const benzine = list.find((row) => row.code === "1") ?? list[0];
-          return benzine ? engineKey(benzine) : "";
-        });
+        setAutoType(data.AutoCategories[0]?.code || "");
+        const year = params.get("year");
+        const engineCc = params.get("engine");
+        const priceQ = params.get("price");
+        const freightQ = params.get("freight");
+        const fuelCode = params.get("fuelCode");
+        if (year && /^(19|20)\d{2}$/.test(year)) setIssueDate(`${year}-06-15`);
+        if (engineCc && Number(engineCc) > 0) setEngine(engineCc);
+        if (priceQ && Number(priceQ) > 0) setPrice(priceQ);
+        if (freightQ && Number(freightQ) > 0) setFreight(freightQ);
+        const match = fuelCode ? list.find((row) => row.code === fuelCode) : null;
+        const benzine = list.find((row) => row.code === "1") ?? list[0];
+        setEngineType(match ? engineKey(match) : benzine ? engineKey(benzine) : "");
       })
       .catch(() => setError(t.pages.customsFail));
-  }, [locale, t.pages.customsFail]);
+  }, [locale, query, t.pages.customsFail]);
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
+  async function runDuty() {
     const picked = engines.find((row) => engineKey(row) === engineType);
     if (!picked || !autoType) return;
     setBusy(true);
@@ -211,6 +222,23 @@ export function CustomsCalculator() {
       setError(err instanceof Error ? err.message : t.pages.customsFail);
     }
     setBusy(false);
+  }
+
+  useEffect(() => {
+    const params = new URLSearchParams(query);
+    if (params.get("auto") !== "1") return;
+    if (autoOnce.current || !options || !engineType || !autoType) return;
+    if (params.get("engine") && engine !== params.get("engine")) return;
+    if (params.get("price") && price !== params.get("price")) return;
+    if (params.get("freight") && freight !== params.get("freight")) return;
+    autoOnce.current = true;
+    void runDuty();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options, engineType, autoType, engine, price, freight, issueDate, query]);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    await runDuty();
   }
 
   return (

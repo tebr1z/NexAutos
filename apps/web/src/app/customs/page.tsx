@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { CustomsCalculator } from "@/components/customs/customs-calculator";
 
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function CustomsPage() {
-  return <CustomsCalculator />;
+  return (
+    <Suspense fallback={<div className="px-5 pt-32 text-muted">…</div>}>
+      <CustomsCalculator />
+    </Suspense>
+  );
 }

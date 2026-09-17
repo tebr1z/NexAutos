@@ -369,6 +369,48 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  shippingQuote: (payload: { url?: string; priceUsd: number; state?: string; auction?: string }) =>
+    request<{
+      lot?: {
+        title?: string;
+        vin?: string;
+        location?: string;
+        shippingFrom?: string;
+        state?: string;
+        auction?: string;
+        year?: number;
+        engineCc?: number;
+        engineLabel?: string;
+        fuel?: string;
+      } | null;
+      state: string;
+      stateName?: string;
+      auction: string;
+      band: { id: string; min: number; max: number };
+      priceUsd: number;
+      year?: number;
+      engineCc?: number;
+      fuel?: string;
+      dgkEngineCode?: string;
+      oceanUsd: number | null;
+      tirUsd: number;
+      totalUsd: number | null;
+      missing: boolean;
+      cellKey: string;
+    }>("/shipping/quote", { method: "POST", body: JSON.stringify(payload) }),
+  shippingMeta: () =>
+    request<{
+      bands: { id: string; min: number; max: number }[];
+      auctions: string[];
+      states: { code: string; name: string }[];
+    }>("/shipping/meta"),
+  shippingRates: () =>
+    request<{ tirUsd: number; cells: Record<string, number | null> }>("/shipping/rates"),
+  saveShippingRates: (payload: { tirUsd: number; cells: Record<string, number | null> }) =>
+    request<{ tirUsd: number; cells: Record<string, number | null> }>("/shipping/rates", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
   catalogManage: () => request<CatalogCar[]>("/catalog/manage"),
   createCatalogCar: (payload: Record<string, unknown>) =>
     request<CatalogCar>("/catalog", { method: "POST", body: JSON.stringify(payload) }),
