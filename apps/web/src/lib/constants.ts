@@ -8,12 +8,47 @@ export const TRACKING_STEPS = [
   { key: "SHIP_DEPARTED", en: "Ship Departed", az: "Gəmi yola düşüb", ru: "Судно отправилось", tr: "Gemi yola çıktı" },
   { key: "IN_TRANSIT", en: "In Transit", az: "Yoldadır", ru: "В пути", tr: "Yolda" },
   { key: "DESTINATION_PORT", en: "Destination Port", az: "Təyinat limanı", ru: "Порт назначения", tr: "Varış limanı" },
+  { key: "TIR_LOADED", en: "Loaded on truck", az: "TIR yüklənib", ru: "Погружено на фуру", tr: "TIR yüklendi" },
+  { key: "TIR_DEPARTED", en: "Truck departed", az: "TIR yola çıxıb", ru: "Фура выехала", tr: "TIR yola çıktı" },
+  { key: "TIR_GEORGIA_BORDER", en: "At Georgia border", az: "TIR Gürcüstan sərhədindədir", ru: "Фура на границе Грузии", tr: "TIR Gürcistan sınırında" },
+  { key: "TIR_BAKU_CUSTOMS", en: "At Baku customs", az: "TIR Bakı gömrüyündədir", ru: "Фура на таможне Баку", tr: "TIR Bakü gümrüğünde" },
   { key: "CUSTOMS_CLEARANCE", en: "Customs Clearance", az: "Gömrük rəsmiləşdirməsi", ru: "Таможенное оформление", tr: "Gümrükleme" },
   { key: "READY_FOR_DELIVERY", en: "Ready For Delivery", az: "Çatdırılmağa hazır", ru: "Готово к доставке", tr: "Teslime hazır" },
   { key: "DELIVERED", en: "Delivered", az: "Çatdırılıb", ru: "Доставлено", tr: "Teslim edildi" },
 ] as const;
 
 export type ShipmentStatus = (typeof TRACKING_STEPS)[number]["key"] | "CANCELLED";
+
+export const DESTINATION_PORTS = [
+  { value: "Batumi", az: "Batum", en: "Batumi", ru: "Батуми", tr: "Batum", country: "Georgia" },
+  { value: "Poti", az: "Poti", en: "Poti", ru: "Поти", tr: "Poti", country: "Georgia" },
+] as const;
+
+export type DestinationPortValue = (typeof DESTINATION_PORTS)[number]["value"];
+
+export function destinationPortName(port: string | null | undefined, locale: "az" | "en" | "ru" | "tr" = "az") {
+  const raw = port?.trim();
+  if (!raw) return "";
+  const hit = DESTINATION_PORTS.find((row) => row.value.toLowerCase() === raw.toLowerCase() || row.az.toLowerCase() === raw.toLowerCase());
+  return hit ? hit[locale] : raw;
+}
+
+export function locationForStatus(
+  status: ShipmentStatus,
+  destinationPort?: string | null,
+): { currentPort?: string; currentCountry?: string } {
+  const dest = destinationPort?.trim();
+  if (status === "DESTINATION_PORT" || status === "TIR_LOADED" || status === "TIR_DEPARTED") {
+    return dest ? { currentPort: dest, currentCountry: "Georgia" } : {};
+  }
+  if (status === "TIR_GEORGIA_BORDER") {
+    return { currentPort: "Gürcüstan sərhədi", currentCountry: "Georgia" };
+  }
+  if (status === "TIR_BAKU_CUSTOMS") {
+    return { currentPort: "Bakı gömrüyü", currentCountry: "Azerbaijan" };
+  }
+  return {};
+}
 
 export const AUCTIONS = ["COPART", "IAAI", "MANHEIM"] as const;
 

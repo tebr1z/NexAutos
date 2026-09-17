@@ -6,12 +6,26 @@ import { VesselsService } from '../vessels/vessels.service';
 import { attachPortCoords } from '../containers/registry';
 import { CreateOrderDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { generateTrackingCode, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
-import { NotifyService } from '../notify/notify.service';
+import { NotifyService, statusLabelAz } from '../notify/notify.service';
 
 function opt(value?: string) {
   if (value === undefined) return undefined;
   const t = value.trim();
   return t === '' ? null : t;
+}
+
+function locationForStatus(status: ShipmentStatus, destinationPort?: string | null) {
+  const dest = destinationPort?.trim();
+  if (status === 'DESTINATION_PORT' || status === 'TIR_LOADED' || status === 'TIR_DEPARTED') {
+    return dest ? { currentPort: dest, currentCountry: 'Georgia' } : {};
+  }
+  if (status === 'TIR_GEORGIA_BORDER') {
+    return { currentPort: 'Gürcüstan sərhədi', currentCountry: 'Georgia' };
+  }
+  if (status === 'TIR_BAKU_CUSTOMS') {
+    return { currentPort: 'Bakı gömrüyü', currentCountry: 'Azerbaijan' };
+  }
+  return {};
 }
 
 function packTransits(existing: unknown, stops?: unknown[], currentIndex?: number) {
@@ -226,6 +240,12 @@ export class OrdersService {
     const voyageNumber = opt(dto.voyageNumber);
     const containerNumber = opt(dto.containerNumber);
     const trackingCode = normalizeTrackingCode(dto.trackingCode);
+    const eta =
+      dto.eta === undefined
+        ? undefined
+        : dto.eta.trim() && !Number.isNaN(Date.parse(dto.eta))
+          ? new Date(dto.eta)
+          : null;
 
     if (trackingCode && trackingCode !== existing.trackingCode) {
       const clash = await this.prisma.order.findUnique({ where: { trackingCode } });
@@ -245,6 +265,7 @@ export class OrdersService {
         ...(transitPorts !== undefined ? { transitPorts } : {}),
         ...(voyageNumber !== undefined ? { voyageNumber } : {}),
         ...(trackingCode ? { trackingCode } : {}),
+        ...(eta !== undefined ? { eta } : {}),
         events: {
           create: {
             status: existing.currentStatus,
@@ -355,10 +376,13 @@ export class OrdersService {
       dto.currentTransitIndex !== undefined
         ? packTransits((existing as { transitPorts?: unknown }).transitPorts, undefined, dto.currentTransitIndex)
         : undefined;
+    const location = locationForStatus(status, existing.destinationPort);
+    const title = statusLabelAz(status);
     const order = await this.prisma.order.update({
       where: { id },
       data: {
         currentStatus: status,
+        ...location,
         ...(status === 'DELIVERED'
           ? { deliveredAt: (existing as { deliveredAt?: Date | null }).deliveredAt ?? new Date() }
           : {}),
@@ -366,8 +390,8 @@ export class OrdersService {
         events: {
           create: {
             status,
-            title: status.replaceAll('_', ' '),
-            description: dto.note || `Hazırkı mərhələ: ${status}`,
+            title,
+            description: dto.note || `Hazırkı mərhələ: ${title}`,
             occurredAt: new Date(),
           },
         },

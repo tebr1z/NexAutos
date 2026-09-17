@@ -133,14 +133,14 @@ export function Header() {
               "rounded-full p-2 transition",
               onDarkHero ? "text-white hover:bg-white/15" : "text-fg hover:bg-fg/10",
             )}
-            aria-label="Toggle theme"
+            aria-label={t.common.theme}
           >
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
           <Link
             href={user?.role === "CUSTOMER" ? "/account" : user ? "/admin" : "/login"}
             className={cn("rounded-full p-2 transition", onDarkHero ? "text-white hover:bg-white/15" : "text-fg hover:bg-fg/10")}
-            aria-label={user ? "Hesabım" : "Daxil ol"}
+            aria-label={user ? t.nav.account : t.nav.login}
           >
             <UserRound size={17} />
           </Link>
@@ -159,7 +159,7 @@ export function Header() {
             type="button"
             className={cn("rounded-full p-2", onDarkHero ? "text-white hover:bg-white/15" : "text-fg hover:bg-fg/10")}
             onClick={() => setOpen((v) => !v)}
-            aria-label="Menu"
+            aria-label={t.common.menu}
           >
             {open ? <X /> : <Menu />}
           </button>
@@ -181,7 +181,7 @@ export function Header() {
               </Link>
             ))}
             <Link href={user?.role === "CUSTOMER" ? "/account" : user ? "/admin" : "/login"} onClick={() => setOpen(false)}>
-              {user ? "Hesabım" : "Daxil ol / Qeydiyyat"}
+              {user ? t.nav.account : t.nav.signIn}
             </Link>
             <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
               <LocaleSwitcher tone="bar" />

@@ -13,7 +13,7 @@ import {
   mergeRemotePreserveLocal,
 } from "@/lib/local-orders";
 import type { TrackingShipment } from "@/lib/types";
-import { TRACKING_STEPS, type ShipmentStatus } from "@/lib/constants";
+import { TRACKING_STEPS, locationForStatus, type ShipmentStatus } from "@/lib/constants";
 import { normalizePhone } from "@/lib/sms";
 import { buildJourney, journeyPosition, selectedJourneyValue, transitLabel, normalizeTransits } from "@/lib/journey";
 import { EMPTY_VOYAGE, VoyageFields, type VoyageValues } from "@/components/admin/voyage-fields";
@@ -71,6 +71,7 @@ function stageLabel(order: TrackingShipment) {
     order.transitPorts,
     order.currentTransitIndex,
     "az",
+    order.destinationPort,
   );
   return items[cursor]?.label ?? order.currentStatus;
 }
@@ -235,6 +236,7 @@ export default function AdminHomePage() {
       currentPort: order.currentPort ?? "",
       currentCountry: order.currentCountry ?? "",
       transitPorts: normalizeTransits(order.transitPorts),
+      eta: order.eta ?? "",
     });
     setPhotos(photosFromList(order.photos ?? []));
     setNotice("");
@@ -269,6 +271,7 @@ export default function AdminHomePage() {
       status === "IN_TRANSIT" && transitIdx >= 0 && transits[transitIdx]
         ? transitLabel(transits[transitIdx].place, "az")
         : (TRACKING_STEPS.find((s) => s.key === status)?.az ?? status);
+    const location = locationForStatus(status, order.destinationPort);
     const event = {
       status,
       title: label,
@@ -279,6 +282,7 @@ export default function AdminHomePage() {
       currentStatus: status,
       currentTransitIndex: transitIdx,
       transitPorts: transits,
+      ...location,
       deliveredAt: status === "DELIVERED" ? new Date().toISOString() : order.deliveredAt,
       events: [...(order.events ?? []), event],
     };
@@ -325,6 +329,15 @@ export default function AdminHomePage() {
     }
     const transitPorts = normalizeTransits(voyage.transitPorts);
     const { status, transitIndex } = parseJourney(journey, transitPorts.length);
+    if (
+      (status === "DESTINATION_PORT" || status === "TIR_LOADED" || status === "TIR_DEPARTED") &&
+      !voyage.destinationPort.trim()
+    ) {
+      setSaving(false);
+      window.alert("Təyinat limanı seçin: Batum və ya Poti.");
+      return;
+    }
+    const location = locationForStatus(status, voyage.destinationPort);
     const next: TrackingShipment = {
       ...order,
       trackingCode,
@@ -339,8 +352,9 @@ export default function AdminHomePage() {
       vesselImo: voyage.vesselImo.length === 7 ? voyage.vesselImo : undefined,
       originPort: voyage.originPort || undefined,
       destinationPort: voyage.destinationPort || undefined,
-      currentPort: voyage.currentPort || undefined,
-      currentCountry: voyage.currentCountry || undefined,
+      currentPort: location.currentPort || voyage.currentPort || undefined,
+      currentCountry: location.currentCountry || voyage.currentCountry || undefined,
+      eta: voyage.eta || undefined,
       transitPorts,
       currentTransitIndex: transitIndex,
       photos: flattenPhotos(photos),
@@ -362,6 +376,7 @@ export default function AdminHomePage() {
           currentCountry: next.currentCountry,
           transitPorts,
           currentTransitIndex: transitIndex,
+          eta: next.eta,
         });
         saved = mergeRemotePreserveLocal(next, remote);
         persist(saved, trackingCode);
@@ -428,7 +443,7 @@ export default function AdminHomePage() {
       containerStatus: live?.containerStatus || loaded?.containerStatus,
       lat: live?.lat ?? loaded?.lat,
       lng: live?.lng ?? loaded?.lng,
-      eta: live?.eta || loaded?.eta,
+      eta: voyage.eta || live?.eta || loaded?.eta,
     };
 
     saveLocalOrder(shipment);
@@ -454,6 +469,7 @@ export default function AdminHomePage() {
         currentPort: voyage.currentPort || undefined,
         currentCountry: voyage.currentCountry || undefined,
         transitPorts,
+        eta: voyage.eta || undefined,
       });
       saved = mergeRemotePreserveLocal(shipment, { ...remote, ...shipment, trackingCode: remote.trackingCode || trackingCode });
       persist(saved, trackingCode);
@@ -599,7 +615,13 @@ export default function AdminHomePage() {
     }
 
     const previewStage = parseJourney(journey, voyage.transitPorts.length);
-    const previewJourney = journeyPosition(previewStage.status, voyage.transitPorts, previewStage.transitIndex, "az");
+    const previewJourney = journeyPosition(
+      previewStage.status,
+      voyage.transitPorts,
+      previewStage.transitIndex,
+      "az",
+      voyage.destinationPort,
+    );
     const previewLabel = previewJourney.items[previewJourney.cursor]?.label ?? previewStage.status;
 
     return (
@@ -648,7 +670,7 @@ export default function AdminHomePage() {
               onChange={(e) => setJourney(e.target.value)}
               className="mt-1 w-full rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-sm text-white"
             >
-              {buildJourney(voyage.transitPorts, "az").map((item) => (
+              {buildJourney(voyage.transitPorts, "az", voyage.destinationPort).map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.label}
                 </option>

@@ -11,6 +11,10 @@ const STATUS_AZ: Record<string, string> = {
   SHIP_DEPARTED: 'Gəmi yola düşüb',
   IN_TRANSIT: 'Yoldadır',
   DESTINATION_PORT: 'Təyinat limanı',
+  TIR_LOADED: 'TIR yüklənib',
+  TIR_DEPARTED: 'TIR yola çıxıb',
+  TIR_GEORGIA_BORDER: 'TIR Gürcüstan sərhədindədir',
+  TIR_BAKU_CUSTOMS: 'TIR Bakı gömrüyündədir',
   CUSTOMS_CLEARANCE: 'Gömrük rəsmiləşdirməsi',
   READY_FOR_DELIVERY: 'Çatdırılmağa hazır',
   DELIVERED: 'Çatdırılıb',
@@ -35,6 +39,10 @@ export function normalizePhone(raw?: string | null): string | null {
 
 export function e164Phone(digits: string) {
   return digits.startsWith('+') ? digits : `+${digits}`;
+}
+
+export function statusLabelAz(status: string) {
+  return STATUS_AZ[status] ?? status.replaceAll('_', ' ');
 }
 
 export function statusSmsBody(input: {

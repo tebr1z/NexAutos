@@ -29,8 +29,10 @@ export type ContainerIntel = {
 };
 
 const PORTS: { keys: string[]; name: string; country: string; lat: number; lng: number }[] = [
+  { keys: ["GÖMRÜK", "GOMRUK"], name: "Bakı gömrüyü", country: "Azerbaijan", lat: 40.409, lng: 49.867 },
+  { keys: ["SƏRHƏD", "SERHED", "GEORGIA BORDER"], name: "Gürcüstan sərhədi", country: "Georgia", lat: 41.329, lng: 45.073 },
   { keys: ["POTI"], name: "Poti", country: "Georgia", lat: 42.155, lng: 41.672 },
-  { keys: ["BATUMI"], name: "Batumi", country: "Georgia", lat: 41.649, lng: 41.639 },
+  { keys: ["BATUMI", "BATUM"], name: "Batumi", country: "Georgia", lat: 41.649, lng: 41.639 },
   { keys: ["BAKU", "BAKI"], name: "Baku", country: "Azerbaijan", lat: 40.373, lng: 49.893 },
   { keys: ["SAVANNAH"], name: "Savannah", country: "United States", lat: 32.081, lng: -81.091 },
   { keys: ["BRUNSWICK"], name: "Brunswick", country: "United States", lat: 31.15, lng: -81.491 },

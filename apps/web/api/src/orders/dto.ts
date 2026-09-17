@@ -140,6 +140,10 @@ export class UpdateVoyageDto {
 
   @IsOptional()
   @IsString()
+  eta?: string;
+
+  @IsOptional()
+  @IsString()
   voyageNumber?: string;
 
   @IsOptional()

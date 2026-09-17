@@ -1,4 +1,4 @@
-import { TRACKING_STEPS, type Locale, type ShipmentStatus } from "@/lib/constants";
+import { TRACKING_STEPS, destinationPortName, type Locale, type ShipmentStatus } from "@/lib/constants";
 import type { TransitStop } from "@/lib/types";
 
 export type JourneyItem =
@@ -54,11 +54,14 @@ export function transitLabel(place: string, locale: string) {
   return `Tranzit ${p}`;
 }
 
-export function buildJourney(transits: unknown, locale: Locale): JourneyItem[] {
+export function buildJourney(transits: unknown, locale: Locale, destinationPort?: string | null): JourneyItem[] {
   const stops = normalizeTransits(transits);
+  const dest = destinationPortName(destinationPort, locale);
   const items: JourneyItem[] = [];
   for (const step of TRACKING_STEPS) {
-    items.push({ id: `step:${step.key}`, kind: "step", key: step.key, label: step[locale] });
+    const label =
+      step.key === "DESTINATION_PORT" && dest ? `${step[locale]} — ${dest}` : step[locale];
+    items.push({ id: `step:${step.key}`, kind: "step", key: step.key, label });
     if (step.key === "IN_TRANSIT") {
       stops.forEach((stop, index) => {
         items.push({
@@ -80,8 +83,9 @@ export function journeyPosition(
   transits: unknown,
   currentTransitIndex = -1,
   locale: Locale = "az",
+  destinationPort?: string | null,
 ) {
-  const items = buildJourney(transits, locale);
+  const items = buildJourney(transits, locale, destinationPort);
   const inTransit = TRACKING_STEPS.findIndex((s) => s.key === "IN_TRANSIT");
   const stepIndex = TRACKING_STEPS.findIndex((s) => s.key === status);
   let cursor = 0;

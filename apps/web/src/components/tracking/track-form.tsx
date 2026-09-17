@@ -37,9 +37,9 @@ export function TrackForm() {
         </button>
       </form>
       <div className="mt-10 grid gap-4 sm:grid-cols-3">
-        <Feature icon={ShieldCheck} title="Təhlükəsiz izləmə" text="Yalnız unikal kodunuzla məlumatlara baxın." />
-        <Feature icon={Box} title="Bütün mərhələlər" text="Alışdan təhvilə qədər hər yenilənməni görün." />
-        <Feature icon={ArrowRight} title="Canlı marşrut" text="Liman, gəmi, konteyner və təxmini tarixi izləyin." />
+        <Feature icon={ShieldCheck} title={t.track.featSafe} text={t.track.featSafeD} />
+        <Feature icon={Box} title={t.track.featStages} text={t.track.featStagesD} />
+        <Feature icon={ArrowRight} title={t.track.featLive} text={t.track.featLiveD} />
       </div>
       <ShippingNotice className="mx-auto mt-10 max-w-2xl" />
     </div>

@@ -163,9 +163,9 @@ export function TrackingDetail({ code }: { code: string }) {
       <div className="mx-auto max-w-2xl px-5 pt-32 pb-24 text-center">
         <div className="rounded-3xl border border-line bg-card px-6 py-14">
           <MapPin className="mx-auto text-muted" size={30} />
-          <h1 className="font-display mt-5 text-3xl">Göndəriş tapılmadı</h1>
+          <h1 className="font-display mt-5 text-3xl">{t.track.notFoundTitle}</h1>
           <p className="mt-3 text-muted">{error}</p>
-          <Link href="/track" className="mt-7 inline-flex rounded-full bg-fg px-6 py-3 text-sm text-bg">Yenidən axtar</Link>
+          <Link href="/track" className="mt-7 inline-flex rounded-full bg-fg px-6 py-3 text-sm text-bg">{t.track.searchAgain}</Link>
         </div>
       </div>
     );
@@ -181,6 +181,7 @@ export function TrackingDetail({ code }: { code: string }) {
     stops,
     data.currentTransitIndex,
     locale,
+    data.destinationPort,
   );
   const currentLabel = items[cursor]?.label ?? data.currentStatus;
   const route = [data.originPort, ...stops.map((s) => s.place), data.destinationPort].filter(Boolean).join(" → ");
@@ -196,19 +197,19 @@ export function TrackingDetail({ code }: { code: string }) {
             <span className="rounded-full bg-royal/10 px-3 py-1 text-xs font-medium text-royal">{currentLabel}</span>
           </div>
           <h1 className="font-display mt-2 text-4xl md:text-5xl">
-            {[data.year, data.make, data.model].filter(Boolean).join(" ") || "Avtomobiliniz"}
+            {[data.year, data.make, data.model].filter(Boolean).join(" ") || t.track.yourCar}
           </h1>
           <p className="mt-2 font-mono text-sm text-muted">VIN {data.vin}</p>
         </div>
         <div className="glass hidden items-center gap-4 rounded-2xl p-3 sm:flex">
-          <div className="pl-2 text-right"><p className="text-xs text-muted">Telefonda aç</p><p className="mt-1 text-sm">QR kodu oxudun</p></div>
+          <div className="pl-2 text-right"><p className="text-xs text-muted">{t.track.openPhone}</p><p className="mt-1 text-sm">{t.track.scanQr}</p></div>
           <QRCodeSVG value={`${SITE.url}/track/${data.trackingCode}`} size={72} bgColor="transparent" fgColor="currentColor" />
         </div>
       </div>
 
       <div className="mt-10 rounded-3xl border border-line bg-card p-5 sm:p-7">
         <div className="mb-2 flex justify-between text-sm">
-          <span className="text-muted">Ümumi irəliləyiş</span>
+          <span className="text-muted">{t.track.progressLabel}</span>
           <span className="font-medium text-royal">{Math.round(progress)}%</span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-fg/10">
@@ -217,26 +218,35 @@ export function TrackingDetail({ code }: { code: string }) {
         <div className="mt-4 flex items-center gap-2 text-sm"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-royal text-white"><Navigation size={13} /></span><span>{currentLabel}</span></div>
       </div>
 
+      <div className="mt-5 rounded-3xl border border-royal/25 bg-royal/5 p-5 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:p-6">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.32em] text-royal">{t.track.eta}</p>
+          <p className="font-display mt-2 text-2xl sm:text-3xl">{data.eta ? formatDate(data.eta) : t.track.pending}</p>
+          <p className="mt-2 max-w-xl text-xs leading-5 text-muted">{t.track.etaHint}</p>
+        </div>
+        <CalendarClock className="mt-4 hidden h-10 w-10 text-royal sm:mt-0 sm:block" />
+      </div>
+
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <InfoCard icon={MapPin} label="Hazırkı yer" value={location || "Dəqiqləşdirilir"} />
-        <InfoCard icon={Ship} label="Gəmi" value={data.vesselName || "Təyin edilməyib"} detail={data.vesselImo ? `IMO ${data.vesselImo}` : undefined} />
-        <InfoCard icon={Container} label="Konteyner" value={data.containerNumber || "Təyin edilməyib"} detail={data.carrierName} mono />
-        <InfoCard icon={CalendarClock} label="Təxmini çatma" value={data.eta ? formatDate(data.eta) : "Dəqiqləşdirilir"} />
+        <InfoCard icon={MapPin} label={t.track.location} value={location || t.track.pending} />
+        <InfoCard icon={Ship} label={t.track.vessel} value={data.vesselName || t.track.unset} detail={data.vesselImo ? `IMO ${data.vesselImo}` : undefined} />
+        <InfoCard icon={Container} label={t.track.container} value={data.containerNumber || t.track.unset} detail={data.carrierName} mono />
+        <InfoCard icon={CalendarClock} label={t.track.eta} value={data.eta ? formatDate(data.eta) : t.track.pending} />
       </div>
 
       <ShippingNotice className="mt-6" />
 
       {(route || location || vessel || data.containerNumber || data.eta) && (
         <div className="mt-8 rounded-3xl border border-line bg-card p-6">
-          <div className="flex items-center gap-3"><Navigation size={19} className="text-royal" /><div><h2 className="font-medium">Daşınma marşrutu</h2><p className="mt-1 text-xs text-muted">Başlanğıcdan təyinat nöqtəsinə qədər</p></div></div>
-          {route ? <p className="mt-6 flex flex-wrap items-center gap-2 text-sm">{[data.originPort, ...stops.map((s) => s.place), data.destinationPort].filter(Boolean).map((place, index, all) => <span key={`${place}-${index}`} className="contents"><span className="rounded-full bg-bg px-3 py-2">{place}</span>{index < all.length - 1 && <ArrowRight size={14} className="text-muted" />}</span>)}</p> : <p className="mt-5 text-sm text-muted">Marşrut məlumatı hazırlanır.</p>}
-          {aisPending && <p className="text-muted">IMO üzrə AIS mövqeyi axtarılır…</p>}
+          <div className="flex items-center gap-3"><Navigation size={19} className="text-royal" /><div><h2 className="font-medium">{t.track.routeTitle}</h2><p className="mt-1 text-xs text-muted">{t.track.routeSub}</p></div></div>
+          {route ? <p className="mt-6 flex flex-wrap items-center gap-2 text-sm">{[data.originPort, ...stops.map((s) => s.place), data.destinationPort].filter(Boolean).map((place, index, all) => <span key={`${place}-${index}`} className="contents"><span className="rounded-full bg-bg px-3 py-2">{place}</span>{index < all.length - 1 && <ArrowRight size={14} className="text-muted" />}</span>)}</p> : <p className="mt-5 text-sm text-muted">{t.track.routePending}</p>}
+          {aisPending && <p className="mt-3 text-sm text-muted">{t.track.aisPending}</p>}
         </div>
       )}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,.95fr)]">
         <section className="rounded-3xl border border-line bg-card p-6 sm:p-8">
-          <div className="flex items-center gap-3"><CarFront size={20} className="text-royal" /><div><h2 className="text-xl font-medium">Göndəriş mərhələləri</h2><p className="mt-1 text-xs text-muted">Tam status ardıcıllığı</p></div></div>
+          <div className="flex items-center gap-3"><CarFront size={20} className="text-royal" /><div><h2 className="text-xl font-medium">{t.track.stagesTitle}</h2><p className="mt-1 text-xs text-muted">{t.track.stagesSub}</p></div></div>
       <ol className="mt-8 space-y-0">
         {items.map((item, i) => {
           const event = item.kind === "step" ? data.events.find((e) => e.status === item.key) : undefined;
@@ -263,15 +273,15 @@ export function TrackingDetail({ code }: { code: string }) {
 
         <div className="space-y-6">
           <section className="overflow-hidden rounded-3xl border border-line bg-card">
-            <div className="flex items-center justify-between p-5"><div><h2 className="font-medium">Canlı mövqe</h2><p className="mt-1 text-xs text-muted">{location || vessel || "Mövqe gözlənilir"}</p></div><MapPin size={20} className="text-royal" /></div>
-            {data.lat != null && data.lng != null ? <iframe title={data.vesselName ?? t.track.location} className="h-[320px] w-full border-0" src={`https://www.openstreetmap.org/export/embed.html?bbox=${data.lng - 2.2}%2C${data.lat - 1.3}%2C${data.lng + 2.2}%2C${data.lat + 1.3}&layer=mapnik&marker=${data.lat}%2C${data.lng}`} /> : <div className="flex h-52 items-center justify-center bg-bg text-sm text-muted">Koordinatlar yenilənir</div>}
+            <div className="flex items-center justify-between p-5"><div><h2 className="font-medium">{t.track.liveTitle}</h2><p className="mt-1 text-xs text-muted">{location || vessel || t.track.livePending}</p></div><MapPin size={20} className="text-royal" /></div>
+            {data.lat != null && data.lng != null ? <iframe title={data.vesselName ?? t.track.location} className="h-[320px] w-full border-0" src={`https://www.openstreetmap.org/export/embed.html?bbox=${data.lng - 2.2}%2C${data.lat - 1.3}%2C${data.lng + 2.2}%2C${data.lat + 1.3}&layer=mapnik&marker=${data.lat}%2C${data.lng}`} /> : <div className="flex h-52 items-center justify-center bg-bg text-sm text-muted">{t.track.coordsPending}</div>}
           </section>
 
-          {(data.invoice || data.documents.length > 0) && <section className="rounded-3xl border border-line bg-card p-6"><div className="flex items-center gap-3"><FileText size={19} className="text-royal" /><h2 className="font-medium">Sənədlər və ödəniş</h2></div>{data.invoice && <div className="mt-5 rounded-2xl bg-bg p-4 text-sm"><div className="flex justify-between gap-4"><span className="text-muted">Faktura {data.invoice.number}</span><span className="font-medium">${data.invoice.amountUsd.toLocaleString()}</span></div><p className="mt-2 text-xs text-royal">{data.invoice.status}</p></div>}<div className="mt-3 space-y-2">{data.documents.map((doc) => <a key={doc.url} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-line px-4 py-3 text-sm transition hover:bg-bg"><span>{doc.title}</span><Download size={15} className="text-muted" /></a>)}</div></section>}
+          {(data.invoice || data.documents.length > 0) && <section className="rounded-3xl border border-line bg-card p-6"><div className="flex items-center gap-3"><FileText size={19} className="text-royal" /><h2 className="font-medium">{t.track.docsTitle}</h2></div>{data.invoice && <div className="mt-5 rounded-2xl bg-bg p-4 text-sm"><div className="flex justify-between gap-4"><span className="text-muted">{t.track.invoice} {data.invoice.number}</span><span className="font-medium">${data.invoice.amountUsd.toLocaleString()}</span></div><p className="mt-2 text-xs text-royal">{data.invoice.status}</p></div>}<div className="mt-3 space-y-2">{data.documents.map((doc) => <a key={doc.url} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-line px-4 py-3 text-sm transition hover:bg-bg"><span>{doc.title}</span><Download size={15} className="text-muted" /></a>)}</div></section>}
         </div>
       </div>
 
-      {data.events.length > 0 && <section className="mt-8 rounded-3xl border border-line bg-card p-6 sm:p-8"><h2 className="text-xl font-medium">Yenilənmə tarixçəsi</h2><div className="mt-6 grid gap-3 md:grid-cols-2">{[...data.events].reverse().map((event, index) => <div key={`${event.occurredAt}-${index}`} className="rounded-2xl bg-bg p-4"><div className="flex items-start justify-between gap-3"><p className="text-sm font-medium">{event.title}</p><time className="shrink-0 text-xs text-muted">{formatDate(event.occurredAt)}</time></div>{event.description && <p className="mt-2 text-sm leading-6 text-muted">{event.description}</p>}{(event.port || event.country) && <p className="mt-2 text-xs text-royal">{[event.port, event.country].filter(Boolean).join(", ")}</p>}</div>)}</div></section>}
+      {data.events.length > 0 && <section className="mt-8 rounded-3xl border border-line bg-card p-6 sm:p-8"><h2 className="text-xl font-medium">{t.track.history}</h2><div className="mt-6 grid gap-3 md:grid-cols-2">{[...data.events].reverse().map((event, index) => <div key={`${event.occurredAt}-${index}`} className="rounded-2xl bg-bg p-4"><div className="flex items-start justify-between gap-3"><p className="text-sm font-medium">{event.title}</p><time className="shrink-0 text-xs text-muted">{formatDate(event.occurredAt)}</time></div>{event.description && <p className="mt-2 text-sm leading-6 text-muted">{event.description}</p>}{(event.port || event.country) && <p className="mt-2 text-xs text-royal">{[event.port, event.country].filter(Boolean).join(", ")}</p>}</div>)}</div></section>}
 
       {groupPhotos(data.photos).map((group) => (
         <section key={group.key} className="mt-8 rounded-3xl border border-line bg-card p-6 sm:p-8">
@@ -295,5 +305,5 @@ export function TrackingDetail({ code }: { code: string }) {
 }
 
 function InfoCard({ icon: Icon, label, value, detail, mono = false }: { icon: typeof MapPin; label: string; value: string; detail?: string; mono?: boolean }) {
-  return <div className="rounded-3xl border border-line bg-card p-5"><div className="flex items-center gap-2 text-xs text-muted"><Icon size={16} className="text-royal" />{label}</div><p className={`mt-4 truncate text-sm font-medium ${mono ? "font-mono" : ""}`}>{value}</p>{detail && <p className="mt-1 truncate text-xs text-muted">{detail}</p>}</div>;
+  return <div className="rounded-3xl border border-line bg-card p-5"><div className="flex items-center gap-2 text-xs text-muted"><Icon size={16} className="text-royal" />{label}</div><p className={`mt-4 text-sm font-medium ${mono ? "font-mono" : ""}`}>{value}</p>{detail && <p className="mt-1 truncate text-xs text-muted">{detail}</p>}</div>;
 }

@@ -1,4 +1,5 @@
 import type { TransitStop } from "@/lib/types";
+import { DESTINATION_PORTS } from "@/lib/constants";
 
 export type VoyageValues = {
   vesselName: string;
@@ -8,6 +9,7 @@ export type VoyageValues = {
   currentPort: string;
   currentCountry: string;
   transitPorts: TransitStop[];
+  eta: string;
 };
 
 export const EMPTY_VOYAGE: VoyageValues = {
@@ -18,6 +20,7 @@ export const EMPTY_VOYAGE: VoyageValues = {
   currentPort: "",
   currentCountry: "",
   transitPorts: [],
+  eta: "",
 };
 
 const field =
@@ -73,12 +76,36 @@ export function VoyageFields({
           onChange={(e) => set("originPort", e.target.value)}
           className={field}
         />
-        <input
-          placeholder="Son liman — Bakı"
-          value={value.destinationPort}
-          onChange={(e) => set("destinationPort", e.target.value)}
-          className={field}
-        />
+        <select
+          value={DESTINATION_PORTS.some((p) => p.value === value.destinationPort) ? value.destinationPort : value.destinationPort ? "__other__" : ""}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next === "__other__") return;
+            const hit = DESTINATION_PORTS.find((p) => p.value === next);
+            onChange({
+              ...value,
+              destinationPort: next,
+              currentCountry: hit?.country || value.currentCountry,
+              currentPort:
+                !value.currentPort ||
+                DESTINATION_PORTS.some((p) => p.value === value.currentPort) ||
+                value.currentPort === value.destinationPort
+                  ? next
+                  : value.currentPort,
+            });
+          }}
+          className="w-full rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-sm text-white"
+        >
+          <option value="">Təyinat limanı — Batum və ya Poti</option>
+          {DESTINATION_PORTS.map((port) => (
+            <option key={port.value} value={port.value}>
+              {port.az} limanı
+            </option>
+          ))}
+          {value.destinationPort && !DESTINATION_PORTS.some((p) => p.value === value.destinationPort) ? (
+            <option value="__other__">{value.destinationPort}</option>
+          ) : null}
+        </select>
         <input
           placeholder="Hazırkı yer"
           value={value.currentPort}
@@ -105,6 +132,29 @@ export function VoyageFields({
           inputMode="numeric"
         />
       </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="text-[11px] text-zinc-500">
+          Təxmini çatma vaxtı — tarix
+          <input
+            type="date"
+            value={splitAt(value.eta || undefined).date}
+            onChange={(e) => set("eta", joinAt(e.target.value, splitAt(value.eta || undefined).time) ?? "")}
+            className={`${field} mt-1`}
+          />
+        </label>
+        <label className="text-[11px] text-zinc-500">
+          Saat
+          <input
+            type="time"
+            value={splitAt(value.eta || undefined).time}
+            onChange={(e) => set("eta", joinAt(splitAt(value.eta || undefined).date, e.target.value) ?? "")}
+            className={`${field} mt-1`}
+          />
+        </label>
+      </div>
+      <p className="text-[11px] text-zinc-500">
+        Təyinat limanından sonra izləmədə TIR mərhələləri görünür: yüklənib → yola çıxıb → Gürcüstan sərhədi → Bakı gömrüyü.
+      </p>
 
       <div>
         <p className="text-sm">Tranzitlər</p>
