@@ -74,6 +74,8 @@ function normalizeImo(raw?: string | null) {
   return digits;
 }
 
+type MapPin = { lat?: number; lng?: number; vesselName?: string };
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -374,8 +376,8 @@ export class OrdersService {
     containerNumber?: string | null;
     mapLat?: number | null;
     mapLng?: number | null;
-  }) {
-    const manual =
+  }): Promise<MapPin> {
+    const manual: MapPin | null =
       order.mapLat != null && order.mapLng != null
         ? { lat: order.mapLat, lng: order.mapLng }
         : null;
