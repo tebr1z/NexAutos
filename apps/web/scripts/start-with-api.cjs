@@ -3,6 +3,7 @@
 const { spawn } = require("child_process");
 const net = require("net");
 const path = require("path");
+const { resolveDatabaseUrl } = require("../api/scripts/resolve-database-url.cjs");
 
 const root = path.join(__dirname, "..");
 const apiDir = path.join(root, "api");
@@ -66,6 +67,8 @@ function spawnChild(cmd, args, cwd, extraEnv, useShell) {
 
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
+
+process.env.DATABASE_URL = resolveDatabaseUrl(process.env.DATABASE_URL);
 
 console.log(`Starting Nest API on ${apiHost}:${apiPort} and Next.js on 0.0.0.0:${publicPort}`);
 

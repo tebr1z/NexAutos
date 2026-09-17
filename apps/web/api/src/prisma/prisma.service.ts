@@ -7,8 +7,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     try {
       await this.$connect();
     } catch (err) {
-      console.warn('Postgres unavailable — AIS and other live lookups still run; order/auth need the database.');
-      console.warn(err instanceof Error ? err.message : err);
+      const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code) : "";
+      console.warn("Postgres unavailable — AIS and other live lookups still run; login/orders need the database.");
+      console.warn(code || (err instanceof Error ? err.message : err));
     }
   }
 

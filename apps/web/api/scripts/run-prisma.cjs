@@ -23,6 +23,13 @@ const muslSchema = path.join(enginesDir, "schema-engine-linux-musl-openssl-3.0.x
 if (fs.existsSync(muslQuery)) process.env.PRISMA_QUERY_ENGINE_LIBRARY = muslQuery;
 if (fs.existsSync(muslSchema)) process.env.PRISMA_SCHEMA_ENGINE_BINARY = muslSchema;
 
+try {
+  const { resolveDatabaseUrl } = require("./resolve-database-url.cjs");
+  process.env.DATABASE_URL = resolveDatabaseUrl(process.env.DATABASE_URL);
+} catch (err) {
+  console.warn("DATABASE_URL resolve skipped:", err instanceof Error ? err.message : err);
+}
+
 function clientReady() {
   return fs.existsSync(clientJs);
 }

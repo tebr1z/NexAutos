@@ -23,13 +23,18 @@ async function proxy(req: Request, ctx: { params: Promise<{ path?: string[] }> }
 
   const headers = new Headers();
   req.headers.forEach((value, key) => {
-    if (!HOP_BY_HOP.has(key.toLowerCase())) headers.set(key, value);
+    const lower = key.toLowerCase();
+    if (HOP_BY_HOP.has(lower) || lower === "accept-encoding") return;
+    headers.set(key, value);
   });
 
   const init: RequestInit & { duplex?: "half" } = { method: req.method, headers, redirect: "manual" };
   if (req.method !== "GET" && req.method !== "HEAD") {
-    init.body = await req.arrayBuffer();
-    init.duplex = "half";
+    const body = await req.arrayBuffer();
+    if (body.byteLength > 0) {
+      init.body = body;
+      init.duplex = "half";
+    }
   }
 
   try {
