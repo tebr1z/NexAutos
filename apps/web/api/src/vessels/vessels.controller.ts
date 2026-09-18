@@ -14,7 +14,10 @@ export class VesselsController {
     const imo = query.imo?.trim();
     const name = query.name?.trim();
     if (mmsi) return this.vessels.position(mmsi);
-    if (imo) return this.vessels.positionByImo(imo).then((pos) => {
+    if (imo) return this.vessels.positionByImo(imo, {
+      lat: query.nearLat ? Number(query.nearLat) : undefined,
+      lng: query.nearLng ? Number(query.nearLng) : undefined,
+    }).then((pos) => {
       if (!pos) throw new NotFoundException('No AIS record for this IMO.');
       return pos;
     });

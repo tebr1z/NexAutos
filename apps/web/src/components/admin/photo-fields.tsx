@@ -10,16 +10,32 @@ import {
 async function readPhotos(files: FileList | null) {
   if (!files?.length) return [] as string[];
   const picked = [...files].slice(0, 12);
-  return Promise.all(
-    picked.map(
-      (file) =>
-        new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result ?? ""));
-          reader.readAsDataURL(file);
-        }),
-    ),
-  );
+  return Promise.all(picked.map(compressImage));
+}
+
+function compressImage(file: File) {
+  return new Promise<string>((resolve) => {
+    const img = new Image();
+    const blobUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const max = 1400;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(blobUrl);
+      resolve(canvas.toDataURL("image/jpeg", 0.74));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(blobUrl);
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.readAsDataURL(file);
+    };
+    img.src = blobUrl;
+  });
 }
 
 export function PhotoFields({

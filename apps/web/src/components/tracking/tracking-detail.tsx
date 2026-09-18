@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { api } from "@/lib/api";
@@ -38,7 +37,10 @@ async function pinFromImo(shipment: TrackingShipment): Promise<TrackingShipment>
   const imo = shipment.vesselImo?.replace(/\D/g, "") ?? "";
   if (imo.length !== 7) return withManualPin(shipment);
   try {
-    const pos = await api.vesselByImo(imo);
+    const pos = await api.vesselByImo(imo, {
+      lat: shipment.lat ?? shipment.mapLat,
+      lng: shipment.lng ?? shipment.mapLng,
+    });
     const name = pos?.name?.trim() || shipment.vesselName;
     if (!pos?.hasCoordinates || pos.latitude == null || pos.longitude == null) {
       return withManualPin({ ...shipment, vesselName: name, vesselImo: shipment.vesselImo || imo });
@@ -328,20 +330,14 @@ export function TrackingDetail({ code }: { code: string }) {
         </div>
       </div>
 
-      {data.events.length > 0 && <section className="mt-8 rounded-3xl border border-line bg-card p-6 sm:p-8"><h2 className="text-xl font-medium">{t.track.history}</h2><div className="mt-6 grid gap-3 md:grid-cols-2">{[...data.events].reverse().map((event, index) => <div key={`${event.occurredAt}-${index}`} className="rounded-2xl bg-bg p-4"><div className="flex items-start justify-between gap-3"><p className="text-sm font-medium">{event.title}</p><time className="shrink-0 text-xs text-muted">{formatDate(event.occurredAt)}</time></div>{event.description && <p className="mt-2 text-sm leading-6 text-muted">{event.description}</p>}{(event.port || event.country) && <p className="mt-2 text-xs text-royal">{[event.port, event.country].filter(Boolean).join(", ")}</p>}</div>)}</div></section>}
-
-      {groupPhotos(data.photos).map((group) => (
+      {groupPhotos(data.photos ?? []).map((group) => (
         <section key={group.key} className="mt-8 rounded-3xl border border-line bg-card p-6 sm:p-8">
           <h2 className="text-lg font-medium">{t.photoCats[group.key] ?? t.track.photos}</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {group.items.map((p) => (
-              <div key={p.url} className="relative aspect-[16/10] overflow-hidden rounded-2xl">
-                {p.url.startsWith("data:") || p.url.startsWith("blob:") ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.url} alt={p.caption ?? ""} className="h-full w-full object-cover" />
-                ) : (
-                  <Image src={p.url} alt={p.caption ?? ""} fill className="object-cover" />
-                )}
+              <div key={p.url.slice(0, 80)} className="relative aspect-[16/10] overflow-hidden rounded-2xl">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.url} alt={p.caption ?? ""} className="h-full w-full object-cover" />
               </div>
             ))}
           </div>

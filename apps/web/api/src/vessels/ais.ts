@@ -1,5 +1,5 @@
 const HTTP_TIMEOUT_MS = 8_000;
-const AISSTREAM_WAIT_MS = 75_000;
+const AISSTREAM_WAIT_MS = 22_000;
 const VESSEL_CACHE_TTL_MS = 180_000;
 const POSITION_CACHE_TTL_MS = 15 * 60_000;
 const AISSTREAM_URL = 'wss://stream.aisstream.io/v0/stream';
@@ -71,6 +71,78 @@ type DigitraffficVessel = {
 
 let vesselCache: { at: number; rows: DigitraffficVessel[] } = { at: 0, rows: [] };
 let aisstreamDownUntil = 0;
+
+export function resetAisstreamBackoff() {
+  aisstreamDownUntil = 0;
+}
+
+export function probeAisKey(apiKey: string, waitMs = 8_000): Promise<{ ok: boolean; message: string }> {
+  const Socket = (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
+  const key = apiKey.trim();
+  if (!Socket) return Promise.resolve({ ok: false, message: 'Bu serverdə WebSocket yoxdur.' });
+  if (!key) return Promise.resolve({ ok: false, message: 'AIS açarı yazılmayıb.' });
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (ok: boolean, message: string) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        ws.close();
+      } catch {
+        /* ignore */
+      }
+      resolve({ ok, message });
+    };
+
+    const timer = setTimeout(() => done(false, 'AISStream cavab vermədi (8s).'), waitMs);
+    const ws = new Socket(AISSTREAM_URL);
+
+    ws.addEventListener('open', () => {
+      ws.send(
+        JSON.stringify({
+          APIKey: key,
+          BoundingBoxes: [
+            [
+              [40, 28],
+              [42, 30],
+            ],
+          ],
+          FilterMessageTypes: ['PositionReport'],
+        }),
+      );
+    });
+
+    ws.addEventListener('message', (event) => {
+      let msg: any;
+      try {
+        msg = JSON.parse(wsDataToString(event.data));
+      } catch {
+        return;
+      }
+      if (typeof msg?.error === 'string') {
+        const invalid = /key|auth|unauthor/i.test(msg.error);
+        done(false, invalid ? 'Açar etibarsızdır.' : msg.error);
+        return;
+      }
+      const parsed = parseAisStream(msg);
+      if (parsed.kind === 'error') {
+        done(false, 'AISStream açarı rədd edildi.');
+        return;
+      }
+      if (parsed.kind === 'confirm' || parsed.kind === 'position') {
+        done(true, 'AISStream qoşuldu — açar işləyir.');
+      }
+    });
+
+    ws.addEventListener('error', () => done(false, 'AISStream WebSocket xətası.'));
+    ws.addEventListener('close', () => {
+      if (!settled) done(false, 'AISStream bağlantısı bağlandı.');
+    });
+  });
+}
+
 const positionCache = new Map<string, { at: number; pos: VesselPosition }>();
 const inflight = new Map<string, Promise<VesselPosition>>();
 
@@ -289,29 +361,20 @@ function parseAisStream(msg: any): { kind: string } & Partial<VesselPosition> {
   return { kind: 'ignore' };
 }
 
-function positionFromAisStream(mmsi: string, apiKey: string): Promise<VesselPosition> {
-  if (typeof WebSocket === 'undefined') {
+function positionFromAisStream(
+  mmsi: string,
+  apiKey: string,
+  waitMs = AISSTREAM_WAIT_MS,
+  boxes?: number[][][],
+): Promise<VesselPosition> {
+  const Socket = (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
+  if (!Socket) {
     return Promise.reject(new AisError('WebSocket is not available in this Node runtime.', 500));
   }
 
   return new Promise((resolve, reject) => {
     let settled = false;
-    let acc: VesselPosition = {
-      source: 'aisstream',
-      name: null,
-      imo: null,
-      mmsi: Number(mmsi),
-      latitude: null,
-      longitude: null,
-      speed: null,
-      course: null,
-      heading: null,
-      destination: null,
-      lastUpdate: null,
-      aisStatus: null,
-      navStat: null,
-      hasCoordinates: false,
-    };
+    let acc: VesselPosition = emptyPosition(Number(mmsi), { source: 'aisstream' });
 
     const finish = (err: AisError | null, data?: VesselPosition) => {
       if (settled) return;
@@ -329,20 +392,15 @@ function positionFromAisStream(mmsi: string, apiKey: string): Promise<VesselPosi
     const timer = setTimeout(() => {
       if (acc.hasCoordinates) finish(null, acc);
       else finish(new AisError('No AISStream position yet. The vessel may not be transmitting.', 504, true));
-    }, AISSTREAM_WAIT_MS);
+    }, waitMs);
 
-    const ws = new WebSocket(AISSTREAM_URL);
+    const ws = new Socket(AISSTREAM_URL);
 
     ws.addEventListener('open', () => {
       ws.send(
         JSON.stringify({
           APIKey: apiKey,
-          BoundingBoxes: [
-            [
-              [-90, -180],
-              [90, 180],
-            ],
-          ],
+          BoundingBoxes: boxes?.length ? boxes : TRADE_BOXES,
           FiltersShipMMSI: [String(mmsi)],
           FilterMessageTypes: [
             'PositionReport',
@@ -395,6 +453,107 @@ function positionFromAisStream(mmsi: string, apiKey: string): Promise<VesselPosi
   });
 }
 
+const TRADE_BOXES: number[][][] = [
+  [
+    [24, -98],
+    [42, -68],
+  ],
+  [
+    [18, -80],
+    [48, -6],
+  ],
+  [
+    [30, -6],
+    [47, 42],
+  ],
+];
+
+function boxAround(lat: number, lng: number, span = 5): number[][] {
+  return [
+    [Math.max(-90, lat - span), Math.max(-180, lng - span)],
+    [Math.min(90, lat + span), Math.min(180, lng + span)],
+  ];
+}
+
+export async function discoverImoOnAis(
+  imo: string,
+  apiKey: string,
+  hint?: { lat: number; lng: number },
+  waitMs = 18_000,
+): Promise<{ mmsi: string; name: string | null; pos: VesselPosition | null } | null> {
+  const Socket = (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
+  if (!Socket || !apiKey.trim()) return null;
+  const want = Number(imo);
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let mmsi = '';
+    let name: string | null = null;
+    let pos: VesselPosition | null = null;
+    const boxes = hint?.lat != null && hint?.lng != null ? [boxAround(hint.lat, hint.lng, 6)] : TRADE_BOXES;
+
+    const done = (value: { mmsi: string; name: string | null; pos: VesselPosition | null } | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        ws.close();
+      } catch {
+        /* ignore */
+      }
+      resolve(value);
+    };
+
+    const timer = setTimeout(() => done(mmsi ? { mmsi, name, pos } : null), waitMs);
+    const ws = new Socket(AISSTREAM_URL);
+
+    ws.addEventListener('open', () => {
+      ws.send(
+        JSON.stringify({
+          APIKey: apiKey,
+          BoundingBoxes: boxes,
+          FilterMessageTypes: ['PositionReport', 'ShipStaticData', 'StaticDataReport'],
+        }),
+      );
+    });
+
+    ws.addEventListener('message', (event) => {
+      let msg: any;
+      try {
+        msg = JSON.parse(wsDataToString(event.data));
+      } catch {
+        return;
+      }
+      const parsed = parseAisStream(msg);
+      const msgImo =
+        parsed.imo ??
+        numOrNull(msg?.Message?.ShipStaticData?.ImoNumber ?? msg?.Message?.StaticDataReport?.ReportA?.ImoNumber);
+      const msgMmsi = parsed.mmsi != null ? String(parsed.mmsi) : '';
+      if (msgImo === want && msgMmsi.length === 9) {
+        mmsi = msgMmsi;
+        name = parsed.name ?? name;
+      }
+      if (mmsi && parsed.kind === 'position' && String(parsed.mmsi) === mmsi && parsed.hasCoordinates) {
+        pos = {
+          ...emptyPosition(Number(mmsi), parsed),
+          source: 'aisstream',
+          imo: want,
+          name: parsed.name ?? name,
+          hasCoordinates: true,
+          latitude: parsed.latitude ?? null,
+          longitude: parsed.longitude ?? null,
+        };
+        done({ mmsi, name, pos });
+      }
+    });
+
+    ws.addEventListener('error', () => done(mmsi ? { mmsi, name, pos } : null));
+    ws.addEventListener('close', () => {
+      if (!settled) done(mmsi ? { mmsi, name, pos } : null);
+    });
+  });
+}
+
 export function peekVesselPosition(mmsi: string): VesselPosition | null {
   const cached = positionCache.get(mmsi);
   if (cached && Date.now() - cached.at < POSITION_CACHE_TTL_MS && cached.pos.hasCoordinates) {
@@ -408,11 +567,11 @@ function rememberPosition(mmsi: string, pos: VesselPosition) {
   return pos;
 }
 
-async function resolveLivePosition(mmsi: string, aisstreamKey?: string): Promise<VesselPosition> {
+async function resolveLivePosition(mmsi: string, aisstreamKey?: string, waitMs = 22_000): Promise<VesselPosition> {
   const key = aisstreamKey?.trim();
   if (key && Date.now() > aisstreamDownUntil) {
     try {
-      return rememberPosition(mmsi, await positionFromAisStream(mmsi, key));
+      return rememberPosition(mmsi, await positionFromAisStream(mmsi, key, waitMs, TRADE_BOXES));
     } catch (err) {
       const aisErr = err as AisError;
       if (aisErr.status === 401) throw aisErr;
@@ -435,9 +594,21 @@ export function warmVesselPosition(mmsi: string, aisstreamKey?: string) {
   inflight.set(mmsi, job);
 }
 
-export async function fetchVesselPosition(mmsi: string, aisstreamKey?: string): Promise<VesselPosition> {
+export async function awaitVesselPosition(mmsi: string, aisstreamKey?: string, waitMs = 24_000): Promise<VesselPosition> {
   const cached = peekVesselPosition(mmsi);
   if (cached) return cached;
-  warmVesselPosition(mmsi, aisstreamKey);
-  return emptyPosition(Number(mmsi), { source: 'ais-pending' });
+  if (!inflight.has(mmsi)) {
+    const job = resolveLivePosition(mmsi, aisstreamKey, Math.max(8_000, waitMs - 1_000)).finally(() => inflight.delete(mmsi));
+    inflight.set(mmsi, job);
+  }
+  const pending = inflight.get(mmsi)!;
+  const raced = await Promise.race([
+    pending,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), waitMs)),
+  ]);
+  return peekVesselPosition(mmsi) ?? raced ?? emptyPosition(Number(mmsi), { source: 'ais-pending' });
+}
+
+export async function fetchVesselPosition(mmsi: string, aisstreamKey?: string): Promise<VesselPosition> {
+  return awaitVesselPosition(mmsi, aisstreamKey, 8_000);
 }

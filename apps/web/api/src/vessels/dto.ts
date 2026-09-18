@@ -19,4 +19,12 @@ export class VesselQueryDto {
   @IsString()
   @Matches(/^\d{7}$/, { message: 'IMO must be 7 digits.' })
   imo?: string;
+
+  @IsOptional()
+  @IsString()
+  nearLat?: string;
+
+  @IsOptional()
+  @IsString()
+  nearLng?: string;
 }

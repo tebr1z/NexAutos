@@ -5,6 +5,15 @@ const UA = 'AutoNex/1.0 (shipment tracking; https://nex.autos)';
 const imoCache = new Map<string, { at: number; hit: { mmsi: string; name: string | null } | null }>();
 const IMO_CACHE_MS = 24 * 60 * 60_000;
 
+export function isValidImo(raw: string): string | null {
+  const digits = String(raw).replace(/\D/g, '');
+  if (digits.length !== 7 || /^0+$/.test(digits)) return null;
+  const d = digits.split('').map(Number);
+  const sum = d[0] * 7 + d[1] * 6 + d[2] * 5 + d[3] * 4 + d[4] * 3 + d[5] * 2;
+  if (sum % 10 !== d[6]) return null;
+  return digits;
+}
+
 function nineDigit(raw: unknown): string | null {
   const digits = String(raw || '').replace(/\D/g, '');
   return digits.length === 9 ? digits : null;
@@ -75,7 +84,30 @@ export async function mmsiFromWikidata(imo: string): Promise<{ mmsi: string; nam
   const cached = imoCache.get(digits);
   if (cached && Date.now() - cached.at < IMO_CACHE_MS) return cached.hit;
 
-  const hit = (await mmsiFromSparql(digits)) ?? (await mmsiFromWikidataApi(digits));
+  const hit =
+    (await mmsiFromSparql(digits)) ??
+    (await mmsiFromWikidataApi(digits)) ??
+    (await mmsiFromWikipedia(digits));
   imoCache.set(digits, { at: Date.now(), hit });
   return hit;
+}
+
+async function mmsiFromWikipedia(imo: string): Promise<{ mmsi: string; name: string | null } | null> {
+  const search = (await timedJson(
+    `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(`IMO ${imo}`)}&format=json`,
+    { 'User-Agent': UA, Accept: 'application/json' },
+    8_000,
+  )) as { query?: { search?: { title?: string }[] } } | null;
+  const title = search?.query?.search?.[0]?.title?.trim();
+  if (!title) return null;
+  const page = (await timedJson(
+    `https://en.wikipedia.org/w/api.php?action=query&prop=revisions&rvprop=content&rvslots=main&format=json&titles=${encodeURIComponent(title)}`,
+    { 'User-Agent': UA, Accept: 'application/json' },
+    8_000,
+  )) as { query?: { pages?: Record<string, { revisions?: { slots?: { main?: { '*': string } } }[] }> } } | null;
+  const pages = page?.query?.pages ?? {};
+  const text = Object.values(pages)[0]?.revisions?.[0]?.slots?.main?.['*'] ?? '';
+  const mmsi = nineDigit(text.match(/\bMMSI\s*[|=:]\s*(\d{9})\b/i)?.[1]);
+  if (!mmsi) return null;
+  return { mmsi, name: title };
 }

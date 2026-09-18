@@ -97,7 +97,10 @@ export function VoyageFields({
     setMapBusy("imo");
     setMapNotice("");
     try {
-      const pos = await api.vesselByImo(imo);
+      const pos = await api.vesselByImo(imo, {
+        lat: Number(value.mapLat) || undefined,
+        lng: Number(value.mapLng) || undefined,
+      });
       const nextName = pos?.name?.trim() || value.vesselName;
       const live = pos?.hasCoordinates && pos.latitude != null && pos.longitude != null;
       onChange({

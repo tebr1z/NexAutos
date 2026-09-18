@@ -1,6 +1,6 @@
 import type { AuctionHouse, Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsArray, IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 const AUCTION_HOUSES = {
   COPART: 'COPART',
@@ -94,6 +94,12 @@ export class CreateOrderDto {
   @Type(() => Number)
   @IsInt()
   currentTransitIndex?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderPhotoDto)
+  photos?: OrderPhotoDto[];
 }
 
 export class UpdateStatusDto {
@@ -173,6 +179,25 @@ export class UpdateVoyageDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderPhotoDto)
+  photos?: OrderPhotoDto[];
+}
+
+export class OrderPhotoDto {
+  @IsString()
+  url: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @IsOptional()
+  @IsString()
+  caption?: string;
 }
 
 export type Decimal = Prisma.Decimal;

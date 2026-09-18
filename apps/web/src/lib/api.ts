@@ -253,12 +253,15 @@ export const api = {
   searchVessels: (name: string) =>
     request<{ results: VesselHit[] }>(`/vessels?name=${encodeURIComponent(name)}`),
   vesselPosition: (mmsi: string) => request<VesselPosition>(`/vessels?mmsi=${encodeURIComponent(mmsi)}`),
-  vesselByImo: async (imo: string) => {
+  vesselByImo: async (imo: string, near?: { lat?: number; lng?: number }) => {
     const digits = imo.replace(/\D/g, "");
+    const q = new URLSearchParams({ imo: digits });
+    if (near?.lat != null && Number.isFinite(near.lat)) q.set("nearLat", String(near.lat));
+    if (near?.lng != null && Number.isFinite(near.lng)) q.set("nearLng", String(near.lng));
     try {
-      return await request<VesselPosition>(`/vessels?imo=${encodeURIComponent(digits)}`);
+      return await request<VesselPosition>(`/vessels?${q.toString()}`);
     } catch {
-      const res = await fetch(`/api/vessels?imo=${encodeURIComponent(digits)}`);
+      const res = await fetch(`/api/vessels?${q.toString()}`);
       if (!res.ok) throw new Error("IMO lookup failed");
       return res.json() as Promise<VesselPosition>;
     }
@@ -410,6 +413,18 @@ export const api = {
     request<{ tirUsd: number; cells: Record<string, number | null> }>("/shipping/rates", {
       method: "PUT",
       body: JSON.stringify(payload),
+    }),
+  aisSettings: () =>
+    request<{ configured: boolean; preview: string | null; source: "admin" | "env" | "none" }>("/settings/ais"),
+  saveAisKey: (key: string) =>
+    request<{ configured: boolean; preview: string | null; source: "admin" | "env" | "none" }>("/settings/ais", {
+      method: "PUT",
+      body: JSON.stringify({ key }),
+    }),
+  testAisKey: (key?: string) =>
+    request<{ ok: boolean; message: string }>("/settings/ais/test", {
+      method: "POST",
+      body: JSON.stringify({ key: key ?? "" }),
     }),
   catalogManage: () => request<CatalogCar[]>("/catalog/manage"),
   createCatalogCar: (payload: Record<string, unknown>) =>

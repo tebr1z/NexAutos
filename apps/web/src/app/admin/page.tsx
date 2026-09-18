@@ -70,6 +70,7 @@ function createOrderBody(shipment: TrackingShipment) {
     eta: shipment.eta,
     mapLat: shipment.mapLat,
     mapLng: shipment.mapLng,
+    photos: shipment.photos,
   };
 }
 
@@ -475,6 +476,7 @@ export default function AdminHomePage() {
           eta: next.eta ?? "",
           mapLat: next.mapLat ?? null,
           mapLng: next.mapLng ?? null,
+          photos: next.photos,
         });
         saved = mergeRemotePreserveLocal(next, remote);
         persist({ ...saved, vesselImo: imo || undefined, vesselName: next.vesselName || saved.vesselName }, trackingCode);

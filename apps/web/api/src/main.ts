@@ -1,3 +1,4 @@
+import { json, urlencoded } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -8,7 +9,9 @@ import { PrismaExceptionFilter } from './common/prisma-exception.filter';
 
 async function bootstrap() {
   jwtSecret();
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.use(json({ limit: '20mb' }));
+  app.use(urlencoded({ extended: true, limit: '20mb' }));
   app.setGlobalPrefix('api/v1');
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   const origins = (process.env.CORS_ORIGIN ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000')

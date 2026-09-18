@@ -16,6 +16,7 @@ import { ContractsModule } from './contracts/contracts.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CustomsModule } from './customs/customs.module';
 import { ShippingModule } from './shipping/shipping.module';
+import { SettingsModule } from './settings/settings.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -36,6 +37,7 @@ import { HealthController } from './health/health.controller';
     CatalogModule,
     CustomsModule,
     ShippingModule,
+    SettingsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

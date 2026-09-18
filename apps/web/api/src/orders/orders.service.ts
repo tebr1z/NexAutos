@@ -54,6 +54,18 @@ function coord(value?: number | null) {
   return Number(value);
 }
 
+function photoRows(photos?: { url?: string; category?: string; caption?: string }[]) {
+  if (!photos?.length) return [];
+  return photos
+    .filter((row) => typeof row.url === "string" && (row.url.startsWith("data:image/") || /^https?:\/\//i.test(row.url)))
+    .slice(0, 40)
+    .map((row) => ({
+      url: row.url as string,
+      caption: row.caption?.trim() || null,
+      category: row.category?.trim() || "auction",
+    }));
+}
+
 function isLiveVesselMapStatus(status?: string | null) {
   if (!status) return true;
   return !(
@@ -71,6 +83,10 @@ function normalizeImo(raw?: string | null) {
   const digits = String(raw).replace(/\D/g, '');
   if (!digits) return null;
   if (digits.length !== 7) throw new BadRequestException('IMO 7 rəqəm olmalıdır.');
+  if (/^0+$/.test(digits)) return null;
+  const d = digits.split('').map(Number);
+  const sum = d[0] * 7 + d[1] * 6 + d[2] * 5 + d[3] * 4 + d[4] * 3 + d[5] * 2;
+  if (sum % 10 !== d[6]) throw new BadRequestException('IMO yoxlama rəqəmi səhvdir.');
   return digits;
 }
 
@@ -152,6 +168,9 @@ export class OrdersService {
             occurredAt: new Date(),
           },
         },
+        ...(photoRows(dto.photos).length
+          ? { photos: { create: photoRows(dto.photos) } }
+          : {}),
       },
       include: ORDER_INCLUDE,
     });
@@ -294,25 +313,9 @@ export class OrdersService {
         ...(eta !== undefined ? { eta } : {}),
         ...(mapLat !== undefined ? { mapLat } : {}),
         ...(mapLng !== undefined ? { mapLng } : {}),
-        events: {
-          create: {
-            status: existing.currentStatus,
-            title: 'Voyage update',
-            description:
-              dto.note?.trim() ||
-              [
-                vesselName ? `Vessel ${vesselName}` : null,
-                vesselImo ? `IMO ${vesselImo}` : null,
-                currentPort ? `at ${currentPort}` : null,
-                originPort && destinationPort ? `${originPort} → ${destinationPort}` : null,
-              ]
-                .filter(Boolean)
-                .join(' · ') || 'Shipment location updated',
-            port: currentPort ?? existing.currentPort,
-            country: currentCountry ?? existing.currentCountry,
-            occurredAt: new Date(),
-          },
-        },
+        ...(dto.photos !== undefined
+          ? { photos: { deleteMany: {}, create: photoRows(dto.photos) } }
+          : {}),
       },
       include: ORDER_INCLUDE,
     });
