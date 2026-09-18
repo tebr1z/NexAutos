@@ -205,6 +205,11 @@ export class PrunePhotosDto {
   @IsArray()
   @IsString({ each: true })
   keepIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  keepUrls?: string[];
 }
 
 export type Decimal = Prisma.Decimal;

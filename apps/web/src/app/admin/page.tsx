@@ -77,18 +77,27 @@ function createOrderBody(shipment: TrackingShipment) {
 
 async function pushOrderPhotos(orderId: string, photos: TrackingShipment["photos"]) {
   const keepIds: string[] = [];
+  const keepUrls: string[] = [];
   let last: TrackingShipment | null = null;
-  let uploaded = 0;
   const failed: string[] = [];
 
   if (!photos.length) {
-    return api.pruneOrderPhotos(orderId, []);
+    return api.pruneOrderPhotos(orderId, [], []);
   }
 
   for (const photo of photos) {
+    if (photo.id && !photo.url.startsWith("data:")) {
+      keepIds.push(photo.id);
+      keepUrls.push(photo.url);
+      continue;
+    }
     const mediaId = photo.url.match(/\/media\/photos\/([^/?#]+)/)?.[1];
     if (mediaId) {
       keepIds.push(mediaId);
+      continue;
+    }
+    if (/^https?:\/\//i.test(photo.url) || photo.url.startsWith("/api/")) {
+      keepUrls.push(photo.url);
       continue;
     }
     if (!photo.url.startsWith("data:image/")) {
@@ -109,18 +118,16 @@ async function pushOrderPhotos(orderId: string, photos: TrackingShipment["photos
       });
       const id = added?.id || added?.url.match(/\/media\/photos\/([^/?#]+)/)?.[1];
       if (id) keepIds.push(id);
-      uploaded += 1;
+      if (added?.url) keepUrls.push(added.url);
     } catch (err) {
       failed.push(err instanceof Error ? err.message : photo.category || "şəkil");
     }
   }
 
-  if (keepIds.length === 0) {
-    throw new Error(
-      failed[0] || "Şəkillər serverə yazılmadı. Yenidən Yadda saxla basın.",
-    );
+  if (keepIds.length === 0 && keepUrls.length === 0) {
+    throw new Error(failed[0] || "Şəkillər Cloudflare R2-yə yazılmadı. Yenidən Yadda saxla basın.");
   }
-  last = await api.pruneOrderPhotos(orderId, keepIds);
+  last = await api.pruneOrderPhotos(orderId, keepIds, keepUrls);
   return last;
 }
 

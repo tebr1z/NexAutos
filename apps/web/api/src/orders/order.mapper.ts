@@ -126,7 +126,9 @@ export function mapOrder(order: {
       const raw = String(p.url || "");
       return {
         id: id || undefined,
-        url: id && raw.startsWith("data:image/") ? `/api/v1/media/photos/${id}` : raw,
+        url: id && (raw.startsWith("data:image/") || raw.startsWith("r2:"))
+          ? `/api/v1/media/photos/${id}`
+          : raw,
         caption: p.caption,
         category: p.category ?? undefined,
       };

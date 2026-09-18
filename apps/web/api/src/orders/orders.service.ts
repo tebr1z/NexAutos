@@ -7,6 +7,7 @@ import { attachPortCoords, enrichKnownContainer, lookupCarrier } from '../contai
 import { CreateOrderDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { generateTrackingCode, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
 import { NotifyService, statusLabelAz } from '../notify/notify.service';
+import { R2Storage } from '../storage/r2.storage';
 
 function opt(value?: string) {
   if (value === undefined) return undefined;
@@ -111,6 +112,7 @@ export class OrdersService {
     private containers: ContainersService,
     private vessels: VesselsService,
     private notify: NotifyService,
+    private r2: R2Storage,
   ) {}
 
   async create(dto: CreateOrderDto, userId?: string) {
@@ -470,8 +472,13 @@ export class OrdersService {
     const row = await this.prisma.orderPhoto.findUnique({ where: { id } });
     if (!row?.url) throw new NotFoundException('Şəkil tapılmadı');
     const parsed = decodeDataUrl(row.url);
-    if (!parsed) throw new NotFoundException('Şəkil tapılmadı');
-    return parsed;
+    if (parsed) return parsed;
+    const key = this.r2.keyFromUrl(row.url);
+    if (key) {
+      const file = await this.r2.get(key);
+      if (file) return file;
+    }
+    throw new NotFoundException('Şəkil tapılmadı');
   }
 
   async addPhoto(orderId: string, dto: { url?: string; category?: string; caption?: string }) {
@@ -481,17 +488,39 @@ export class OrdersService {
     if (!rows.length) throw new BadRequestException('Şəkil JPEG və ya PNG olmalıdır.');
     const count = await this.prisma.orderPhoto.count({ where: { orderId } });
     if (count >= 40) throw new BadRequestException('Maksimum 40 şəkil.');
-    await this.prisma.orderPhoto.create({ data: { orderId, ...rows[0] } });
+    const parsed = decodeDataUrl(rows[0].url);
+    if (this.r2.enabled() && parsed) {
+      const created = await this.prisma.orderPhoto.create({
+        data: { orderId, url: 'pending', caption: rows[0].caption, category: rows[0].category },
+      });
+      try {
+        const key = `orders/${orderId}/${created.id}.jpg`;
+        const url = await this.r2.put(key, parsed.buf, parsed.mime);
+        await this.prisma.orderPhoto.update({ where: { id: created.id }, data: { url } });
+      } catch (err) {
+        await this.prisma.orderPhoto.delete({ where: { id: created.id } }).catch(() => undefined);
+        throw new BadRequestException(`Cloudflare R2-yə yazılmadı: ${(err as Error).message}`);
+      }
+    } else {
+      await this.prisma.orderPhoto.create({ data: { orderId, ...rows[0] } });
+    }
     const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: ORDER_INCLUDE });
     return mapOrder(order);
   }
 
-  async prunePhotos(orderId: string, keepIds: string[] = []) {
+  async prunePhotos(orderId: string, keepIds: string[] = [], keepUrls: string[] = []) {
     const existing = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
-    await this.prisma.orderPhoto.deleteMany({
-      where: keepIds.length ? { orderId, id: { notIn: keepIds } } : { orderId },
-    });
+    const all = await this.prisma.orderPhoto.findMany({ where: { orderId } });
+    const keep = new Set([...keepIds, ...keepUrls]);
+    const doomed = all.filter((row) => !keep.has(row.id) && !keep.has(row.url));
+    for (const row of doomed) {
+      const key = this.r2.keyFromUrl(row.url);
+      if (key) await this.r2.remove(key);
+    }
+    if (doomed.length) {
+      await this.prisma.orderPhoto.deleteMany({ where: { id: { in: doomed.map((row) => row.id) } } });
+    }
     const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: ORDER_INCLUDE });
     return mapOrder(order);
   }

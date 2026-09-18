@@ -90,6 +90,6 @@ export class OrdersController {
   @Roles(...STAFF)
   @Put('orders/:id/photos')
   prunePhotos(@Param('id') id: string, @Body() dto: PrunePhotosDto) {
-    return this.orders.prunePhotos(id, dto.keepIds ?? []);
+    return this.orders.prunePhotos(id, dto.keepIds ?? [], dto.keepUrls ?? []);
   }
 }

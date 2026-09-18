@@ -235,10 +235,10 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
-  pruneOrderPhotos: (id: string, keepIds: string[]) =>
+  pruneOrderPhotos: (id: string, keepIds: string[], keepUrls: string[] = []) =>
     request<TrackingShipment>(`/orders/${id}/photos`, {
       method: "PUT",
-      body: JSON.stringify({ keepIds }),
+      body: JSON.stringify({ keepIds, keepUrls }),
     }),
   addOrderPhoto: async (id: string, payload: { url: string; category?: string; caption?: string }) => {
     const { dataUrlToBlob } = await import("./fit-image");
