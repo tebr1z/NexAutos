@@ -196,7 +196,7 @@ async function requestWithLocal<T>(path: string, init?: RequestInit): Promise<T>
 export const api = {
   track: (code: string) =>
     request<TrackingShipment>(`/tracking/${encodeURIComponent(code)}`, {
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(20_000),
     }),
   vin: (vin: string) => request<VinRecord>(`/vins/${encodeURIComponent(vin)}`),
   login: (email: string, password: string) =>
@@ -233,6 +233,16 @@ export const api = {
   updateVoyage: (id: string, payload: Record<string, unknown>) =>
     request<TrackingShipment>(`/orders/${id}/voyage`, {
       method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  pruneOrderPhotos: (id: string, keepIds: string[]) =>
+    request<TrackingShipment>(`/orders/${id}/photos`, {
+      method: "PUT",
+      body: JSON.stringify({ keepIds }),
+    }),
+  addOrderPhoto: (id: string, payload: { url: string; category?: string; caption?: string }) =>
+    request<TrackingShipment>(`/orders/${id}/photos`, {
+      method: "POST",
       body: JSON.stringify(payload),
     }),
   testimonials: () =>

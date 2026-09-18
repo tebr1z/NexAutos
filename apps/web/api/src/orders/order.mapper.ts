@@ -76,7 +76,7 @@ export function mapOrder(order: {
     occurredAt: Date;
   }[];
   documents: { title: string; type: string; url: string }[];
-  photos: { url: string; caption: string | null; category?: string | null }[];
+  photos: { id?: string; url: string; caption: string | null; category?: string | null }[];
   invoices: { number: string; amountUsd: unknown; status: string }[];
 }) {
   const invoice = order.invoices[0];
@@ -121,11 +121,16 @@ export function mapOrder(order: {
       occurredAt: e.occurredAt.toISOString(),
     })),
     documents: order.documents,
-    photos: order.photos.map((p) => ({
-      url: p.url,
-      caption: p.caption,
-      category: p.category ?? undefined,
-    })),
+    photos: order.photos.map((p) => {
+      const id = "id" in p ? String((p as { id: string }).id) : "";
+      const raw = String(p.url || "");
+      return {
+        id: id || undefined,
+        url: id && raw.startsWith("data:image/") ? `/api/v1/media/photos/${id}` : raw,
+        caption: p.caption,
+        category: p.category ?? undefined,
+      };
+    }),
     invoice: invoice
       ? { number: invoice.number, amountUsd: Number(invoice.amountUsd), status: invoice.status }
       : undefined,

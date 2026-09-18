@@ -76,14 +76,15 @@ export function resetAisstreamBackoff() {
   aisstreamDownUntil = 0;
 }
 
-export function probeAisKey(apiKey: string, waitMs = 8_000): Promise<{ ok: boolean; message: string }> {
+export function probeAisKey(apiKey: string, waitMs = 12_000): Promise<{ ok: boolean; message: string }> {
   const Socket = (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
-  const key = apiKey.trim();
+  const key = apiKey.trim().replace(/^["']|["']$/g, '');
   if (!Socket) return Promise.resolve({ ok: false, message: 'Bu serverdə WebSocket yoxdur.' });
   if (!key) return Promise.resolve({ ok: false, message: 'AIS açarı yazılmayıb.' });
 
   return new Promise((resolve) => {
     let settled = false;
+    let opened = false;
     const done = (ok: boolean, message: string) => {
       if (settled) return;
       settled = true;
@@ -96,49 +97,62 @@ export function probeAisKey(apiKey: string, waitMs = 8_000): Promise<{ ok: boole
       resolve({ ok, message });
     };
 
-    const timer = setTimeout(() => done(false, 'AISStream cavab vermədi (8s).'), waitMs);
+    const timer = setTimeout(() => {
+      if (!opened) {
+        done(false, 'Server AISStream-ə çıxa bilmədi (wss://stream.aisstream.io). Firewall/DNS yoxlanılmalıdır.');
+      } else {
+        done(false, 'Qoşuldu, amma AIS mesajı gəlmədi. Açarı aisstream.io/apikeys-də yenidən kopyalayın.');
+      }
+    }, waitMs);
+
     const ws = new Socket(AISSTREAM_URL);
 
-    ws.addEventListener('open', () => {
-      ws.send(
-        JSON.stringify({
-          APIKey: key,
-          BoundingBoxes: [
-            [
-              [40, 28],
-              [42, 30],
+    const subscribe = () => {
+      opened = true;
+      try {
+        ws.send(
+          JSON.stringify({
+            APIKey: key,
+            BoundingBoxes: [
+              [
+                [-90, -180],
+                [90, 180],
+              ],
             ],
-          ],
-          FilterMessageTypes: ['PositionReport'],
-        }),
-      );
-    });
+          }),
+        );
+      } catch {
+        done(false, 'AISStream abunə mesajı göndərilmədi.');
+      }
+    };
+
+    ws.addEventListener('open', subscribe);
 
     ws.addEventListener('message', (event) => {
-      let msg: any;
-      try {
-        msg = JSON.parse(wsDataToString(event.data));
-      } catch {
-        return;
-      }
-      if (typeof msg?.error === 'string') {
-        const invalid = /key|auth|unauthor/i.test(msg.error);
-        done(false, invalid ? 'Açar etibarsızdır.' : msg.error);
-        return;
-      }
-      const parsed = parseAisStream(msg);
-      if (parsed.kind === 'error') {
-        done(false, 'AISStream açarı rədd edildi.');
-        return;
-      }
-      if (parsed.kind === 'confirm' || parsed.kind === 'position') {
+      void (async () => {
+        const msg = await readWsJson((event as MessageEvent).data);
+        if (!msg || settled) return;
+        const errText =
+          typeof msg.error === 'string' ? msg.error : typeof msg.Error === 'string' ? msg.Error : '';
+        if (errText || msg.MessageType === 'Error') {
+          const invalid = /key|auth|unauthor|invalid/i.test(errText || '');
+          done(
+            false,
+            invalid
+              ? 'Açar etibarsızdır. aisstream.io/apikeys-dən yeni açar kopyalayın.'
+              : errText || 'AISStream açarı rədd edildi.',
+          );
+          return;
+        }
         done(true, 'AISStream qoşuldu — açar işləyir.');
-      }
+      })();
     });
 
-    ws.addEventListener('error', () => done(false, 'AISStream WebSocket xətası.'));
+    ws.addEventListener('error', () => done(false, 'AISStream WebSocket xətası. Serverdən internet/wss çıxışı olmalıdır.'));
     ws.addEventListener('close', () => {
-      if (!settled) done(false, 'AISStream bağlantısı bağlandı.');
+      if (!settled) {
+        done(false, opened ? 'AISStream bağlantısı bağlandı — açar rədd edilmiş ola bilər.' : 'AISStream-ə qoşulmadı.');
+      }
     });
   });
 }
@@ -184,12 +198,25 @@ function headingOrNull(value: unknown): number | null {
 
 function wsDataToString(data: unknown): string {
   if (typeof data === 'string') return data;
-  if (Buffer.isBuffer(data)) return data.toString('utf8');
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(data)) return data.toString('utf8');
   if (data instanceof ArrayBuffer) return Buffer.from(data).toString('utf8');
   if (ArrayBuffer.isView(data)) {
     return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString('utf8');
   }
-  return String(data);
+  return '';
+}
+
+async function readWsJson(data: unknown): Promise<any | null> {
+  try {
+    let text = wsDataToString(data);
+    if (!text && data && typeof data === 'object' && 'text' in data && typeof (data as { text: () => Promise<string> }).text === 'function') {
+      text = await (data as { text: () => Promise<string> }).text();
+    }
+    if (!text?.trim()) return null;
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 async function httpsGetJson(url: string): Promise<any> {
@@ -413,13 +440,9 @@ function positionFromAisStream(
       );
     });
 
-    ws.addEventListener('message', (event) => {
-      let msg: any;
-      try {
-        msg = JSON.parse(wsDataToString(event.data));
-      } catch {
-        return;
-      }
+    ws.addEventListener('message', async (event) => {
+      const msg = await readWsJson(event.data);
+      if (!msg) return;
       if (typeof msg?.error === 'string') {
         const invalid = /key|auth|unauthor/i.test(msg.error);
         finish(new AisError(invalid ? 'AISStream API key is invalid.' : msg.error, invalid ? 401 : 502));
@@ -517,13 +540,9 @@ export async function discoverImoOnAis(
       );
     });
 
-    ws.addEventListener('message', (event) => {
-      let msg: any;
-      try {
-        msg = JSON.parse(wsDataToString(event.data));
-      } catch {
-        return;
-      }
+    ws.addEventListener('message', async (event) => {
+      const msg = await readWsJson(event.data);
+      if (!msg) return;
       const parsed = parseAisStream(msg);
       const msgImo =
         parsed.imo ??

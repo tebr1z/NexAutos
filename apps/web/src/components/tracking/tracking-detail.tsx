@@ -335,7 +335,7 @@ export function TrackingDetail({ code }: { code: string }) {
           <h2 className="text-lg font-medium">{t.photoCats[group.key] ?? t.track.photos}</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {group.items.map((p) => (
-              <div key={p.url.slice(0, 80)} className="relative aspect-[16/10] overflow-hidden rounded-2xl">
+              <div key={p.id || p.url.slice(0, 80)} className="relative aspect-[16/10] overflow-hidden rounded-2xl">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.url} alt={p.caption ?? ""} className="h-full w-full object-cover" />
               </div>

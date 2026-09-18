@@ -70,8 +70,23 @@ function createOrderBody(shipment: TrackingShipment) {
     eta: shipment.eta,
     mapLat: shipment.mapLat,
     mapLng: shipment.mapLng,
-    photos: shipment.photos,
   };
+}
+
+async function pushOrderPhotos(orderId: string, photos: TrackingShipment["photos"]) {
+  const keepIds = photos
+    .map((p) => p.url.match(/\/media\/photos\/([^/?#]+)/)?.[1])
+    .filter((id): id is string => Boolean(id));
+  let remote = await api.pruneOrderPhotos(orderId, keepIds);
+  for (const photo of photos) {
+    if (!photo.url.startsWith("data:image/")) continue;
+    remote = await api.addOrderPhoto(orderId, {
+      url: photo.url,
+      category: photo.category,
+      caption: photo.caption,
+    });
+  }
+  return remote;
 }
 
 function stageNotice(label: string, phone: string | undefined, notify?: NotifyInfo) {
@@ -476,7 +491,6 @@ export default function AdminHomePage() {
           eta: next.eta ?? "",
           mapLat: next.mapLat ?? null,
           mapLng: next.mapLng ?? null,
-          photos: next.photos,
         });
         saved = mergeRemotePreserveLocal(next, remote);
         persist({ ...saved, vesselImo: imo || undefined, vesselName: next.vesselName || saved.vesselName }, trackingCode);
@@ -486,6 +500,11 @@ export default function AdminHomePage() {
         saved = mergeRemotePreserveLocal(next, { ...remote, ...next, id: remote.id, trackingCode: remote.trackingCode || trackingCode });
         persist(saved, trackingCode);
         serverOk = true;
+      }
+      if (saved.id) {
+        const withPhotos = await pushOrderPhotos(saved.id, flattenPhotos(photos));
+        saved = mergeRemotePreserveLocal(saved, withPhotos);
+        persist({ ...saved, vesselImo: imo || undefined, vesselName: next.vesselName || saved.vesselName }, trackingCode);
       }
     } catch (err) {
       serverOk = false;
@@ -580,6 +599,10 @@ export default function AdminHomePage() {
       });
       saved = mergeRemotePreserveLocal(shipment, { ...remote, ...shipment, trackingCode: remote.trackingCode || trackingCode });
       persist(saved, trackingCode);
+      if (saved.id) {
+        saved = mergeRemotePreserveLocal(saved, await pushOrderPhotos(saved.id, flattenPhotos(photos)));
+        persist(saved, trackingCode);
+      }
       setCreated(saved.trackingCode);
     } catch (err) {
       setNotice(

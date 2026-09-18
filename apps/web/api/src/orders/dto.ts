@@ -200,4 +200,11 @@ export class OrderPhotoDto {
   caption?: string;
 }
 
+export class PrunePhotosDto {
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  keepIds?: string[];
+}
+
 export type Decimal = Prisma.Decimal;

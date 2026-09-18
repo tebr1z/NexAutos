@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Patch, Post, Put, StreamableFile, UseGuards } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { OrdersService } from './orders.service';
-import { CreateOrderDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
+import { CreateOrderDto, OrderPhotoDto, PrunePhotosDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -68,5 +69,27 @@ export class OrdersController {
     @CurrentUser() user: { id: string },
   ) {
     return this.orders.updateStatus(id, dto, user.id);
+  }
+
+  @SkipThrottle()
+  @Get('media/photos/:id')
+  @Header('Cache-Control', 'public, max-age=86400, immutable')
+  async photo(@Param('id') id: string) {
+    const file = await this.orders.photoBinary(id);
+    return new StreamableFile(file.buf, { type: file.mime });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...STAFF)
+  @Post('orders/:id/photos')
+  addPhoto(@Param('id') id: string, @Body() dto: OrderPhotoDto) {
+    return this.orders.addPhoto(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...STAFF)
+  @Put('orders/:id/photos')
+  prunePhotos(@Param('id') id: string, @Body() dto: PrunePhotosDto) {
+    return this.orders.prunePhotos(id, dto.keepIds ?? []);
   }
 }

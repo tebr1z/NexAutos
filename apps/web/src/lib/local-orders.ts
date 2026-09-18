@@ -48,7 +48,7 @@ export function mergeRemotePreserveLocal(
     ...local,
     ...remote,
     id: remote.id ?? local.id,
-    photos: local.photos?.length ? local.photos : remote.photos,
+    photos: remote.photos?.length ? remote.photos : local.photos,
     transitPorts: picked.transitPorts,
     currentTransitIndex: picked.useLocal
       ? (local.currentTransitIndex ?? -1)
@@ -69,7 +69,7 @@ export function overlayLocal(remote: TrackingShipment, code: string): TrackingSh
     ...remote,
     ...local,
     id: remote.id ?? local.id,
-    photos: local.photos?.length ? local.photos : remote.photos,
+    photos: remote.photos?.length ? remote.photos : local.photos,
     transitPorts: picked.transitPorts,
     currentTransitIndex: picked.useLocal
       ? (local.currentTransitIndex ?? -1)

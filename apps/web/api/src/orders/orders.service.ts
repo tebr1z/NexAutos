@@ -54,6 +54,18 @@ function coord(value?: number | null) {
   return Number(value);
 }
 
+function decodeDataUrl(url: string): { mime: string; buf: Buffer } | null {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/.exec(url.trim());
+  if (!match) return null;
+  try {
+    const buf = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
+    if (!buf.length) return null;
+    return { mime: match[1], buf };
+  } catch {
+    return null;
+  }
+}
+
 function photoRows(photos?: { url?: string; category?: string; caption?: string }[]) {
   if (!photos?.length) return [];
   return photos
@@ -168,9 +180,7 @@ export class OrdersService {
             occurredAt: new Date(),
           },
         },
-        ...(photoRows(dto.photos).length
-          ? { photos: { create: photoRows(dto.photos) } }
-          : {}),
+        /* photos uploaded one-by-one after create — giant data URLs break nginx/Plesk */
       },
       include: ORDER_INCLUDE,
     });
@@ -313,9 +323,6 @@ export class OrdersService {
         ...(eta !== undefined ? { eta } : {}),
         ...(mapLat !== undefined ? { mapLat } : {}),
         ...(mapLng !== undefined ? { mapLng } : {}),
-        ...(dto.photos !== undefined
-          ? { photos: { deleteMany: {}, create: photoRows(dto.photos) } }
-          : {}),
       },
       include: ORDER_INCLUDE,
     });
@@ -457,5 +464,35 @@ export class OrdersService {
       model: order.vehicle?.model,
     });
     return { ...mapOrder(order), notify };
+  }
+
+  async photoBinary(id: string) {
+    const row = await this.prisma.orderPhoto.findUnique({ where: { id } });
+    if (!row?.url) throw new NotFoundException('Şəkil tapılmadı');
+    const parsed = decodeDataUrl(row.url);
+    if (!parsed) throw new NotFoundException('Şəkil tapılmadı');
+    return parsed;
+  }
+
+  async addPhoto(orderId: string, dto: { url?: string; category?: string; caption?: string }) {
+    const existing = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
+    const rows = photoRows([dto]);
+    if (!rows.length) throw new BadRequestException('Şəkil JPEG və ya PNG olmalıdır.');
+    const count = await this.prisma.orderPhoto.count({ where: { orderId } });
+    if (count >= 40) throw new BadRequestException('Maksimum 40 şəkil.');
+    await this.prisma.orderPhoto.create({ data: { orderId, ...rows[0] } });
+    const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: ORDER_INCLUDE });
+    return mapOrder(order);
+  }
+
+  async prunePhotos(orderId: string, keepIds: string[] = []) {
+    const existing = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
+    await this.prisma.orderPhoto.deleteMany({
+      where: keepIds.length ? { orderId, id: { notIn: keepIds } } : { orderId },
+    });
+    const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: ORDER_INCLUDE });
+    return mapOrder(order);
   }
 }

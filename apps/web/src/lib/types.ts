@@ -19,6 +19,7 @@ export type TrackingDocument = {
 };
 
 export type TrackingPhoto = {
+  id?: string;
   url: string;
   caption?: string;
   category?: string;

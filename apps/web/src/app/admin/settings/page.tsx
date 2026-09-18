@@ -130,7 +130,7 @@ export default function AdminSettingsPage() {
             onClick={() => void testAis()}
             className="rounded-xl border border-emerald-500/40 px-4 py-3 text-xs text-emerald-300 disabled:opacity-40"
           >
-            AIS-i yoxla
+            {busy ? "Yoxlanır…" : "AIS-i yoxla"}
           </button>
           <button
             type="button"

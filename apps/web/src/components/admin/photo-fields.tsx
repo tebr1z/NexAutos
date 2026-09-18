@@ -18,7 +18,7 @@ function compressImage(file: File) {
     const img = new Image();
     const blobUrl = URL.createObjectURL(file);
     img.onload = () => {
-      const max = 1400;
+      const max = 1100;
       const scale = Math.min(1, max / Math.max(img.width, img.height));
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.round(img.width * scale));
@@ -26,7 +26,7 @@ function compressImage(file: File) {
       const ctx = canvas.getContext("2d");
       ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(blobUrl);
-      resolve(canvas.toDataURL("image/jpeg", 0.74));
+      resolve(canvas.toDataURL("image/jpeg", 0.68));
     };
     img.onerror = () => {
       URL.revokeObjectURL(blobUrl);
@@ -48,7 +48,7 @@ export function PhotoFields({
   return (
     <div className="space-y-3">
       <p className="text-xs text-zinc-500">
-        Kateqoriya üzrə şəkil yükləyin. Boş kateqoriyalar müştəri səhifəsində görünməyəcək.
+        Kateqoriya üzrə şəkil yükləyin. Yadda saxladıqdan sonra müştəri izləmə səhifəsində görünür.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {PHOTO_CATEGORIES.map((category) => (
