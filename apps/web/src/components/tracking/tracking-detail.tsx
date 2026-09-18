@@ -8,6 +8,7 @@ import { SITE, TRACKING_STEPS, isLiveVesselMapStatus } from "@/lib/constants";
 import type { TrackingShipment } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { findPortCoords } from "@/lib/carriers";
+import { isValidImo } from "@/lib/imo";
 import { useI18n } from "@/providers/i18n-provider";
 import { groupPhotos } from "@/lib/photo-categories";
 import { journeyPosition, normalizeTransits } from "@/lib/journey";
@@ -34,8 +35,8 @@ function withManualPin(shipment: TrackingShipment): TrackingShipment {
 }
 
 async function pinFromImo(shipment: TrackingShipment): Promise<TrackingShipment> {
-  const imo = shipment.vesselImo?.replace(/\D/g, "") ?? "";
-  if (imo.length !== 7) return withManualPin(shipment);
+  const imo = isValidImo(shipment.vesselImo);
+  if (!imo) return withManualPin(shipment);
   try {
     const pos = await api.vesselByImo(imo, {
       lat: shipment.lat ?? shipment.mapLat,
@@ -90,7 +91,7 @@ async function pinFromPorts(shipment: TrackingShipment): Promise<TrackingShipmen
 
 async function locateShipment(shipment: TrackingShipment) {
   const seeded = withManualPin(shipment);
-  if (seeded.vesselImo && isLiveVesselMapStatus(seeded.currentStatus)) {
+  if (isValidImo(seeded.vesselImo) && isLiveVesselMapStatus(seeded.currentStatus)) {
     const live = await pinFromImo(seeded);
     if (live.lat != null && live.lng != null) return live;
     return pinFromPorts(withManualPin(live));
@@ -111,11 +112,11 @@ async function refreshImoUntilPinned(
   if (cancelled()) return current;
   onUpdate(current);
   const waitingAis =
-    Boolean(current.vesselImo) &&
+    Boolean(isValidImo(current.vesselImo)) &&
     isLiveVesselMapStatus(current.currentStatus) &&
     current.mapLat != null &&
     current.lat === current.mapLat;
-  if (!current.vesselImo || !isLiveVesselMapStatus(current.currentStatus)) return current;
+  if (!isValidImo(current.vesselImo) || !isLiveVesselMapStatus(current.currentStatus)) return current;
   if (current.lat != null && !waitingAis) return current;
   for (let i = 0; i < 12 && !cancelled(); i++) {
     await new Promise((r) => setTimeout(r, 5000));

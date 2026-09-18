@@ -240,11 +240,28 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ keepIds }),
     }),
-  addOrderPhoto: (id: string, payload: { url: string; category?: string; caption?: string }) =>
-    request<TrackingShipment>(`/orders/${id}/photos`, {
+  addOrderPhoto: async (id: string, payload: { url: string; category?: string; caption?: string }) => {
+    const { dataUrlToBlob } = await import("./fit-image");
+    const form = new FormData();
+    form.append("orderId", id);
+    form.append("category", payload.category || "auction");
+    form.append("caption", payload.caption || "");
+    form.append("file", dataUrlToBlob(payload.url), "photo.jpg");
+    const token = typeof window !== "undefined" ? localStorage.getItem("anx_token") : null;
+    const res = await fetch("/api/order-photos", {
       method: "POST",
-      body: JSON.stringify(payload),
-    }),
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const raw = (body as { message?: string | string[] }).message;
+      const message = Array.isArray(raw) ? raw.join(" ") : raw;
+      throw new Error(message ?? `Şəkil yazılmadı (${res.status})`);
+    }
+    return res.json() as Promise<TrackingShipment>;
+  },
   testimonials: () =>
     request<{ name: string; role?: string; rating: number; body: string; avatarUrl?: string }[]>(
       "/testimonials",

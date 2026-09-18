@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { TransitStop } from "@/lib/types";
 import { DESTINATION_PORTS } from "@/lib/constants";
 import { findPortCoords } from "@/lib/carriers";
+import { isValidImo } from "@/lib/imo";
 import { api } from "@/lib/api";
 
 export type VoyageValues = {
@@ -89,9 +90,9 @@ export function VoyageFields({
   }
 
   async function pinFromImo() {
-    const imo = value.vesselImo.replace(/\D/g, "");
-    if (imo.length !== 7) {
-      setMapNotice("Əvvəl 7 rəqəmli IMO yazın.");
+    const imo = isValidImo(value.vesselImo);
+    if (!imo) {
+      setMapNotice("IMO səhvdir. 0000000 işləməz — konosamentdəki real 7 rəqəmli IMO-nu yazın.");
       return;
     }
     setMapBusy("imo");
@@ -118,8 +119,8 @@ export function VoyageFields({
         return;
       }
       setMapNotice(`Gəmi AIS: ${pos.name || "IMO " + imo}`);
-    } catch {
-      setMapNotice("AIS-ə çıxılmadı. Koordinatı əl ilə yazın və ya limandan götürün.");
+    } catch (err) {
+      setMapNotice(err instanceof Error ? err.message : "AIS-ə çıxılmadı. Koordinatı əl ilə yazın.");
     } finally {
       setMapBusy("");
     }

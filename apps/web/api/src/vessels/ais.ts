@@ -427,7 +427,7 @@ function positionFromAisStream(
       ws.send(
         JSON.stringify({
           APIKey: apiKey,
-          BoundingBoxes: boxes?.length ? boxes : TRADE_BOXES,
+          BoundingBoxes: boxes?.length ? boxes : WORLD_BOX,
           FiltersShipMMSI: [String(mmsi)],
           FilterMessageTypes: [
             'PositionReport',
@@ -476,6 +476,13 @@ function positionFromAisStream(
   });
 }
 
+const WORLD_BOX: number[][][] = [
+  [
+    [-90, -180],
+    [90, 180],
+  ],
+];
+
 const TRADE_BOXES: number[][][] = [
   [
     [24, -98],
@@ -513,7 +520,8 @@ export async function discoverImoOnAis(
     let mmsi = '';
     let name: string | null = null;
     let pos: VesselPosition | null = null;
-    const boxes = hint?.lat != null && hint?.lng != null ? [boxAround(hint.lat, hint.lng, 6)] : TRADE_BOXES;
+    const boxes =
+      hint?.lat != null && hint?.lng != null ? [boxAround(hint.lat, hint.lng, 8), ...TRADE_BOXES] : TRADE_BOXES;
 
     const done = (value: { mmsi: string; name: string | null; pos: VesselPosition | null } | null) => {
       if (settled) return;
@@ -590,7 +598,7 @@ async function resolveLivePosition(mmsi: string, aisstreamKey?: string, waitMs =
   const key = aisstreamKey?.trim();
   if (key && Date.now() > aisstreamDownUntil) {
     try {
-      return rememberPosition(mmsi, await positionFromAisStream(mmsi, key, waitMs, TRADE_BOXES));
+      return rememberPosition(mmsi, await positionFromAisStream(mmsi, key, waitMs, WORLD_BOX));
     } catch (err) {
       const aisErr = err as AisError;
       if (aisErr.status === 401) throw aisErr;

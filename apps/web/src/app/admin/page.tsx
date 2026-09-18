@@ -19,7 +19,8 @@ import { buildJourney, journeyPosition, selectedJourneyValue, transitLabel, norm
 import { EMPTY_VOYAGE, VoyageFields, type VoyageValues } from "@/components/admin/voyage-fields";
 import { PhotoFields } from "@/components/admin/photo-fields";
 import { emptyPhotos, flattenPhotos, photosFromList, type PhotosByCategory } from "@/lib/photo-categories";
-import { daysLeftInArchive, isDelivered, normalizeTrackingCode } from "@/lib/archive";
+import { fitDataUrl } from "@/lib/fit-image";
+import { isValidImo } from "@/lib/imo";
 
 type NotifyInfo = { sent?: boolean; channel?: string; error?: string };
 type Screen = "list" | "create" | "edit";
@@ -74,19 +75,52 @@ function createOrderBody(shipment: TrackingShipment) {
 }
 
 async function pushOrderPhotos(orderId: string, photos: TrackingShipment["photos"]) {
-  const keepIds = photos
-    .map((p) => p.url.match(/\/media\/photos\/([^/?#]+)/)?.[1])
-    .filter((id): id is string => Boolean(id));
-  let remote = await api.pruneOrderPhotos(orderId, keepIds);
-  for (const photo of photos) {
-    if (!photo.url.startsWith("data:image/")) continue;
-    remote = await api.addOrderPhoto(orderId, {
-      url: photo.url,
-      category: photo.category,
-      caption: photo.caption,
-    });
+  const keepIds: string[] = [];
+  let last: TrackingShipment | null = null;
+  let uploaded = 0;
+  const failed: string[] = [];
+
+  if (!photos.length) {
+    return api.pruneOrderPhotos(orderId, []);
   }
-  return remote;
+
+  for (const photo of photos) {
+    const mediaId = photo.url.match(/\/media\/photos\/([^/?#]+)/)?.[1];
+    if (mediaId) {
+      keepIds.push(mediaId);
+      continue;
+    }
+    if (!photo.url.startsWith("data:image/")) {
+      failed.push(photo.category || "şəkil");
+      continue;
+    }
+    try {
+      const url = await fitDataUrl(photo.url);
+      const before = new Set(keepIds);
+      last = await api.addOrderPhoto(orderId, {
+        url,
+        category: photo.category,
+        caption: photo.caption,
+      });
+      const added = last.photos?.find((row) => {
+        const id = row.id || row.url.match(/\/media\/photos\/([^/?#]+)/)?.[1];
+        return Boolean(id && !before.has(id));
+      });
+      const id = added?.id || added?.url.match(/\/media\/photos\/([^/?#]+)/)?.[1];
+      if (id) keepIds.push(id);
+      uploaded += 1;
+    } catch (err) {
+      failed.push(err instanceof Error ? err.message : photo.category || "şəkil");
+    }
+  }
+
+  if (keepIds.length === 0) {
+    throw new Error(
+      failed[0] || "Şəkillər serverə yazılmadı. Yenidən Yadda saxla basın.",
+    );
+  }
+  last = await api.pruneOrderPhotos(orderId, keepIds);
+  return last;
 }
 
 function stageNotice(label: string, phone: string | undefined, notify?: NotifyInfo) {
@@ -439,10 +473,10 @@ export default function AdminHomePage() {
       return;
     }
     const location = locationForStatus(status, voyage.destinationPort);
-    const imo = imoDigits(voyage.vesselImo);
-    if (imo && imo.length !== 7) {
+    const imo = isValidImo(voyage.vesselImo) ?? "";
+    if (voyage.vesselImo.replace(/\D/g, "") && !imo) {
       setSaving(false);
-      window.alert("IMO 7 rəqəm olmalıdır, və ya boş buraxın.");
+      window.alert("IMO səhvdir. 0000000 olmaz — gəminin real IMO-sunu yazın, və ya boş buraxın.");
       return;
     }
     const next: TrackingShipment = {
@@ -505,6 +539,7 @@ export default function AdminHomePage() {
         const withPhotos = await pushOrderPhotos(saved.id, flattenPhotos(photos));
         saved = mergeRemotePreserveLocal(saved, withPhotos);
         persist({ ...saved, vesselImo: imo || undefined, vesselName: next.vesselName || saved.vesselName }, trackingCode);
+        setPhotos(photosFromList(saved.photos ?? []));
       }
     } catch (err) {
       serverOk = false;
@@ -520,7 +555,17 @@ export default function AdminHomePage() {
     }
 
     setSaving(false);
-    if (serverOk) setNotice("Yadda saxlanıldı. Müştəri izləmə linkindən görə bilər.");
+    if (serverOk) {
+      const localCount = flattenPhotos(photos).length;
+      const remoteCount = saved.photos?.filter((p) => !p.url.startsWith("data:")).length ?? 0;
+      setNotice(
+        localCount && remoteCount < localCount
+          ? `Maşın yazıldı, amma ${localCount - remoteCount} şəkil müştəri səhifəsinə düşmədi. Yenidən Yadda saxla basın.`
+          : localCount
+            ? "Yadda saxlanıldı. Şəkillər müştəri izləmə səhifəsində görünməlidir."
+            : "Yadda saxlanıldı. Müştəri izləmə linkindən görə bilər.",
+      );
+    }
     setEditingCode(trackingCode);
   }
 
@@ -532,9 +577,9 @@ export default function AdminHomePage() {
       return;
     }
     if (!form.customerName.trim() || !form.vin.trim()) return;
-    const createdImo = imoDigits(voyage.vesselImo);
-    if (createdImo && createdImo.length !== 7) {
-      window.alert("IMO 7 rəqəm olmalıdır, və ya boş buraxın.");
+    const createdImo = isValidImo(voyage.vesselImo) ?? "";
+    if (voyage.vesselImo.replace(/\D/g, "") && !createdImo) {
+      window.alert("IMO səhvdir. 0000000 olmaz — gəminin real IMO-sunu yazın, və ya boş buraxın.");
       return;
     }
     if (
