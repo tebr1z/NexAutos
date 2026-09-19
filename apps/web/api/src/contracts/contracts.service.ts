@@ -104,7 +104,7 @@ export class ContractsService {
     let orderDocSeries: string | null = null;
     if (orderId || trackingCode) {
       const order = await this.prisma.order.findFirst({
-        where: orderId ? { id: orderId } : { trackingCode },
+        where: orderId ? { id: orderId } : { trackingCode: trackingCode! },
       });
       if (order) {
         orderId = order.id;
