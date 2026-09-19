@@ -10,6 +10,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotifyService, normalizePhone } from '../notify/notify.service';
 import { buildContractBody, type ContractBody } from './contract-text';
+import { buildInsuranceContractBody } from './insurance-contract-text';
 import { renderContractPdf } from './pdf';
 import { CreateContractDto, SignContractDto, AssignContractDto } from './dto';
 
@@ -105,13 +106,15 @@ export class ContractsService {
       if (order) orderId = order.id;
     }
 
+    const kind = dto.kind === 'INSURANCE' ? 'INSURANCE' : 'SERVICE';
     const year = new Date().getFullYear();
     const count = await this.prisma.contract.count({
       where: { createdAt: { gte: new Date(`${year}-01-01T00:00:00.000Z`) } },
     });
-    let number = `ANX-${year}-${String(count + 1).padStart(4, '0')}`;
+    const prefix = kind === 'INSURANCE' ? `ANX-SIG-${year}-` : `ANX-${year}-`;
+    let number = `${prefix}${String(count + 1).padStart(4, '0')}`;
     while (await this.prisma.contract.findUnique({ where: { number } })) {
-      number = `ANX-${year}-${String(randomInt(1000, 9999))}`;
+      number = `${prefix}${String(randomInt(1000, 9999))}`;
     }
 
     const token = randomBytes(32).toString('base64url');
@@ -133,12 +136,13 @@ export class ContractsService {
       paymentNote: dto.paymentNote?.trim() || null,
       extraTerms: dto.extraTerms?.trim() || null,
     };
-    const bodySnapshot = buildContractBody(fields);
+    const bodySnapshot = kind === 'INSURANCE' ? buildInsuranceContractBody(fields) : buildContractBody(fields);
 
     const created = await this.prisma.contract.create({
       data: {
         number,
         token,
+        kind,
         status: 'SENT',
         customerName: fields.customerName,
         customerPhone: phone,
@@ -173,7 +177,14 @@ export class ContractsService {
       select: this.adminSelect(),
     });
 
-    return { ...this.toAdmin(row), notify, publicUrl: this.publicUrl(row.token) };
+    if (kind === 'INSURANCE' && orderId) {
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: { insuranceStatus: 'PROCESSING' },
+      }).catch(() => undefined);
+    }
+
+    return { ...this.toAdmin(row), notify, publicUrl: this.publicUrl(row.token, row.kind) };
   }
 
   async assign(id: string, dto: AssignContractDto) {
@@ -214,7 +225,7 @@ export class ContractsService {
       },
       select: this.adminSelect(),
     });
-    return { ...this.toAdmin(updated), notify, publicUrl: this.publicUrl(updated.token) };
+    return { ...this.toAdmin(updated), notify, publicUrl: this.publicUrl(updated.token, updated.kind) };
   }
 
   async void(id: string) {
@@ -237,6 +248,7 @@ export class ContractsService {
     return {
       id: row.id,
       number: row.number,
+      kind: row.kind,
       status: row.status,
       customerName: row.customerName,
       maskedPhone: maskPhone(row.customerPhone),
@@ -426,14 +438,24 @@ export class ContractsService {
       },
     });
 
-    const pdfUrl = this.publicUrl(row.token);
-    const signedMsg = [
-      `Auto Nex: müqavilə № ${row.number} imzalandı.`,
-      `PDF: ${pdfUrl}`,
-      row.trackingCode ? `İzləmə: ${siteUrl()}/track/${row.trackingCode}` : null,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    if (row.kind === 'INSURANCE' && row.orderId) {
+      await this.prisma.order.update({
+        where: { id: row.orderId },
+        data: { insuranceStatus: 'PAID' },
+      }).catch(() => undefined);
+    }
+
+    const pdfUrl = this.publicUrl(row.token, row.kind);
+    const signedMsg =
+      row.kind === 'INSURANCE'
+        ? 'Auto Nex: sığorta müqaviləsi imzalandı. Qısa sonra sığorta haqqı hesabınıza köçürüləcək.'
+        : [
+            `Auto Nex: müqavilə № ${row.number} imzalandı.`,
+            `PDF: ${pdfUrl}`,
+            row.trackingCode ? `İzləmə: ${siteUrl()}/track/${row.trackingCode}` : null,
+          ]
+            .filter(Boolean)
+            .join('\n');
     await this.notify.sendMessage(row.customerPhone, signedMsg);
     if (row.customerEmail) {
       await this.notify.sendEmail({
@@ -481,29 +503,42 @@ export class ContractsService {
     });
   }
 
-  private async dispatchContractLink(row: { token: string; number: string; customerName: string; customerPhone: string; customerEmail: string | null }) {
-    const url = this.publicUrl(row.token);
+  private async dispatchContractLink(row: {
+    token: string;
+    number: string;
+    customerName: string;
+    customerPhone: string;
+    customerEmail: string | null;
+    kind?: string | null;
+  }) {
+    const insurance = row.kind === 'INSURANCE';
+    const url = this.publicUrl(row.token, row.kind);
+    const label = insurance ? 'sığorta müqaviləsini' : 'xidmət müqaviləsini';
     const text = [
-      `Auto Nex müqavilə № ${row.number}`,
+      `Auto Nex ${insurance ? 'sığorta ' : ''}müqavilə № ${row.number}`,
       `Hörmətli ${row.customerName},`,
-      'Xidmət müqaviləsini oxuyub elektron imza atmaq üçün keçid:',
+      `${insurance ? 'Sığorta' : 'Xidmət'} müqaviləsini oxuyub elektron imza atmaq üçün keçid:`,
       url,
       '1) Telefona gələn SMS kodu  2) Müqaviləni oxuyun  3) Əl ilə imza  4) İkinci SMS kodu ilə təsdiq.',
+      insurance ? 'İmzadan sonra sığorta haqqı qısa müddətdə hesabınıza köçürüləcək.' : null,
       'Kodları heç kimə verməyin.',
-    ].join('\n');
-    const html = `<p>Hörmətli ${this.escape(row.customerName)},</p><p>Auto Nex xidmət müqaviləsi <strong>№ ${this.escape(row.number)}</strong>.</p><p><a href="${url}">Müqaviləni açın, oxuyun və elektron imza atın</a></p><p>Axın: telefon OTP → müqavilə mətni → əl imzası → ikinci OTP ilə təsdiq.</p><p>${url}</p>`;
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const html = `<p>Hörmətli ${this.escape(row.customerName)},</p><p>Auto Nex ${label} <strong>№ ${this.escape(row.number)}</strong>.</p><p><a href="${url}">Müqaviləni açın, oxuyun və elektron imza atın</a></p><p>Axın: telefon OTP → müqavilə mətni → əl imzası → ikinci OTP ilə təsdiq.</p><p>${url}</p>`;
     const whatsapp = await this.notify.sendMessage(row.customerPhone, text);
     const email = await this.notify.sendEmail({
       to: row.customerEmail,
-      subject: `Auto Nex müqavilə ${row.number} — oxuyun və imzalayın`,
+      subject: `Auto Nex ${insurance ? 'sığorta ' : ''}müqavilə ${row.number} — oxuyun və imzalayın`,
       text,
       html,
     });
     return { whatsapp, email, publicUrl: url, waMe: `https://wa.me/${row.customerPhone}?text=${encodeURIComponent(text)}` };
   }
 
-  private publicUrl(token: string) {
-    return `${siteUrl()}/contract/${token}`;
+  private publicUrl(token: string, kind?: string | null) {
+    const path = kind === 'INSURANCE' ? 'insurance-contract' : 'contract';
+    return `${siteUrl()}/${path}/${token}`;
   }
 
   private escape(value: string) {
@@ -539,6 +574,7 @@ export class ContractsService {
       id: true,
       number: true,
       token: true,
+      kind: true,
       status: true,
       customerName: true,
       customerPhone: true,
@@ -578,7 +614,7 @@ export class ContractsService {
       lastOtpPreview: revealOtp() ? row.lastOtpPreview : null,
       amountUsd: row.amountUsd != null ? String(row.amountUsd) : null,
       amountAzn: row.amountAzn != null ? String(row.amountAzn) : null,
-      publicUrl: this.publicUrl(String(row.token)),
+      publicUrl: this.publicUrl(String(row.token), row.kind as string | undefined),
       hasPdf: Boolean(row.signedAt),
     };
   }

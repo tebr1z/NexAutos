@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { normalizePhone, sendOtpSms, sendPlainMessage } from "@/lib/sms";
 import { buildContractBody, type ContractBody } from "@/lib/legal/service-contract";
+import { buildInsuranceContractBody } from "@/lib/legal/insurance-contract";
 
 export type ContractStatus = "DRAFT" | "SENT" | "PHONE_VERIFIED" | "READ" | "SIGNED" | "VOID";
 
@@ -19,6 +20,7 @@ export type StoredContract = {
   id: string;
   number: string;
   token: string;
+  kind?: "SERVICE" | "INSURANCE" | string;
   status: ContractStatus;
   customerName: string;
   customerPhone: string;
@@ -95,8 +97,9 @@ async function save(rows: StoredContract[]) {
   await writeFile(FILE, JSON.stringify(rows, null, 2), "utf8");
 }
 
-function publicUrl(token: string) {
-  return `${site()}/contract/${token}`;
+function publicUrl(token: string, kind?: string) {
+  const path = kind === "INSURANCE" ? "insurance-contract" : "contract";
+  return `${site()}/${path}/${token}`;
 }
 
 function toAdmin(row: StoredContract) {
@@ -106,7 +109,7 @@ function toAdmin(row: StoredContract) {
   return {
     ...rest,
     lastOtpPreview: revealOtp() ? lastOtpPreview : null,
-    publicUrl: publicUrl(row.token),
+    publicUrl: publicUrl(row.token, row.kind),
     hasPdf: row.status === "SIGNED",
   };
 }
@@ -127,8 +130,10 @@ export async function createContract(input: Record<string, string | number | und
   const name = String(input.customerName ?? "").trim();
   if (name.length < 2) fail("Müştəri adı lazımdır.");
   const rows = await load();
+  const kind = String(input.kind ?? "SERVICE") === "INSURANCE" ? "INSURANCE" : "SERVICE";
   const year = new Date().getFullYear();
-  const number = `ANX-${year}-${String(rows.filter((r) => r.number.startsWith(`ANX-${year}-`)).length + 1).padStart(4, "0")}`;
+  const prefix = kind === "INSURANCE" ? `ANX-SIG-${year}-` : `ANX-${year}-`;
+  const number = `${prefix}${String(rows.filter((r) => r.number.startsWith(prefix)).length + 1).padStart(4, "0")}`;
   const token = randomBytes(32).toString("base64url");
   const fields = {
     number,
@@ -148,21 +153,25 @@ export async function createContract(input: Record<string, string | number | und
     paymentNote: String(input.paymentNote ?? "").trim() || null,
     extraTerms: String(input.extraTerms ?? "").trim() || null,
   };
-  const url = publicUrl(token);
+  const url = publicUrl(token, kind);
   const text = [
-    `Auto Nex müqavilə № ${number}`,
+    `Auto Nex ${kind === "INSURANCE" ? "sığorta " : ""}müqavilə № ${number}`,
     `Hörmətli ${name},`,
-    "Xidmət müqaviləsini oxuyub elektron imza atmaq üçün keçid:",
+    `${kind === "INSURANCE" ? "Sığorta" : "Xidmət"} müqaviləsini oxuyub elektron imza atmaq üçün keçid:`,
     url,
     "1) SMS kod  2) Oxuyun  3) Əl imzası  4) İkinci SMS kodu.",
-  ].join("\n");
+    kind === "INSURANCE" ? "İmzadan sonra sığorta haqqı qısa müddətdə hesabınıza köçürüləcək." : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
   const whatsapp = await sendPlainMessage(phone, text);
   const row: StoredContract = {
     id: crypto.randomUUID(),
     token,
+    kind,
     status: "SENT",
     ...fields,
-    bodySnapshot: buildContractBody(fields),
+    bodySnapshot: kind === "INSURANCE" ? buildInsuranceContractBody(fields) : buildContractBody(fields),
     otps: [],
     createdAt: new Date().toISOString(),
     publicUrl: url,
@@ -205,7 +214,7 @@ export async function resendContract(id: string) {
     `Auto Nex müqavilə № ${row.number}`,
     `Hörmətli ${row.customerName},`,
     "Xidmət müqaviləsini oxuyub elektron imza atmaq üçün keçid:",
-    publicUrl(row.token),
+    publicUrl(row.token, row.kind),
     "1) SMS kod  2) Oxuyun  3) Əl imzası  4) İkinci SMS kodu.",
   ].join("\n");
   const whatsapp = await sendPlainMessage(row.customerPhone, text);
@@ -213,10 +222,10 @@ export async function resendContract(id: string) {
     whatsapp,
     email: { sent: false, error: row.customerEmail ? "not_configured" : "no_email" },
     waMe: `https://wa.me/${row.customerPhone}?text=${encodeURIComponent(text)}`,
-    publicUrl: publicUrl(row.token),
+    publicUrl: publicUrl(row.token, row.kind),
   };
   await save(rows);
-  return { ...toAdmin(row), notify: row.notifyMeta, publicUrl: publicUrl(row.token) };
+  return { ...toAdmin(row), notify: row.notifyMeta, publicUrl: publicUrl(row.token, row.kind) };
 }
 
 export async function voidContract(id: string) {
@@ -251,6 +260,7 @@ export async function publicView(token: string, session?: string) {
   return {
     id: row.id,
     number: row.number,
+    kind: row.kind,
     status: row.status,
     customerName: row.customerName,
     maskedPhone: maskPhone(row.customerPhone),
@@ -374,8 +384,13 @@ export async function signContract(
   row.lastOtpPreview = null;
   row.sessionTokenHash = null;
   await save(rows);
-  const url = publicUrl(row.token);
-  await sendPlainMessage(row.customerPhone, `Auto Nex: müqavilə № ${row.number} imzalandı.\nPDF: ${url}`);
+  const url = publicUrl(row.token, row.kind);
+  await sendPlainMessage(
+    row.customerPhone,
+    row.kind === "INSURANCE"
+      ? "Auto Nex: sığorta müqaviləsi imzalandı. Qısa sonra sığorta haqqı hesabınıza köçürüləcək."
+      : `Auto Nex: müqavilə № ${row.number} imzalandı.\nPDF: ${url}`,
+  );
   return { ok: true, status: "SIGNED" as const, signedAt: row.signedAt, documentHash, publicUrl: url };
 }
 

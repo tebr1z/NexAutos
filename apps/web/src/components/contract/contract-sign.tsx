@@ -336,7 +336,9 @@ export function ContractSign({ token }: { token: string }) {
         <section className="mt-10 space-y-4">
           <h2 className="font-display text-2xl">Müqavilə imzalandı</h2>
           <p className="text-sm leading-7 text-muted">
-            Sənəd Auto Nex reyestrinə düşdü. PDF keçidi WhatsApp və e-poçtunuza da göndərilir.
+            {data?.kind === "INSURANCE"}
+              ? "Sığorta müqaviləsi təsdiqləndi. Qısa sonra sığorta haqqı hesabınıza köçürüləcək — SMS də göndərilir."
+              : "Sənəd Auto Nex reyestrinə düşdü. PDF keçidi WhatsApp və e-poçtunuza da göndərilir."}
           </p>
           {data.documentHash && (
             <p className="break-all font-mono text-[11px] text-muted">SHA-256: {data.documentHash}</p>

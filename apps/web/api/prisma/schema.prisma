@@ -375,6 +375,7 @@ model Contract {
   id     String         @id @default(cuid())
   number String         @unique
   token  String         @unique
+  kind   String         @default("SERVICE")
   status ContractStatus @default(DRAFT)
 
   customerId String?

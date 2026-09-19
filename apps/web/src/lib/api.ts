@@ -40,6 +40,7 @@ export type ContractRecord = {
   id: string;
   number: string;
   token: string;
+  kind?: "SERVICE" | "INSURANCE" | string;
   status: "DRAFT" | "SENT" | "PHONE_VERIFIED" | "READ" | "SIGNED" | "VOID";
   customerName: string;
   customerPhone: string;
@@ -82,6 +83,7 @@ export type ContractBody = {
 export type PublicContract = {
   id: string;
   number: string;
+  kind?: string;
   status: ContractRecord["status"];
   customerName: string;
   maskedPhone: string;

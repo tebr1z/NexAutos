@@ -11,6 +11,10 @@ import {
 } from 'class-validator';
 
 export class CreateContractDto {
+  @IsOptional()
+  @IsIn(['SERVICE', 'INSURANCE'])
+  kind?: string;
+
   @IsString()
   @MinLength(2)
   customerName: string;

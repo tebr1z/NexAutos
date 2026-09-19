@@ -90,11 +90,67 @@ export default function AdminInsurancePage() {
     }
   }
 
+  async function sendContract() {
+    if (!selected?.id) {
+      setError("Bu maşın serverdə yoxdur. Əvvəl Maşınlar səhifəsində yadda saxlayın.");
+      return;
+    }
+    const phone = normalizePhone(selected.customerPhone);
+    if (!phone) {
+      setError("Müştəri telefonu yoxdur — müqavilə göndərilmir.");
+      return;
+    }
+    const customerName = [form.firstName, form.lastName].filter(Boolean).join(" ").trim() || selected.customerName;
+    if (!customerName?.trim()) {
+      setError("Ad və soyad yazın.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const saved = await api.updateInsurance(selected.id, {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        docSeries: form.docSeries.trim(),
+        trustee: form.trustee.trim(),
+        status: "PROCESSING",
+        notify: false,
+      });
+      setOrders((list) => list.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)));
+      setForm((prev) => ({ ...prev, status: "PROCESSING" }));
+      const created = await api.createContract({
+        kind: "INSURANCE",
+        customerName: customerName.trim(),
+        customerPhone: phone,
+        customerIdNumber: form.docSeries.trim() || undefined,
+        extraTerms: form.trustee.trim() || undefined,
+        orderId: selected.id,
+        trackingCode: selected.trackingCode,
+        vin: selected.vin,
+        make: selected.make,
+        model: selected.model,
+        year: selected.year,
+      });
+      const sent = created.notify?.whatsapp?.sent || created.notify?.email?.sent;
+      setNotice(
+        sent
+          ? `Sığorta müqaviləsi göndərildi. İmza: ${created.publicUrl}`
+          : created.notify?.whatsapp?.error || `Müqavilə yaradıldı. Link: ${created.publicUrl}`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Müqavilə göndərilmədi.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
       <h1 className="font-display text-3xl">Sığorta</h1>
       <p className="mt-2 text-sm text-zinc-400">
-        Bütün maşınların sığortası buradadır. Tək maşın səhifəsində deyil — siyahıdan seçib doldurun.
+        Bütün maşınların sığortası buradadır. Vəsiqəni doldurub sığorta müqaviləsini SMS ilə göndərin;
+        müştəri OTP və əl imzası atır, imzadan sonra pulun hesaba köçəcəyi barədə qısa SMS gedir.
       </p>
       {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
       {notice ? <p className="mt-4 text-sm text-emerald-400">{notice}</p> : null}
@@ -192,10 +248,18 @@ export default function AdminInsurancePage() {
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => void save(true)}
+                  onClick={() => void sendContract()}
                   className="rounded-xl bg-sky-400 px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50"
                 >
-                  Saxla və link göndər
+                  Sığorta müqaviləsi göndər
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void save(true)}
+                  className="rounded-xl border border-sky-400/40 px-4 py-2.5 text-sm text-sky-200 disabled:opacity-50"
+                >
+                  Status linki göndər
                 </button>
                 <button
                   type="button"
