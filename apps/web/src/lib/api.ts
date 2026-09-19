@@ -246,7 +246,8 @@ export const api = {
     form.append("orderId", id);
     form.append("category", payload.category || "auction");
     form.append("caption", payload.caption || "");
-    form.append("file", dataUrlToBlob(payload.url), "photo.jpg");
+    const blob = dataUrlToBlob(payload.url);
+    form.append("file", new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" }));
     const token = typeof window !== "undefined" ? localStorage.getItem("anx_token") : null;
     const res = await fetch("/api/order-photos", {
       method: "POST",

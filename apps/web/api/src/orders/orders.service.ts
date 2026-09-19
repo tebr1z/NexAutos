@@ -498,8 +498,11 @@ export class OrdersService {
         const url = await this.r2.put(key, parsed.buf, parsed.mime);
         await this.prisma.orderPhoto.update({ where: { id: created.id }, data: { url } });
       } catch (err) {
-        await this.prisma.orderPhoto.delete({ where: { id: created.id } }).catch(() => undefined);
-        throw new BadRequestException(`Cloudflare R2-yə yazılmadı: ${(err as Error).message}`);
+        console.error('R2 photo upload failed, storing in database', err);
+        await this.prisma.orderPhoto.update({
+          where: { id: created.id },
+          data: { url: rows[0].url },
+        });
       }
     } else {
       await this.prisma.orderPhoto.create({ data: { orderId, ...rows[0] } });

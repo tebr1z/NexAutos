@@ -13,15 +13,21 @@ export async function POST(req: Request) {
   const category = String(form.get("category") || "auction").trim() || "auction";
   const caption = String(form.get("caption") || "").trim();
   const file = form.get("file");
-  if (!orderId || !(file instanceof File)) {
+  const upload =
+    file instanceof Blob
+      ? file
+      : file && typeof file === "object" && "arrayBuffer" in file
+        ? (file as Blob)
+        : null;
+  if (!orderId || !upload) {
     return Response.json({ message: "Şəkil və sifariş lazımdır." }, { status: 400 });
   }
 
-  const buf = Buffer.from(await file.arrayBuffer());
+  const buf = Buffer.from(await upload.arrayBuffer());
   if (!buf.length) return Response.json({ message: "Boş şəkil." }, { status: 400 });
   if (buf.length > 250_000) return Response.json({ message: "Şəkil çox böyükdür — yenidən yükləyin." }, { status: 413 });
 
-  const mime = file.type.startsWith("image/") ? file.type : "image/jpeg";
+  const mime = upload.type?.startsWith("image/") ? upload.type : "image/jpeg";
   const dataUrl = `data:${mime};base64,${buf.toString("base64")}`;
 
   try {
