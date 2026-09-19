@@ -249,11 +249,22 @@ export const api = {
       lastName?: string;
       docSeries?: string;
       trustee?: string;
+      amountAzn?: string;
       status: string;
+      signRequired?: boolean;
+      signUrl?: string;
       notifiedAt?: string;
       paidOutAt?: string;
       receiptUrl?: string;
     }>(`/insurance/${encodeURIComponent(code)}`),
+  createInsurance: (payload: {
+    firstName: string;
+    lastName?: string;
+    phone: string;
+    docSeries?: string;
+    trustee?: string;
+    amountAzn?: string;
+  }) => request<TrackingShipment>("/insurance", { method: "POST", body: JSON.stringify(payload) }),
   insuranceReceipt: (token: string) =>
     request<{
       trackingCode: string;
@@ -284,6 +295,7 @@ export const api = {
       lastName?: string;
       docSeries?: string;
       trustee?: string;
+      amountAzn?: string;
       status?: string;
       notify?: boolean;
     },

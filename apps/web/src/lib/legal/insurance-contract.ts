@@ -49,7 +49,10 @@ export function buildInsuranceContractBody(fields: ContractFields): ContractBody
         id: "odenis",
         title: "3. Sığorta haqqı və köçürmə",
         facts: [
-          { label: "Sığorta haqqı (AZN)", value: dash(fields.amountAzn) },
+          {
+            label: "Ayrılan məbləğ (AZN)",
+            value: fields.amountAzn?.trim() || "İlk mərhələdə yazılmayıb — sonra əlavə olunacaq",
+          },
           { label: "USD ekvivalent", value: dash(fields.amountUsd) },
         ],
         paragraphs: [

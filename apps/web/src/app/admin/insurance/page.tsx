@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { INSURANCE_STATUSES, insurancePublicPath, insuranceStatusLabel } from "@/lib/insurance";
+import { INSURANCE_STATUS_OPTIONS, insurancePublicPath, insuranceStatusLabel, normalizeInsuranceStatus } from "@/lib/insurance";
 import { listLocalOrders } from "@/lib/local-orders";
 import { normalizePhone } from "@/lib/sms";
 import type { TrackingShipment } from "@/lib/types";
@@ -14,8 +14,10 @@ const inp =
 const EMPTY = {
   firstName: "",
   lastName: "",
+  phone: "",
   docSeries: "",
   trustee: "",
+  amountAzn: "",
   status: "DRAFT",
 };
 
@@ -52,35 +54,62 @@ export default function AdminInsurancePage() {
     setForm({
       firstName: order.insurance?.firstName ?? "",
       lastName: order.insurance?.lastName ?? "",
+      phone: order.customerPhone ?? "",
       docSeries: order.insurance?.docSeries ?? "",
       trustee: order.insurance?.trustee ?? "",
-      status: order.insurance?.status || "DRAFT",
+      amountAzn: order.insurance?.amountAzn ?? "",
+      status: normalizeInsuranceStatus(order.insurance?.status),
     });
     setNotice("");
     setError("");
   }
 
+  function startNew() {
+    setSelectedId("__new__");
+    setForm(EMPTY);
+    setNotice("");
+    setError("");
+  }
+
+  async function ensureRecord() {
+    if (selected?.id) return selected;
+    const phone = normalizePhone(form.phone);
+    if (!phone) throw new Error("Telefon yazın — maşın olmadan da sığorta açılır.");
+    const firstName = form.firstName.trim();
+    if (!firstName) throw new Error("Ad yazın.");
+    const created = await api.createInsurance({
+      firstName,
+      lastName: form.lastName.trim() || undefined,
+      phone,
+      docSeries: form.docSeries.trim() || undefined,
+      trustee: form.trustee.trim() || undefined,
+      amountAzn: form.amountAzn.trim() || undefined,
+    });
+    setOrders((list) => [created, ...list.filter((row) => row.id !== created.id)]);
+    pick(created);
+    return created;
+  }
+
   async function save(notify: boolean) {
-    if (!selected?.id) {
-      setError("Bu maşın serverdə yoxdur. Əvvəl Maşınlar səhifəsində yadda saxlayın.");
-      return;
-    }
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      const saved = await api.updateInsurance(selected.id, {
+      const target = await ensureRecord();
+      if (!target.id) throw new Error("Sığorta yazılmadı.");
+      const saved = await api.updateInsurance(target.id, {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         docSeries: form.docSeries.trim(),
         trustee: form.trustee.trim(),
+        amountAzn: form.amountAzn.trim(),
         status: form.status,
         notify,
       });
       setOrders((list) => list.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)));
       const label = insuranceStatusLabel(saved.insurance?.status || form.status);
       if (!notify) setNotice(`Sığorta saxlanıldı — ${label}.`);
-      else if (!normalizePhone(selected.customerPhone)) setNotice("Saxlanıldı. Nömrə yoxdur — SMS getmədi.");
+      else if (!normalizePhone(form.phone || target.customerPhone)) setNotice("Saxlanıldı. Nömrə yoxdur — SMS getmədi.");
       else if (saved.notify?.sent) setNotice(`Saxlanıldı. Müştəriyə link getdi (${label}).`);
       else setNotice(saved.notify?.error || `Saxlanıldı — ${label}.`);
     } catch (err) {
@@ -91,18 +120,9 @@ export default function AdminInsurancePage() {
   }
 
   async function sendContract() {
-    if (!selected?.id) {
-      setError("Bu maşın serverdə yoxdur. Əvvəl Maşınlar səhifəsində yadda saxlayın.");
-      return;
-    }
-    const phone = normalizePhone(selected.customerPhone);
-    if (!phone) {
-      setError("Müştəri telefonu yoxdur — müqavilə göndərilmir.");
-      return;
-    }
-    const customerName = [form.firstName, form.lastName].filter(Boolean).join(" ").trim() || selected.customerName;
-    const docSeries = form.docSeries.trim() || selected.insurance?.docSeries?.trim() || "";
-    if (!customerName?.trim()) {
+    const customerName = [form.firstName, form.lastName].filter(Boolean).join(" ").trim() || selected?.customerName || "";
+    const docSeries = form.docSeries.trim() || selected?.insurance?.docSeries?.trim() || "";
+    if (!customerName.trim()) {
       setError("Ad və soyad yazın.");
       return;
     }
@@ -114,28 +134,33 @@ export default function AdminInsurancePage() {
     setError("");
     setNotice("");
     try {
-      const saved = await api.updateInsurance(selected.id, {
+      const target = await ensureRecord();
+      const phone = normalizePhone(form.phone || target.customerPhone);
+      if (!phone) throw new Error("Müştəri telefonu yoxdur — müqavilə göndərilmir.");
+      const saved = await api.updateInsurance(target.id, {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         docSeries,
         trustee: form.trustee.trim(),
-        status: "PROCESSING",
+        amountAzn: form.amountAzn.trim(),
+        status: "SIGN_WAIT",
         notify: false,
       });
       setOrders((list) => list.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)));
-      setForm((prev) => ({ ...prev, status: "PROCESSING", docSeries }));
+      setForm((prev) => ({ ...prev, status: "SIGN_WAIT", docSeries }));
       const created = await api.createContract({
         kind: "INSURANCE",
         customerName: customerName.trim(),
         customerPhone: phone,
         customerIdNumber: docSeries,
         extraTerms: form.trustee.trim() || undefined,
-        orderId: selected.id,
-        trackingCode: selected.trackingCode,
-        vin: selected.vin,
-        make: selected.make,
-        model: selected.model,
-        year: selected.year,
+        amountAzn: form.amountAzn.trim() || undefined,
+        orderId: target.id,
+        trackingCode: target.trackingCode,
+        vin: target.vin?.startsWith("SIG") ? undefined : target.vin,
+        make: target.make,
+        model: target.model,
+        year: target.year,
       });
       const sent = created.notify?.whatsapp?.sent || created.notify?.email?.sent;
       setNotice(
@@ -151,25 +176,21 @@ export default function AdminInsurancePage() {
   }
 
   async function sendPayoutCheck() {
-    if (!selected?.id) {
-      setError("Bu maşın serverdə yoxdur. Əvvəl Maşınlar səhifəsində yadda saxlayın.");
-      return;
-    }
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      if (form.docSeries.trim() || form.firstName.trim() || form.lastName.trim()) {
-        const saved = await api.updateInsurance(selected.id, {
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          docSeries: form.docSeries.trim(),
-          trustee: form.trustee.trim(),
-          notify: false,
-        });
-        setOrders((list) => list.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)));
-      }
-      const result = await api.confirmInsurancePayout(selected.id);
+      const target = await ensureRecord();
+      const saved = await api.updateInsurance(target.id, {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        docSeries: form.docSeries.trim(),
+        trustee: form.trustee.trim(),
+        amountAzn: form.amountAzn.trim(),
+        notify: false,
+      });
+      setOrders((list) => list.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)));
+      const result = await api.confirmInsurancePayout(target.id);
       setOrders((list) => list.map((row) => (row.id === result.id ? { ...row, ...result } : row)));
       setForm((prev) => ({ ...prev, status: result.insurance?.status || "TRANSFERRED" }));
       const sent = result.notify?.sent;
@@ -189,18 +210,27 @@ export default function AdminInsurancePage() {
     <div className="mx-auto max-w-6xl">
       <h1 className="font-display text-3xl">Sığorta</h1>
       <p className="mt-2 text-sm text-zinc-400">
-        Vəsiqə seriyasını yazın — müqaviləyə sistemdən düşür. İmza və köçürmədən sonra «Pul köçürüldü» ilə
-        müştəriyə çek linki gedir.
+        Maşın seçmədən də sığorta aça bilərsiniz. İmza gözləyəndə müştəri mütləq imzalamalıdır.
+        Ayrılan məbləğ əvvəldən boş qala bilər — sonra yazırsınız.
       </p>
       {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
       {notice ? <p className="mt-4 text-sm text-emerald-400">{notice}</p> : null}
 
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Kod, müştəri, VIN, marka…"
-        className={`${inp} mt-6`}
-      />
+      <div className="mt-6 flex flex-wrap gap-3">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Kod, müştəri, VIN, marka…"
+          className={`${inp} flex-1`}
+        />
+        <button
+          type="button"
+          onClick={startNew}
+          className="rounded-xl bg-white px-4 py-3 text-sm font-medium text-black"
+        >
+          Yeni sığorta
+        </button>
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="overflow-hidden rounded-2xl border border-white/10">
@@ -225,10 +255,18 @@ export default function AdminInsurancePage() {
                   >
                     <td className="px-4 py-3">
                       <p className="font-mono text-xs text-sky-300">{row.trackingCode}</p>
-                      <p className="mt-0.5 text-zinc-200">{[row.year, row.make, row.model].filter(Boolean).join(" ") || "—"}</p>
+                      <p className="mt-0.5 text-zinc-200">
+                        {[row.year, row.make, row.model].filter(Boolean).join(" ") ||
+                          (row.vin?.startsWith("SIG") ? "Maşınsız sığorta" : "—")}
+                      </p>
                     </td>
                     <td className="px-4 py-3 text-zinc-300">{row.customerName}</td>
-                    <td className="px-4 py-3 text-zinc-400">{insuranceStatusLabel(row.insurance?.status)}</td>
+                    <td className="px-4 py-3 text-zinc-400">
+                      <p>{insuranceStatusLabel(row.insurance?.status)}</p>
+                      {row.insurance?.amountAzn ? (
+                        <p className="mt-0.5 text-[11px] text-zinc-500">{row.insurance.amountAzn} AZN</p>
+                      ) : null}
+                    </td>
                   </tr>
                 );
               })}
@@ -238,15 +276,17 @@ export default function AdminInsurancePage() {
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          {!selected ? (
-            <p className="text-sm text-zinc-500">Soldan maşın seçin.</p>
+          {!selectedId ? (
+            <p className="text-sm text-zinc-500">Soldan maşın seçin və ya «Yeni sığorta» ilə maşınsız açın.</p>
           ) : (
             <>
-              <p className="font-mono text-xs text-sky-300">{selected.trackingCode}</p>
+              <p className="font-mono text-xs text-sky-300">{selected?.trackingCode || "Yeni sığorta"}</p>
               <p className="mt-1 text-lg text-white">
-                {[selected.year, selected.make, selected.model].filter(Boolean).join(" ") || selected.customerName}
+                {[selected?.year, selected?.make, selected?.model].filter(Boolean).join(" ") ||
+                  (selected?.vin?.startsWith("SIG") || selectedId === "__new__"
+                    ? "Maşınsız sığorta"
+                    : selected?.customerName || "Yeni müştəri")}
               </p>
-              <p className="mt-1 text-xs text-zinc-500">{selected.customerPhone || "nömrə yoxdur"}</p>
               <div className="mt-4 grid gap-3">
                 <input
                   placeholder="Ad"
@@ -261,6 +301,12 @@ export default function AdminInsurancePage() {
                   className={inp}
                 />
                 <input
+                  placeholder="Telefon"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  className={inp}
+                />
+                <input
                   placeholder="Vəsiqə seriyası"
                   value={form.docSeries}
                   onChange={(e) => setForm({ ...form, docSeries: e.target.value.toUpperCase() })}
@@ -272,12 +318,18 @@ export default function AdminInsurancePage() {
                   onChange={(e) => setForm({ ...form, trustee: e.target.value })}
                   className={inp}
                 />
+                <input
+                  placeholder="Ayrılan məbləğ AZN (ilk başda boş ola bilər)"
+                  value={form.amountAzn}
+                  onChange={(e) => setForm({ ...form, amountAzn: e.target.value })}
+                  className={inp}
+                />
                 <select
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value })}
                   className="w-full rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-sm text-white"
                 >
-                  {INSURANCE_STATUSES.map((row) => (
+                  {INSURANCE_STATUS_OPTIONS.map((row) => (
                     <option key={row.key} value={row.key}>
                       {row.az}
                     </option>
@@ -317,13 +369,15 @@ export default function AdminInsurancePage() {
                 >
                   Yalnız saxla
                 </button>
-                <Link
-                  href={insurancePublicPath(selected.trackingCode)}
-                  target="_blank"
-                  className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-sky-300"
-                >
-                  Müştəri səhifəsi ↗
-                </Link>
+                {selected?.trackingCode ? (
+                  <Link
+                    href={insurancePublicPath(selected.trackingCode)}
+                    target="_blank"
+                    className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-sky-300"
+                  >
+                    Müştəri səhifəsi ↗
+                  </Link>
+                ) : null}
                 {selected.insurance?.receiptUrl ? (
                   <Link
                     href={selected.insurance.receiptUrl}

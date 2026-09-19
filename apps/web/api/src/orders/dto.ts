@@ -219,11 +219,39 @@ export class UpdateInsuranceDto {
 
   @IsOptional()
   @IsString()
+  amountAzn?: string;
+
+  @IsOptional()
+  @IsString()
   status?: string;
 
   @IsOptional()
   @IsBoolean()
   notify?: boolean;
+}
+
+export class CreateInsuranceDto {
+  @IsString()
+  firstName: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @IsString()
+  phone: string;
+
+  @IsOptional()
+  @IsString()
+  docSeries?: string;
+
+  @IsOptional()
+  @IsString()
+  trustee?: string;
+
+  @IsOptional()
+  @IsString()
+  amountAzn?: string;
 }
 
 export class CustomerSmsDto {

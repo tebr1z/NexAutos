@@ -83,6 +83,7 @@ export function mapOrder(order: {
   insuranceDocSeries?: string | null;
   insuranceTrustee?: string | null;
   insuranceStatus?: string | null;
+  insuranceAmountAzn?: string | null;
   insuranceNotifiedAt?: Date | null;
   insuranceReceiptToken?: string | null;
   insurancePaidOutAt?: Date | null;
@@ -150,6 +151,7 @@ export function mapOrder(order: {
       docSeries: order.insuranceDocSeries || undefined,
       trustee: order.insuranceTrustee || undefined,
       status: order.insuranceStatus || undefined,
+      amountAzn: order.insuranceAmountAzn || undefined,
       notifiedAt: order.insuranceNotifiedAt?.toISOString(),
       paidOutAt: order.insurancePaidOutAt?.toISOString(),
       receiptToken: order.insuranceReceiptToken || undefined,

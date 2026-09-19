@@ -182,6 +182,7 @@ model Order {
   insuranceDocSeries String?
   insuranceTrustee   String?
   insuranceStatus    String?
+  insuranceAmountAzn String?
   insuranceNotifiedAt DateTime?
   insuranceReceiptToken String?   @unique
   insurancePaidOutAt    DateTime?

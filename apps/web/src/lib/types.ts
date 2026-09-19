@@ -72,6 +72,7 @@ export type TrackingShipment = {
     lastName?: string;
     docSeries?: string;
     trustee?: string;
+    amountAzn?: string;
     status?: string;
     notifiedAt?: string;
     paidOutAt?: string;

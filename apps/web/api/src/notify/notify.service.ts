@@ -124,12 +124,17 @@ export class NotifyService {
     make?: string | null;
     model?: string | null;
     statusLabel?: string;
+    mustSign?: boolean;
+    signUrl?: string;
   }): Promise<NotifyResult> {
     const to = normalizePhone(input.phone);
     if (!to) return { sent: false, error: 'no_phone' };
     const body = [
-      'Auto Nex: maşınınızın sığorta məlumatı yeniləndi.',
+      input.mustSign
+        ? 'Auto Nex: sığorta müqaviləsi imza gözləyir. İmzalamalısınız.'
+        : 'Auto Nex: maşınınızın sığorta məlumatı yeniləndi.',
       input.statusLabel ? `Status: ${input.statusLabel}` : null,
+      input.signUrl ? `İmza: ${input.signUrl}` : null,
       trackSmsFooter(input),
       `Sığorta: ${siteBase()}/insurance/${input.trackingCode}`,
     ]

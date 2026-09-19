@@ -17,7 +17,10 @@ type InsuranceView = {
   lastName?: string;
   docSeries?: string;
   trustee?: string;
+  amountAzn?: string;
   status: string;
+  signRequired?: boolean;
+  signUrl?: string;
   receiptUrl?: string;
 };
 
@@ -75,17 +78,32 @@ export function InsuranceStatus({ code }: { code: string }) {
       <div className="mt-10 rounded-3xl border border-line bg-card p-6">
         <p className="text-xs uppercase tracking-[0.2em] text-muted">{t.track.status}</p>
         <p className="mt-2 text-2xl text-royal">{insuranceStatusLabel(data.status)}</p>
+        {data.signRequired ? (
+          <p className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
+            Sığorta müqaviləsini imzalamalısınız. İmza olmadan sığorta irəliləmir.
+          </p>
+        ) : null}
         <p className="mt-2 font-mono text-sm text-muted">{data.trackingCode}</p>
         <dl className="mt-6 space-y-3 text-sm">
-          <Row label={t.track.yourCar} value={[data.year, data.make, data.model].filter(Boolean).join(" ") || "—"} />
-          <Row label="VIN" value={data.vinHint || "—"} />
+          {[data.year, data.make, data.model].filter(Boolean).length ? (
+            <Row label={t.track.yourCar} value={[data.year, data.make, data.model].filter(Boolean).join(" ")} />
+          ) : (
+            <Row label={t.track.yourCar} value="Maşın hələ seçilməyib" />
+          )}
+          {data.vinHint ? <Row label="VIN" value={data.vinHint} /> : null}
           <Row label={t.track.insuranceName} value={person || t.track.insuranceLater} />
           <Row label={t.track.insuranceDoc} value={data.docSeries || t.track.insuranceLater} />
+          <Row label="Ayrılan məbləğ" value={data.amountAzn ? `${data.amountAzn} AZN` : "Hələ yazılmayıb"} />
           {data.trustee ? <Row label={t.track.insuranceTrustee} value={data.trustee} /> : null}
         </dl>
       </div>
 
       <div className="mt-6 flex flex-wrap justify-center gap-3">
+        {data.signUrl ? (
+          <a href={data.signUrl} className="rounded-2xl bg-amber-400 px-5 py-3 text-sm font-medium text-black">
+            Müqaviləni imzala
+          </a>
+        ) : null}
         {data.receiptUrl ? (
           <Link href={data.receiptUrl} className="rounded-2xl bg-emerald-400 px-5 py-3 text-sm font-medium text-black">
             Pul köçürmə çeki

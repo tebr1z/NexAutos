@@ -102,6 +102,7 @@ export class ContractsService {
     let orderId = dto.orderId?.trim() || null;
     let trackingCode = dto.trackingCode?.trim().toUpperCase() || null;
     let orderDocSeries: string | null = null;
+    let orderAmount: string | null = null;
     if (orderId || trackingCode) {
       const order = await this.prisma.order.findFirst({
         where: orderId ? { id: orderId } : { trackingCode: trackingCode! },
@@ -110,6 +111,7 @@ export class ContractsService {
         orderId = order.id;
         trackingCode = order.trackingCode || trackingCode;
         orderDocSeries = order.insuranceDocSeries?.trim() || null;
+        orderAmount = order.insuranceAmountAzn?.trim() || null;
       }
     }
 
@@ -142,7 +144,7 @@ export class ContractsService {
       year: dto.year ?? null,
       origin: dto.origin?.trim() || null,
       amountUsd: dto.amountUsd?.trim() || null,
-      amountAzn: dto.amountAzn?.trim() || null,
+      amountAzn: dto.amountAzn?.trim() || orderAmount,
       paymentNote: dto.paymentNote?.trim() || null,
       extraTerms: dto.extraTerms?.trim() || null,
     };
@@ -167,7 +169,7 @@ export class ContractsService {
         year: fields.year,
         origin: fields.origin,
         amountUsd: money(dto.amountUsd),
-        amountAzn: money(dto.amountAzn),
+        amountAzn: money(fields.amountAzn || undefined),
         paymentNote: fields.paymentNote,
         extraTerms: fields.extraTerms,
         bodySnapshot: bodySnapshot as unknown as Prisma.InputJsonValue,
@@ -190,7 +192,7 @@ export class ContractsService {
     if (kind === 'INSURANCE' && orderId) {
       await this.prisma.order.update({
         where: { id: orderId },
-        data: { insuranceStatus: 'PROCESSING' },
+        data: { insuranceStatus: 'SIGN_WAIT' },
       }).catch(() => undefined);
     }
 
@@ -452,7 +454,7 @@ export class ContractsService {
     if (row.kind === 'INSURANCE' && row.orderId) {
       await this.prisma.order.update({
         where: { id: row.orderId },
-        data: { insuranceStatus: 'PAID' },
+        data: { insuranceStatus: 'SIGNED' },
       }).catch(() => undefined);
     }
 

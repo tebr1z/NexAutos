@@ -5,9 +5,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ContainersService } from '../containers/containers.service';
 import { VesselsService } from '../vessels/vessels.service';
 import { attachPortCoords, enrichKnownContainer, lookupCarrier } from '../containers/registry';
-import { CreateOrderDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
+import { CreateInsuranceDto, CreateOrderDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { generateTrackingCode, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
-import { NotifyService, siteBase, statusLabelAz, type NotifyResult } from '../notify/notify.service';
+import { NotifyService, normalizePhone, siteBase, statusLabelAz, type NotifyResult } from '../notify/notify.service';
 import { CloudinaryStorage } from '../storage/cloudinary.storage';
 
 function opt(value?: string) {
@@ -279,20 +279,35 @@ export class OrdersService {
     return mapOrder(order);
   }
 
-  insurancePublic(order: Parameters<typeof mapOrder>[0]) {
+  async insurancePublic(order: Parameters<typeof mapOrder>[0]) {
     const mapped = mapOrder(order);
     const vin = order.vin || '';
+    const waiting = mapped.insurance.status === 'SIGN_WAIT' || mapped.insurance.status === 'PROCESSING';
+    const contract = waiting
+      ? await this.prisma.contract.findFirst({
+          where: { orderId: order.id, kind: 'INSURANCE', status: { not: 'VOID' } },
+          orderBy: { createdAt: 'desc' },
+          select: { token: true, status: true },
+        })
+      : null;
+    const signUrl =
+      waiting && contract && contract.status !== 'SIGNED'
+        ? `${siteBase()}/insurance-contract/${contract.token}`
+        : undefined;
     return {
       trackingCode: mapped.trackingCode,
       make: mapped.make,
       model: mapped.model,
       year: mapped.year,
-      vinHint: vin.length > 4 ? `••••${vin.slice(-4)}` : vin,
+      vinHint: vin.startsWith('SIG') ? '' : vin.length > 4 ? `••••${vin.slice(-4)}` : vin,
       firstName: mapped.insurance.firstName,
       lastName: mapped.insurance.lastName,
       docSeries: mapped.insurance.docSeries,
       trustee: mapped.insurance.trustee,
+      amountAzn: mapped.insurance.amountAzn,
       status: mapped.insurance.status || 'DRAFT',
+      signRequired: waiting,
+      signUrl,
       notifiedAt: mapped.insurance.notifiedAt,
       paidOutAt: mapped.insurance.paidOutAt,
       receiptUrl: mapped.insurance.receiptUrl,
@@ -315,7 +330,8 @@ export class OrdersService {
       make: mapped.make,
       model: mapped.model,
       year: mapped.year,
-      vinHint: order.vin && order.vin.length > 4 ? `••••${order.vin.slice(-4)}` : order.vin,
+      amountAzn: mapped.insurance.amountAzn,
+      vinHint: order.vin?.startsWith('SIG') ? '' : order.vin && order.vin.length > 4 ? `••••${order.vin.slice(-4)}` : order.vin,
       paidOutAt: order.insurancePaidOutAt.toISOString(),
       message: 'Pul sizə köçürülmüşdür',
     };
@@ -365,6 +381,69 @@ export class OrdersService {
     return this.insurancePublic(order);
   }
 
+  async createInsuranceCase(dto: CreateInsuranceDto, userId?: string) {
+    const phone = normalizePhone(dto.phone);
+    if (!phone) throw new BadRequestException('Düzgün telefon nömrəsi yazın.');
+    const firstName = dto.firstName.trim();
+    const lastName = dto.lastName?.trim() || '';
+    const name = [firstName, lastName].filter(Boolean).join(' ');
+    if (name.length < 2) throw new BadRequestException('Ad yazın.');
+
+    let customer = await this.prisma.customer.findFirst({ where: { phone } });
+    if (!customer) {
+      customer = await this.prisma.customer.create({
+        data: {
+          name,
+          email: `sig-${randomBytes(6).toString('hex')}@autonex.local`,
+          phone,
+        },
+      });
+    }
+
+    const vin = `SIG${randomBytes(8).toString('hex').toUpperCase()}`.slice(0, 17);
+    let trackingCode = `SIG-${String(Date.now()).slice(-6)}`;
+    while (await this.prisma.order.findUnique({ where: { trackingCode } })) {
+      trackingCode = `SIG-${randomBytes(3).toString('hex').toUpperCase()}`;
+    }
+
+    const order = await this.prisma.order.create({
+      data: {
+        trackingCode,
+        customerId: customer.id,
+        vin,
+        auctionHouse: 'OTHER',
+        insuranceFirstName: firstName,
+        insuranceLastName: lastName || null,
+        insuranceDocSeries: opt(dto.docSeries) ?? null,
+        insuranceTrustee: opt(dto.trustee) ?? null,
+        insuranceAmountAzn: opt(dto.amountAzn) ?? null,
+        insuranceStatus: 'DRAFT',
+        createdById: userId,
+        events: {
+          create: {
+            status: 'PURCHASED',
+            title: 'Insurance',
+            description: 'Standalone insurance case',
+            occurredAt: new Date(),
+          },
+        },
+      },
+      include: ORDER_INCLUDE,
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'INSURANCE_CREATE',
+        entity: 'Order',
+        entityId: order.id,
+        meta: { trackingCode },
+      },
+    });
+
+    return mapOrder(order);
+  }
+
   async sendCustomerSms(id: string, dto: { kind?: string; text?: string }, userId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
@@ -402,15 +481,17 @@ export class OrdersService {
     });
     if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
 
-    const allowed = new Set(['DRAFT', 'PENDING', 'PROCESSING', 'PAID', 'TRANSFERRED', 'ACTIVE']);
+    const allowed = new Set(['DRAFT', 'PENDING', 'PROCESSING', 'SIGN_WAIT', 'SIGNED', 'PAID', 'TRANSFERRED', 'ACTIVE']);
     const status = dto.status === undefined ? undefined : opt(dto.status);
     if (status && !allowed.has(status)) throw new BadRequestException('Sığorta statusu səhvdir.');
 
     const labels: Record<string, string> = {
       DRAFT: 'Hazırlanır',
       PENDING: 'Sənədlər gözlənilir',
-      PROCESSING: 'Sığorta rəsmiləşdirilir',
-      PAID: 'Sığorta ödənilib',
+      PROCESSING: 'Sığorta müqaviləsi imza gözləyir',
+      SIGN_WAIT: 'Sığorta müqaviləsi imza gözləyir',
+      SIGNED: 'Sığorta imzalanıb',
+      PAID: 'Sığorta imzalanıb',
       TRANSFERRED: 'Pul köçürülüb',
       ACTIVE: 'Sığorta aktivdir',
     };
@@ -422,6 +503,7 @@ export class OrdersService {
         ...(dto.lastName !== undefined ? { insuranceLastName: opt(dto.lastName) } : {}),
         ...(dto.docSeries !== undefined ? { insuranceDocSeries: opt(dto.docSeries) } : {}),
         ...(dto.trustee !== undefined ? { insuranceTrustee: opt(dto.trustee) } : {}),
+        ...(dto.amountAzn !== undefined ? { insuranceAmountAzn: opt(dto.amountAzn) } : {}),
         ...(status !== undefined ? { insuranceStatus: status } : {}),
       },
       include: ORDER_INCLUDE,
@@ -430,12 +512,25 @@ export class OrdersService {
     const shouldNotify = dto.notify !== false;
     let notify: NotifyResult = { sent: false, error: 'skipped' };
     if (shouldNotify) {
+      const waiting = order.insuranceStatus === 'SIGN_WAIT' || order.insuranceStatus === 'PROCESSING';
+      const contract = waiting
+        ? await this.prisma.contract.findFirst({
+            where: { orderId: order.id, kind: 'INSURANCE', status: { not: 'VOID' } },
+            orderBy: { createdAt: 'desc' },
+            select: { token: true, status: true },
+          })
+        : null;
       notify = await this.notify.insuranceReady({
         phone: order.customer.phone,
         trackingCode: order.trackingCode,
         make: order.vehicle?.make,
         model: order.vehicle?.model,
         statusLabel: labels[order.insuranceStatus || 'DRAFT'],
+        mustSign: waiting,
+        signUrl:
+          waiting && contract && contract.status !== 'SIGNED'
+            ? `${siteBase()}/insurance-contract/${contract.token}`
+            : undefined,
       });
       if (notify.sent) {
         await this.prisma.order.update({
