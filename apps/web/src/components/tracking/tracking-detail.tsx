@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/utils";
 import { findPortCoords } from "@/lib/carriers";
 import { isValidImo } from "@/lib/imo";
 import { useI18n } from "@/providers/i18n-provider";
+import { getLocalOrder, overlayLocal } from "@/lib/local-orders";
 import { PhotoCatalog } from "@/components/tracking/photo-catalog";
 import { journeyPosition, normalizeTransits } from "@/lib/journey";
 import { ShippingNotice } from "@/components/layout/shipping-notice";
@@ -175,9 +176,14 @@ export function TrackingDetail({ code }: { code: string }) {
 
     api
       .track(code)
+      .catch(() => {
+        const local = getLocalOrder(code);
+        if (!local) throw new Error("not-found");
+        return local;
+      })
       .then(async (shipment) => {
         if (cancelled) return;
-        const merged = withManualPin(shipment);
+        const merged = withManualPin(overlayLocal(shipment, code));
         setData(merged);
         setError("");
         if (merged.vesselImo && isLiveVesselMapStatus(merged.currentStatus) && merged.mapLat == null) {
@@ -242,6 +248,13 @@ export function TrackingDetail({ code }: { code: string }) {
           <div className="flex flex-wrap items-center gap-3">
             <p className="font-mono text-sm text-royal">{data.trackingCode}</p>
             <span className="rounded-full bg-royal/10 px-3 py-1 text-xs font-medium text-royal">{currentLabel}</span>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                data.contract?.signed ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-800"
+              }`}
+            >
+              {data.contract?.signed ? t.track.contractSigned : t.track.contractUnsigned}
+            </span>
           </div>
           <h1 className="font-display mt-2 text-4xl md:text-5xl">
             {[data.year, data.make, data.model].filter(Boolean).join(" ") || t.track.yourCar}

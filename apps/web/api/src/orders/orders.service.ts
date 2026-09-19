@@ -6,7 +6,7 @@ import { ContainersService } from '../containers/containers.service';
 import { VesselsService } from '../vessels/vessels.service';
 import { attachPortCoords, enrichKnownContainer, lookupCarrier } from '../containers/registry';
 import { CreateInsuranceDto, CreateOrderDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
-import { generateTrackingCode, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
+import { generateTrackingCode, mapContractSummary, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
 import { NotifyService, normalizePhone, siteBase, statusLabelAz, type NotifyResult } from '../notify/notify.service';
 import { CloudinaryStorage } from '../storage/cloudinary.storage';
 
@@ -36,6 +36,12 @@ function packTransits(existing: unknown, stops?: unknown[], currentIndex?: numbe
     stops: stops !== undefined ? parseTransitRoute(stops).stops : parsed.stops,
     currentIndex: currentIndex !== undefined ? currentIndex : parsed.currentIndex,
   };
+}
+
+function lookupCode(raw: string) {
+  return String(raw || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
 }
 
 function normalizeTrackingCode(raw?: string) {
@@ -142,8 +148,16 @@ export class OrdersService {
     });
 
     const existing = (await this.prisma.order.findMany({ select: { trackingCode: true } })).map((o) => o.trackingCode);
-    let trackingCode = dto.trackingCode || generateTrackingCode(dto.customerName, dto.make ?? '', dto.model, existing);
-    while (await this.prisma.order.findUnique({ where: { trackingCode } })) {
+    const requested = normalizeTrackingCode(dto.trackingCode);
+    if (requested) {
+      const already = await this.prisma.order.findUnique({ where: { trackingCode: requested }, include: ORDER_INCLUDE });
+      if (already) {
+        if (already.vin === dto.vin.toUpperCase()) return mapOrder(already);
+        throw new ConflictException('Bu izləmə kodu artıq başqa maşındadır.');
+      }
+    }
+    let trackingCode = requested || generateTrackingCode(dto.customerName, dto.make ?? '', dto.model, existing);
+    while (!requested && (await this.prisma.order.findUnique({ where: { trackingCode } }))) {
       trackingCode = generateTrackingCode(dto.customerName, dto.make ?? '', dto.model, [...existing, trackingCode]);
     }
 
@@ -264,19 +278,77 @@ export class OrdersService {
     return orders.map(mapOrder);
   }
 
+  private async resolveOrderByCode(code: string) {
+    const raw = code.toUpperCase().replace(/\s+/g, '');
+    const compact = lookupCode(code);
+    const exact = raw
+      ? await this.prisma.order.findUnique({ where: { trackingCode: raw }, include: ORDER_INCLUDE }).catch(() => null)
+      : null;
+    if (exact) return exact;
+
+    const listed = await this.prisma.order.findMany({
+      select: { id: true, trackingCode: true },
+      orderBy: { createdAt: 'desc' },
+      take: 400,
+    });
+    const hit = listed.find((row) => lookupCode(row.trackingCode) === compact);
+    if (hit) {
+      return this.prisma.order.findUnique({ where: { id: hit.id }, include: ORDER_INCLUDE });
+    }
+
+    const contracts = await this.prisma.contract.findMany({
+      where: { status: { not: 'VOID' }, trackingCode: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      take: 300,
+    });
+    const contract = contracts.find((row) => lookupCode(row.trackingCode || '') === compact);
+    if (contract?.orderId) {
+      return this.prisma.order.findUnique({ where: { id: contract.orderId }, include: ORDER_INCLUDE });
+    }
+    return contract ?? null;
+  }
+
   async findByCode(code: string) {
     await this.purgeExpiredArchive();
-    const raw = code.toUpperCase().replace(/\s+/g, '');
-    const order = await this.prisma.order.findFirst({
-      where: { trackingCode: { equals: raw, mode: 'insensitive' } },
-      include: ORDER_INCLUDE,
-    });
-    if (!order) throw new NotFoundException('Göndəriş tapılmadı');
-    const deliveredAt = (order as { deliveredAt?: Date | null }).deliveredAt;
-    if (order.currentStatus === 'DELIVERED' && deliveredAt && Date.now() - deliveredAt.getTime() > ARCHIVE_MS) {
-      throw new NotFoundException('Göndəriş tapılmadı');
+    const found = await this.resolveOrderByCode(code);
+    if (!found) throw new NotFoundException('Göndəriş tapılmadı');
+
+    if ('customer' in found && found.customer) {
+      const order = found;
+      const deliveredAt = (order as { deliveredAt?: Date | null }).deliveredAt;
+      if (order.currentStatus === 'DELIVERED' && deliveredAt && Date.now() - deliveredAt.getTime() > ARCHIVE_MS) {
+        throw new NotFoundException('Göndəriş tapılmadı');
+      }
+      return mapOrder(order);
     }
-    return mapOrder(order);
+
+    const contract = found as {
+      trackingCode?: string | null;
+      customerName: string;
+      vin?: string | null;
+      make?: string | null;
+      model?: string | null;
+      year?: number | null;
+      status: string;
+      kind?: string | null;
+      token: string;
+      signedAt?: Date | null;
+    };
+    const summary = mapContractSummary([contract]);
+    return {
+      trackingCode: contract.trackingCode || lookupCode(code),
+      vin: contract.vin || '',
+      make: contract.make || undefined,
+      model: contract.model || undefined,
+      year: contract.year || undefined,
+      auctionHouse: 'OTHER',
+      currentStatus: 'PURCHASED',
+      customerName: contract.customerName,
+      events: [],
+      documents: [],
+      photos: [],
+      contract: summary,
+    };
   }
 
   async insurancePublic(order: Parameters<typeof mapOrder>[0]) {
@@ -372,13 +444,11 @@ export class OrdersService {
   }
 
   async findInsuranceByCode(code: string) {
-    const raw = code.toUpperCase().replace(/\s+/g, '');
-    const order = await this.prisma.order.findFirst({
-      where: { trackingCode: { equals: raw, mode: 'insensitive' } },
-      include: ORDER_INCLUDE,
-    });
-    if (!order) throw new NotFoundException('Göndəriş tapılmadı');
-    return this.insurancePublic(order);
+    const found = await this.resolveOrderByCode(code);
+    if (!found || !('customer' in found) || !found.customer) {
+      throw new NotFoundException('Göndəriş tapılmadı');
+    }
+    return this.insurancePublic(found);
   }
 
   async createInsuranceCase(dto: CreateInsuranceDto, userId?: string) {

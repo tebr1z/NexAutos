@@ -78,6 +78,12 @@ export function mapOrder(order: {
   documents: { title: string; type: string; url: string }[];
   photos: { id?: string; url: string; caption: string | null; category?: string | null }[];
   invoices: { number: string; amountUsd: unknown; status: string }[];
+  contracts?: {
+    status: string;
+    kind?: string | null;
+    token: string;
+    signedAt?: Date | null;
+  }[];
   insuranceFirstName?: string | null;
   insuranceLastName?: string | null;
   insuranceDocSeries?: string | null;
@@ -145,6 +151,7 @@ export function mapOrder(order: {
     invoice: invoice
       ? { number: invoice.number, amountUsd: Number(invoice.amountUsd), status: invoice.status }
       : undefined,
+    contract: mapContractSummary(order.contracts),
     insurance: {
       firstName: order.insuranceFirstName || undefined,
       lastName: order.insuranceLastName || undefined,
@@ -162,6 +169,24 @@ export function mapOrder(order: {
   };
 }
 
+export function mapContractSummary(
+  contracts?: { status: string; kind?: string | null; token: string; signedAt?: Date | null }[],
+) {
+  const row =
+    contracts?.find((item) => (item.kind || "SERVICE") === "SERVICE" && item.status !== "VOID") ??
+    contracts?.find((item) => item.status !== "VOID") ??
+    null;
+  if (!row) return { signed: false, status: "NONE" as const, kind: null as string | null, publicUrl: null as string | null };
+  const kind = row.kind || "SERVICE";
+  const path = kind === "INSURANCE" ? "insurance-contract" : "contract";
+  return {
+    signed: row.status === "SIGNED",
+    status: row.status,
+    kind,
+    publicUrl: `/${path}/${row.token}`,
+  };
+}
+
 export const ORDER_INCLUDE = {
   customer: true,
   vehicle: true,
@@ -169,4 +194,10 @@ export const ORDER_INCLUDE = {
   documents: true,
   photos: true,
   invoices: true,
+  contracts: {
+    where: { status: { not: 'VOID' as const } },
+    orderBy: { createdAt: 'desc' as const },
+    take: 5,
+    select: { status: true, kind: true, token: true, signedAt: true },
+  },
 };
