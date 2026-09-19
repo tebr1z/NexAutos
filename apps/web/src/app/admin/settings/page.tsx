@@ -142,8 +142,10 @@ export default function AdminSettingsPage() {
     setNotice("");
     try {
       const row = await api.testR2Settings(r2Form);
-      if (row.ok) setNotice(row.message);
-      else setError(row.message);
+      if (row.ok) {
+        if (row.endpoint) setR2Form((current) => ({ ...current, endpoint: row.endpoint || current.endpoint }));
+        setNotice(row.message);
+      } else setError(row.message);
     } catch (err) {
       setError(err instanceof Error ? err.message : "R2 yoxlanılmadı.");
     }

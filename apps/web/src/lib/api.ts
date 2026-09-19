@@ -499,7 +499,7 @@ export const api = {
       tokenPreview: string;
     }>("/settings/r2", { method: "PUT", body: JSON.stringify(payload) }),
   testR2Settings: (payload: Record<string, unknown>) =>
-    request<{ ok: boolean; message: string }>("/settings/r2/test", {
+    request<{ ok: boolean; message: string; endpoint?: string }>("/settings/r2/test", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
