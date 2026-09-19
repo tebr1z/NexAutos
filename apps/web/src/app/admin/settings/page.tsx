@@ -7,32 +7,20 @@ const inp =
   "w-full rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm text-white placeholder:text-zinc-500";
 
 type AisStatus = { configured: boolean; preview: string | null; source: "admin" | "env" | "none" };
-type R2Status = {
+type CloudStatus = {
   configured: boolean;
   source: "admin" | "env" | "none";
-  accountId: string;
-  endpoint: string;
-  bucket: string;
-  publicUrl: string;
-  accessKeyPreview: string;
-  secretPreview: string;
-  tokenPreview: string;
+  cloudName: string;
+  apiKeyPreview: string;
+  apiSecretPreview: string;
 };
 
-const EMPTY_R2 = {
-  accountId: "",
-  endpoint: "",
-  accessKeyId: "",
-  secretAccessKey: "",
-  apiToken: "",
-  bucket: "nexautos",
-  publicUrl: "",
-};
+const EMPTY_CLOUD = { cloudName: "", apiKey: "", apiSecret: "" };
 
 export default function AdminSettingsPage() {
   const [status, setStatus] = useState<AisStatus | null>(null);
-  const [r2, setR2] = useState<R2Status | null>(null);
-  const [r2Form, setR2Form] = useState(EMPTY_R2);
+  const [cloud, setCloud] = useState<CloudStatus | null>(null);
+  const [cloudForm, setCloudForm] = useState(EMPTY_CLOUD);
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -40,17 +28,13 @@ export default function AdminSettingsPage() {
 
   async function load() {
     try {
-      const [ais, cloud] = await Promise.all([api.aisSettings(), api.r2Settings()]);
+      const [ais, media] = await Promise.all([api.aisSettings(), api.cloudinarySettings()]);
       setStatus(ais);
-      setR2(cloud);
-      setR2Form({
-        accountId: cloud.accountId || "",
-        endpoint: cloud.endpoint || "",
-        accessKeyId: cloud.accessKeyPreview || "",
-        secretAccessKey: cloud.secretPreview || "",
-        apiToken: cloud.tokenPreview || "",
-        bucket: cloud.bucket || "nexautos",
-        publicUrl: cloud.publicUrl || "",
+      setCloud(media);
+      setCloudForm({
+        cloudName: media.cloudName || "",
+        apiKey: media.apiKeyPreview || "",
+        apiSecret: media.apiSecretPreview || "",
       });
     } catch {
       setError("Ayarlar oxunmadı. Yenidən daxil olun.");
@@ -117,52 +101,50 @@ export default function AdminSettingsPage() {
 
   const sourceLabel =
     status?.source === "admin" ? "admin panel" : status?.source === "env" ? "server .env" : "yoxdur";
-  const r2Source =
-    r2?.source === "admin" ? "admin panel" : r2?.source === "env" ? "server .env" : "yoxdur";
+  const cloudSource =
+    cloud?.source === "admin" ? "admin panel" : cloud?.source === "env" ? "server .env" : "yoxdur";
 
-  async function saveR2(e: FormEvent) {
+  async function saveCloud(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      const row = await api.saveR2Settings(r2Form);
-      setR2(row);
-      setNotice("Cloudflare R2 yadda saxlanıldı. Foto yükləməsi indi bu açarlarla işləyir — .env və Docker restart lazım deyil.");
+      const row = await api.saveCloudinarySettings(cloudForm);
+      setCloud(row);
+      setNotice("Cloudinary yadda saxlanıldı. Şəkillər VIN qovluğunda saxlanır. Docker restart lazım deyil.");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "R2 yazılmadı.");
+      setError(err instanceof Error ? err.message : "Cloudinary yazılmadı.");
     }
     setBusy(false);
   }
 
-  async function testR2() {
+  async function testCloud() {
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      const row = await api.testR2Settings(r2Form);
-      if (row.ok) {
-        if (row.endpoint) setR2Form((current) => ({ ...current, endpoint: row.endpoint || current.endpoint }));
-        setNotice(row.message);
-      } else setError(row.message);
+      const row = await api.testCloudinarySettings(cloudForm);
+      if (row.ok) setNotice(row.message);
+      else setError(row.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "R2 yoxlanılmadı.");
+      setError(err instanceof Error ? err.message : "Cloudinary yoxlanılmadı.");
     }
     setBusy(false);
   }
 
-  async function clearR2() {
+  async function clearCloud() {
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      const row = await api.saveR2Settings({ clear: true });
-      setR2(row);
+      const row = await api.saveCloudinarySettings({ clear: true });
+      setCloud(row);
       setNotice(
         row.source === "env"
-          ? "Admin R2 silindi. İndi server .env-dəki açarlar qalır."
-          : "R2 silindi. Şəkillər Postgres-də saxlanacaq.",
+          ? "Admin Cloudinary silindi. İndi .env açarları qalır."
+          : "Cloudinary silindi. Şəkillər bazada qalacaq.",
       );
       await load();
     } catch (err) {
@@ -175,7 +157,7 @@ export default function AdminSettingsPage() {
     <div className="mx-auto max-w-2xl">
       <h1 className="font-display text-3xl">Ayarlar</h1>
       <p className="mt-2 text-sm text-zinc-400">
-        AIS və Cloudflare R2-ni buradan yeniləyin. .env və konteyner restart lazım deyil.
+        AIS və Cloudinary-ni buradan yazın. .env və konteyner restart lazım deyil.
       </p>
       {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
       {notice ? <p className="mt-4 text-sm text-emerald-400">{notice}</p> : null}
@@ -200,13 +182,6 @@ export default function AdminSettingsPage() {
             className={`${inp} mt-1 font-mono`}
           />
         </label>
-        <p className="text-xs text-zinc-500">
-          Açarı{" "}
-          <a className="text-zinc-300 underline" href="https://aisstream.io/apikeys" target="_blank" rel="noreferrer">
-            aisstream.io/apikeys
-          </a>{" "}
-          səhifəsindən kopyalayın. Tam açar admin ekranında saxlanmır, yalnız son 4 simvol görünür.
-        </p>
         <div className="flex flex-wrap gap-3">
           <button disabled={busy} className="rounded-xl bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-50">
             {busy ? "…" : "Yadda saxla"}
@@ -230,107 +205,69 @@ export default function AdminSettingsPage() {
         </div>
       </form>
 
-      <form className="mt-10 space-y-4 rounded-2xl border border-white/10 p-5" onSubmit={saveR2}>
+      <form className="mt-10 space-y-4 rounded-2xl border border-white/10 p-5" onSubmit={saveCloud}>
         <p className="text-sm text-zinc-300">
-          Cloudflare R2:{" "}
-          {r2?.configured ? (
-            <span className="text-emerald-400">aktiv · {r2Source}</span>
+          Cloudinary:{" "}
+          {cloud?.configured ? (
+            <span className="text-emerald-400">aktiv · {cloud.cloudName} · {cloudSource}</span>
           ) : (
             <span className="text-amber-400">açar yoxdur — şəkillər bazada qalır</span>
           )}
         </p>
         <p className="text-xs text-zinc-500">
-          Cloudflare dashboard → R2 → Manage API tokens → <b>S3 Access Key ID</b> və{" "}
-          <b>Secret Access Key</b>. API Token S3 Secret deyil — Access Denied ona görə olur.
+          Cloudinary dashboard → Settings → Product Environment Credentials. Şəkillər{" "}
+          <span className="font-mono text-zinc-300">catalog/VIN/…</span> qovluğuna yazılır. Sistemdən silinəndə
+          Cloudinary-dən də silinir.
         </p>
         <label className="block text-xs text-zinc-500">
-          Account ID
+          Cloud name
           <input
-            value={r2Form.accountId}
-            onChange={(e) => setR2Form({ ...r2Form, accountId: e.target.value.trim() })}
+            value={cloudForm.cloudName}
+            onChange={(e) => setCloudForm({ ...cloudForm, cloudName: e.target.value.trim() })}
             className={`${inp} mt-1 font-mono`}
-            placeholder="Cloudflare Account ID"
+            placeholder="cpyig7an"
             autoComplete="off"
           />
         </label>
         <label className="block text-xs text-zinc-500">
-          Endpoint
+          API key
           <input
-            value={r2Form.endpoint}
-            onChange={(e) => setR2Form({ ...r2Form, endpoint: e.target.value.trim() })}
+            value={cloudForm.apiKey}
+            onChange={(e) => setCloudForm({ ...cloudForm, apiKey: e.target.value.trim() })}
             className={`${inp} mt-1 font-mono`}
-            placeholder="https://ACCOUNT.r2.cloudflarestorage.com"
+            placeholder="545964837536995"
             autoComplete="off"
           />
         </label>
         <label className="block text-xs text-zinc-500">
-          S3 Access Key ID
-          <input
-            value={r2Form.accessKeyId}
-            onChange={(e) => setR2Form({ ...r2Form, accessKeyId: e.target.value })}
-            className={`${inp} mt-1 font-mono`}
-            autoComplete="off"
-          />
-        </label>
-        <label className="block text-xs text-zinc-500">
-          S3 Secret Access Key
+          API secret
           <input
             type="password"
-            value={r2Form.secretAccessKey}
-            onChange={(e) => setR2Form({ ...r2Form, secretAccessKey: e.target.value })}
-            className={`${inp} mt-1 font-mono`}
-            autoComplete="off"
-          />
-        </label>
-        <label className="block text-xs text-zinc-500">
-          Bucket
-          <input
-            value={r2Form.bucket}
-            onChange={(e) => setR2Form({ ...r2Form, bucket: e.target.value.trim() })}
-            className={`${inp} mt-1 font-mono`}
-            placeholder="nexautos"
-            autoComplete="off"
-          />
-        </label>
-        <label className="block text-xs text-zinc-500">
-          Public URL (istəyə bağlı)
-          <input
-            value={r2Form.publicUrl}
-            onChange={(e) => setR2Form({ ...r2Form, publicUrl: e.target.value.trim() })}
-            className={`${inp} mt-1 font-mono`}
-            placeholder="https://pub-….r2.dev"
-            autoComplete="off"
-          />
-        </label>
-        <label className="block text-xs text-zinc-500">
-          API Token (yalnız public domain, istəyə bağlı)
-          <input
-            type="password"
-            value={r2Form.apiToken}
-            onChange={(e) => setR2Form({ ...r2Form, apiToken: e.target.value })}
+            value={cloudForm.apiSecret}
+            onChange={(e) => setCloudForm({ ...cloudForm, apiSecret: e.target.value })}
             className={`${inp} mt-1 font-mono`}
             autoComplete="off"
           />
         </label>
         <div className="flex flex-wrap gap-3">
           <button disabled={busy} className="rounded-xl bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-50">
-            {busy ? "…" : "R2 yadda saxla"}
+            {busy ? "…" : "Cloudinary yadda saxla"}
           </button>
           <button
             type="button"
             disabled={busy}
-            onClick={() => void testR2()}
+            onClick={() => void testCloud()}
             className="rounded-xl border border-emerald-500/40 px-4 py-3 text-xs text-emerald-300 disabled:opacity-40"
           >
-            {busy ? "Yoxlanır…" : "R2-ni yoxla"}
+            {busy ? "Yoxlanır…" : "Cloudinary-ni yoxla"}
           </button>
           <button
             type="button"
-            disabled={busy || r2?.source !== "admin"}
-            onClick={() => void clearR2()}
+            disabled={busy || cloud?.source !== "admin"}
+            onClick={() => void clearCloud()}
             className="rounded-xl border border-white/15 px-4 py-3 text-xs text-zinc-300 disabled:opacity-40"
           >
-            Admin R2-ni sil
+            Admin Cloudinary-ni sil
           </button>
         </div>
       </form>

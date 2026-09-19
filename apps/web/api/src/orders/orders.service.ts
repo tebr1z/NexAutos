@@ -7,7 +7,7 @@ import { attachPortCoords, enrichKnownContainer, lookupCarrier } from '../contai
 import { CreateOrderDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { generateTrackingCode, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
 import { NotifyService, statusLabelAz, type NotifyResult } from '../notify/notify.service';
-import { R2Storage } from '../storage/r2.storage';
+import { CloudinaryStorage } from '../storage/cloudinary.storage';
 
 function opt(value?: string) {
   if (value === undefined) return undefined;
@@ -112,7 +112,7 @@ export class OrdersService {
     private containers: ContainersService,
     private vessels: VesselsService,
     private notify: NotifyService,
-    private r2: R2Storage,
+    private cloud: CloudinaryStorage,
   ) {}
 
   async create(dto: CreateOrderDto, userId?: string) {
@@ -593,11 +593,8 @@ export class OrdersService {
     if (!row?.url) throw new NotFoundException('Şəkil tapılmadı');
     const parsed = decodeDataUrl(row.url);
     if (parsed) return parsed;
-    const key = this.r2.keyFromUrl(row.url);
-    if (key) {
-      const file = await this.r2.get(key);
-      if (file) return file;
-    }
+    const file = await this.cloud.get(row.url);
+    if (file) return file;
     throw new NotFoundException('Şəkil tapılmadı');
   }
 
@@ -609,16 +606,15 @@ export class OrdersService {
     const count = await this.prisma.orderPhoto.count({ where: { orderId } });
     if (count >= 40) throw new BadRequestException('Maksimum 40 şəkil.');
     const parsed = decodeDataUrl(rows[0].url);
-    if ((await this.r2.isEnabled()) && parsed) {
+    if ((await this.cloud.isEnabled()) && parsed) {
       const created = await this.prisma.orderPhoto.create({
         data: { orderId, url: 'pending', caption: rows[0].caption, category: rows[0].category },
       });
       try {
-        const key = `orders/${orderId}/${created.id}.jpg`;
-        const url = await this.r2.put(key, parsed.buf, parsed.mime);
+        const url = await this.cloud.put(existing.vin, created.id, rows[0].url);
         await this.prisma.orderPhoto.update({ where: { id: created.id }, data: { url } });
       } catch (err) {
-        console.error('R2 photo upload failed, storing in database', err);
+        console.error('Cloudinary photo upload failed, storing in database', err);
         await this.prisma.orderPhoto.update({
           where: { id: created.id },
           data: { url: rows[0].url },
@@ -638,8 +634,7 @@ export class OrdersService {
     const keep = new Set([...keepIds, ...keepUrls]);
     const doomed = all.filter((row) => !keep.has(row.id) && !keep.has(row.url));
     for (const row of doomed) {
-      const key = this.r2.keyFromUrl(row.url);
-      if (key) await this.r2.remove(key);
+      await this.cloud.remove(row.url);
     }
     if (doomed.length) {
       await this.prisma.orderPhoto.deleteMany({ where: { id: { in: doomed.map((row) => row.id) } } });

@@ -2,15 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { probeAisKey, resetAisstreamBackoff } from '../vessels/ais';
-import { probeR2 } from '../storage/r2-probe';
+import { probeCloudinary } from '../storage/cloudinary.storage';
 import {
-  emptyR2,
+  CLOUDINARY_SETTING,
+  cloudinaryReady,
+  emptyCloudinary,
   isMaskedSecret,
   maskSecret,
-  r2Ready,
-  R2_SETTING,
-  type R2Creds,
-} from './r2-config';
+  parseCloudinaryUrl,
+  type CloudinaryCreds,
+} from './cloudinary-config';
 
 export const AIS_KEY_SETTING = 'aisstream_api_key';
 
@@ -79,109 +80,83 @@ export class SettingsService {
     return this.aisStatus();
   }
 
-  envR2(): R2Creds {
-    const accountId = this.config.get<string>('R2_ACCOUNT_ID')?.trim() || '';
-    const endpoint =
-      this.config.get<string>('R2_ENDPOINT')?.trim() ||
-      (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : '');
+  envCloudinary(): CloudinaryCreds {
+    const fromUrl = parseCloudinaryUrl(this.config.get<string>('CLOUDINARY_URL'));
+    if (fromUrl) return fromUrl;
     return {
-      accountId,
-      endpoint,
-      accessKeyId: this.config.get<string>('R2_ACCESS_KEY_ID')?.trim() || '',
-      secretAccessKey: this.config.get<string>('R2_SECRET_ACCESS_KEY')?.trim() || '',
-      apiToken: this.config.get<string>('R2_API_TOKEN')?.trim() || '',
-      bucket: this.config.get<string>('R2_BUCKET')?.trim() || 'nexautos',
-      publicUrl: this.config.get<string>('R2_PUBLIC_URL')?.trim() || '',
+      cloudName: this.config.get<string>('CLOUDINARY_CLOUD_NAME')?.trim() || '',
+      apiKey: this.config.get<string>('CLOUDINARY_API_KEY')?.trim() || '',
+      apiSecret: this.config.get<string>('CLOUDINARY_API_SECRET')?.trim() || '',
     };
   }
 
-  async storedR2(): Promise<R2Creds | null> {
-    const row = await this.prisma.setting.findUnique({ where: { key: R2_SETTING } });
+  async storedCloudinary(): Promise<CloudinaryCreds | null> {
+    const row = await this.prisma.setting.findUnique({ where: { key: CLOUDINARY_SETTING } });
     const value = row?.value;
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const raw = value as Record<string, unknown>;
     const pick = (name: string) => (typeof raw[name] === 'string' ? String(raw[name]).trim() : '');
-    const accountId = pick('accountId');
-    const creds: R2Creds = {
-      accountId,
-      endpoint: pick('endpoint') || (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : ''),
-      accessKeyId: pick('accessKeyId'),
-      secretAccessKey: pick('secretAccessKey'),
-      apiToken: pick('apiToken'),
-      bucket: pick('bucket') || 'nexautos',
-      publicUrl: pick('publicUrl'),
+    const creds: CloudinaryCreds = {
+      cloudName: pick('cloudName'),
+      apiKey: pick('apiKey'),
+      apiSecret: pick('apiSecret'),
     };
-    return r2Ready(creds) || creds.accountId ? creds : null;
+    return cloudinaryReady(creds) ? creds : null;
   }
 
-  async resolveR2(): Promise<R2Creds> {
-    return (await this.storedR2()) || this.envR2();
+  async resolveCloudinary(): Promise<CloudinaryCreds> {
+    return (await this.storedCloudinary()) || this.envCloudinary();
   }
 
-  async r2Status() {
-    const admin = await this.storedR2();
-    const env = this.envR2();
-    const active = admin && r2Ready(admin) ? admin : r2Ready(env) ? env : admin || env;
-    const source = admin && r2Ready(admin) ? 'admin' : r2Ready(env) ? 'env' : 'none';
+  async cloudinaryStatus() {
+    const admin = await this.storedCloudinary();
+    const env = this.envCloudinary();
+    const active = admin && cloudinaryReady(admin) ? admin : env;
+    const source = admin && cloudinaryReady(admin) ? 'admin' : cloudinaryReady(env) ? 'env' : 'none';
     return {
-      configured: r2Ready(active),
+      configured: cloudinaryReady(active),
       source,
-      accountId: active.accountId,
-      endpoint: active.endpoint,
-      bucket: active.bucket,
-      publicUrl: active.publicUrl,
-      accessKeyPreview: maskSecret(active.accessKeyId),
-      secretPreview: maskSecret(active.secretAccessKey),
-      tokenPreview: maskSecret(active.apiToken),
+      cloudName: active.cloudName,
+      apiKeyPreview: maskSecret(active.apiKey),
+      apiSecretPreview: maskSecret(active.apiSecret),
     };
   }
 
-  async saveR2(input: Partial<R2Creds> & { clear?: boolean }) {
+  async saveCloudinary(input: Partial<CloudinaryCreds> & { clear?: boolean }) {
     if (input.clear) {
-      await this.prisma.setting.deleteMany({ where: { key: R2_SETTING } });
-      return this.r2Status();
+      await this.prisma.setting.deleteMany({ where: { key: CLOUDINARY_SETTING } });
+      return this.cloudinaryStatus();
     }
-    const prev = (await this.storedR2()) || this.envR2() || emptyR2();
+    const prev = (await this.storedCloudinary()) || this.envCloudinary() || emptyCloudinary();
     const take = (next: string | undefined, current: string) => {
       const value = String(next ?? '').trim();
       if (!value || isMaskedSecret(value)) return current;
       return value;
     };
-    const accountId = take(input.accountId, prev.accountId);
-    const creds: R2Creds = {
-      accountId,
-      endpoint:
-        take(input.endpoint, prev.endpoint) ||
-        (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : ''),
-      accessKeyId: take(input.accessKeyId, prev.accessKeyId),
-      secretAccessKey: take(input.secretAccessKey, prev.secretAccessKey),
-      apiToken: take(input.apiToken, prev.apiToken),
-      bucket: take(input.bucket, prev.bucket) || 'nexautos',
-      publicUrl: take(input.publicUrl, prev.publicUrl),
+    const creds: CloudinaryCreds = {
+      cloudName: take(input.cloudName, prev.cloudName),
+      apiKey: take(input.apiKey, prev.apiKey),
+      apiSecret: take(input.apiSecret, prev.apiSecret),
     };
     await this.prisma.setting.upsert({
-      where: { key: R2_SETTING },
+      where: { key: CLOUDINARY_SETTING },
       update: { value: creds },
-      create: { key: R2_SETTING, value: creds },
+      create: { key: CLOUDINARY_SETTING, value: creds },
     });
-    return this.r2Status();
+    return this.cloudinaryStatus();
   }
 
-  async testR2(input?: Partial<R2Creds>) {
-    const saved = await this.resolveR2();
+  async testCloudinary(input?: Partial<CloudinaryCreds>) {
+    const saved = await this.resolveCloudinary();
     const take = (next: string | undefined, current: string) => {
       const value = String(next ?? '').trim();
       if (!value || isMaskedSecret(value)) return current;
       return value;
     };
-    return probeR2({
-      accountId: take(input?.accountId, saved.accountId),
-      endpoint: take(input?.endpoint, saved.endpoint),
-      accessKeyId: take(input?.accessKeyId, saved.accessKeyId),
-      secretAccessKey: take(input?.secretAccessKey, saved.secretAccessKey),
-      apiToken: take(input?.apiToken, saved.apiToken),
-      bucket: take(input?.bucket, saved.bucket) || 'nexautos',
-      publicUrl: take(input?.publicUrl, saved.publicUrl),
+    return probeCloudinary({
+      cloudName: take(input?.cloudName, saved.cloudName),
+      apiKey: take(input?.apiKey, saved.apiKey),
+      apiSecret: take(input?.apiSecret, saved.apiSecret),
     });
   }
 

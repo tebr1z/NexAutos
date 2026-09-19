@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { SettingsModule } from '../settings/settings.module';
-import { R2Storage } from './r2.storage';
+import { CloudinaryStorage } from './cloudinary.storage';
 
 @Module({
   imports: [SettingsModule],
-  providers: [R2Storage],
-  exports: [R2Storage],
+  providers: [CloudinaryStorage],
+  exports: [CloudinaryStorage],
 })
 export class StorageModule {}

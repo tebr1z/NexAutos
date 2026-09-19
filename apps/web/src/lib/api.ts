@@ -474,32 +474,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ key: key ?? "" }),
     }),
-  r2Settings: () =>
+  cloudinarySettings: () =>
     request<{
       configured: boolean;
       source: "admin" | "env" | "none";
-      accountId: string;
-      endpoint: string;
-      bucket: string;
-      publicUrl: string;
-      accessKeyPreview: string;
-      secretPreview: string;
-      tokenPreview: string;
-    }>("/settings/r2"),
-  saveR2Settings: (payload: Record<string, unknown>) =>
+      cloudName: string;
+      apiKeyPreview: string;
+      apiSecretPreview: string;
+    }>("/settings/cloudinary"),
+  saveCloudinarySettings: (payload: Record<string, unknown>) =>
     request<{
       configured: boolean;
       source: "admin" | "env" | "none";
-      accountId: string;
-      endpoint: string;
-      bucket: string;
-      publicUrl: string;
-      accessKeyPreview: string;
-      secretPreview: string;
-      tokenPreview: string;
-    }>("/settings/r2", { method: "PUT", body: JSON.stringify(payload) }),
-  testR2Settings: (payload: Record<string, unknown>) =>
-    request<{ ok: boolean; message: string; endpoint?: string }>("/settings/r2/test", {
+      cloudName: string;
+      apiKeyPreview: string;
+      apiSecretPreview: string;
+    }>("/settings/cloudinary", { method: "PUT", body: JSON.stringify(payload) }),
+  testCloudinarySettings: (payload: Record<string, unknown>) =>
+    request<{ ok: boolean; message: string }>("/settings/cloudinary/test", {
       method: "POST",
       body: JSON.stringify(payload),
     }),

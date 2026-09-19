@@ -1,40 +1,20 @@
 import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 
-export class R2SettingsDto {
+export class CloudinarySettingsDto {
   @IsOptional()
   @IsString()
-  @MaxLength(120)
-  accountId?: string;
+  @MaxLength(80)
+  cloudName?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(300)
-  endpoint?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  accessKeyId?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  secretAccessKey?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(300)
-  apiToken?: string;
+  @MaxLength(80)
+  apiKey?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(120)
-  bucket?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(300)
-  publicUrl?: string;
+  apiSecret?: string;
 
   @IsOptional()
   @IsBoolean()
