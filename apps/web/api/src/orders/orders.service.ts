@@ -6,7 +6,7 @@ import { ContainersService } from '../containers/containers.service';
 import { VesselsService } from '../vessels/vessels.service';
 import { attachPortCoords, enrichKnownContainer, lookupCarrier } from '../containers/registry';
 import { CreateInsuranceDto, CreateOrderDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
-import { generateTrackingCode, mapContractSummary, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
+import { generateTrackingCode, hasInsuranceRecord, mapContractSummary, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
 import { NotifyService, normalizePhone, siteBase, statusLabelAz, type NotifyResult } from '../notify/notify.service';
 import { CloudinaryStorage } from '../storage/cloudinary.storage';
 
@@ -352,9 +352,10 @@ export class OrdersService {
   }
 
   async insurancePublic(order: Parameters<typeof mapOrder>[0]) {
+    if (!hasInsuranceRecord(order)) throw new NotFoundException('Sığorta tapılmadı');
     const mapped = mapOrder(order);
     const vin = order.vin || '';
-    const waiting = mapped.insurance.status === 'SIGN_WAIT' || mapped.insurance.status === 'PROCESSING';
+    const waiting = mapped.insurance?.status === 'SIGN_WAIT' || mapped.insurance?.status === 'PROCESSING';
     const contract = waiting
       ? await this.prisma.contract.findFirst({
           where: { orderId: order.id, kind: 'INSURANCE', status: { not: 'VOID' } },
@@ -372,17 +373,17 @@ export class OrdersService {
       model: mapped.model,
       year: mapped.year,
       vinHint: vin.startsWith('SIG') ? '' : vin.length > 4 ? `••••${vin.slice(-4)}` : vin,
-      firstName: mapped.insurance.firstName,
-      lastName: mapped.insurance.lastName,
-      docSeries: mapped.insurance.docSeries,
-      trustee: mapped.insurance.trustee,
-      amountAzn: mapped.insurance.amountAzn,
-      status: mapped.insurance.status || 'DRAFT',
+      firstName: mapped.insurance?.firstName,
+      lastName: mapped.insurance?.lastName,
+      docSeries: mapped.insurance?.docSeries,
+      trustee: mapped.insurance?.trustee,
+      amountAzn: mapped.insurance?.amountAzn,
+      status: mapped.insurance?.status || 'DRAFT',
       signRequired: waiting,
       signUrl,
-      notifiedAt: mapped.insurance.notifiedAt,
-      paidOutAt: mapped.insurance.paidOutAt,
-      receiptUrl: mapped.insurance.receiptUrl,
+      notifiedAt: mapped.insurance?.notifiedAt,
+      paidOutAt: mapped.insurance?.paidOutAt,
+      receiptUrl: mapped.insurance?.receiptUrl,
     };
   }
 

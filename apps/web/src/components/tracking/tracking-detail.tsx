@@ -248,19 +248,23 @@ export function TrackingDetail({ code }: { code: string }) {
           <div className="flex flex-wrap items-center gap-3">
             <p className="font-mono text-sm text-royal">{data.trackingCode}</p>
             <span className="rounded-full bg-royal/10 px-3 py-1 text-xs font-medium text-royal">{currentLabel}</span>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                data.contract?.signed ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-800"
-              }`}
-            >
-              {data.contract?.signed ? t.track.contractSigned : t.track.contractUnsigned}
-            </span>
+            {data.contract?.status && data.contract.status !== "NONE" ? (
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  data.contract.signed ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-800"
+                }`}
+              >
+                {data.contract.signed ? t.track.contractSigned : t.track.contractUnsigned}
+              </span>
+            ) : null}
           </div>
           <h1 className="font-display mt-2 text-4xl md:text-5xl">
             {[data.year, data.make, data.model].filter(Boolean).join(" ") || t.track.yourCar}
-            <Link href={`/insurance/${data.trackingCode}`} className="ml-3 text-sm font-normal text-royal">
-              {t.track.insurance}
-            </Link>
+            {data.hasInsurance || data.insurance?.status ? (
+              <Link href={`/insurance/${data.trackingCode}`} className="ml-3 text-sm font-normal text-royal">
+                {t.track.insurance}
+              </Link>
+            ) : null}
           </h1>
           <p className="mt-2 font-mono text-sm text-muted">VIN {data.vin}</p>
         </div>

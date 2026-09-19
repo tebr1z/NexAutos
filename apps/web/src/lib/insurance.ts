@@ -25,9 +25,20 @@ export function normalizeInsuranceStatus(status?: string | null) {
   return status || "DRAFT";
 }
 
+export function hasInsuranceCase(row?: {
+  insurance?: { status?: string | null; firstName?: string | null; lastName?: string | null; receiptToken?: string | null } | null;
+  hasInsurance?: boolean;
+} | null) {
+  if (row?.hasInsurance) return true;
+  const ins = row?.insurance;
+  if (!ins) return false;
+  return Boolean(ins.status || ins.firstName || ins.lastName || ins.receiptToken);
+}
+
 export function insuranceStatusLabel(status?: string | null) {
+  if (!status) return "—";
   const row = INSURANCE_STATUSES.find((item) => item.key === status);
-  return row?.az ?? "Hazırlanır";
+  return row?.az ?? "—";
 }
 
 export function insurancePublicPath(code: string) {

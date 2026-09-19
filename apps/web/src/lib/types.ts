@@ -67,6 +67,7 @@ export type TrackingShipment = {
   photos: TrackingPhoto[];
   invoice?: { number: string; amountUsd: number; status: string };
   customsStatus?: string;
+  hasInsurance?: boolean;
   contract?: {
     signed: boolean;
     status?: string;

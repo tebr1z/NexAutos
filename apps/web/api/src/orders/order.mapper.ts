@@ -152,21 +152,37 @@ export function mapOrder(order: {
       ? { number: invoice.number, amountUsd: Number(invoice.amountUsd), status: invoice.status }
       : undefined,
     contract: mapContractSummary(order.contracts),
-    insurance: {
-      firstName: order.insuranceFirstName || undefined,
-      lastName: order.insuranceLastName || undefined,
-      docSeries: order.insuranceDocSeries || undefined,
-      trustee: order.insuranceTrustee || undefined,
-      status: order.insuranceStatus || undefined,
-      amountAzn: order.insuranceAmountAzn || undefined,
-      notifiedAt: order.insuranceNotifiedAt?.toISOString(),
-      paidOutAt: order.insurancePaidOutAt?.toISOString(),
-      receiptToken: order.insuranceReceiptToken || undefined,
-      receiptUrl: order.insuranceReceiptToken
-        ? `/insurance-check/${order.insuranceReceiptToken}`
-        : undefined,
-    },
+    hasInsurance: hasInsuranceRecord(order),
+    insurance: hasInsuranceRecord(order)
+      ? {
+          firstName: order.insuranceFirstName || undefined,
+          lastName: order.insuranceLastName || undefined,
+          docSeries: order.insuranceDocSeries || undefined,
+          trustee: order.insuranceTrustee || undefined,
+          status: order.insuranceStatus || undefined,
+          amountAzn: order.insuranceAmountAzn || undefined,
+          notifiedAt: order.insuranceNotifiedAt?.toISOString(),
+          paidOutAt: order.insurancePaidOutAt?.toISOString(),
+          receiptToken: order.insuranceReceiptToken || undefined,
+          receiptUrl: order.insuranceReceiptToken
+            ? `/insurance-check/${order.insuranceReceiptToken}`
+            : undefined,
+        }
+      : undefined,
   };
+}
+
+export function hasInsuranceRecord(order: {
+  insuranceStatus?: string | null;
+  insuranceFirstName?: string | null;
+  insuranceLastName?: string | null;
+  insuranceReceiptToken?: string | null;
+  contracts?: { kind?: string | null }[];
+}) {
+  if (order.insuranceStatus || order.insuranceFirstName || order.insuranceLastName || order.insuranceReceiptToken) {
+    return true;
+  }
+  return Boolean(order.contracts?.some((row) => row.kind === 'INSURANCE'));
 }
 
 export function mapContractSummary(

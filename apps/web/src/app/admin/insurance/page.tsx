@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { INSURANCE_STATUS_OPTIONS, insurancePublicPath, insuranceStatusLabel, normalizeInsuranceStatus } from "@/lib/insurance";
+import { INSURANCE_STATUS_OPTIONS, hasInsuranceCase, insurancePublicPath, insuranceStatusLabel, normalizeInsuranceStatus } from "@/lib/insurance";
 import { listLocalOrders } from "@/lib/local-orders";
 import { normalizePhone } from "@/lib/sms";
 import type { TrackingShipment } from "@/lib/types";
@@ -44,6 +44,7 @@ export default function AdminInsurancePage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return orders.filter((row) => {
+      if (!hasInsuranceCase(row)) return false;
       const hay = [row.trackingCode, row.customerName, row.vin, row.make, row.model, row.insurance?.status]
         .join(" ")
         .toLowerCase();
@@ -292,7 +293,9 @@ export default function AdminInsurancePage() {
               })}
             </tbody>
           </table>
-          {filtered.length === 0 ? <p className="px-4 py-8 text-sm text-zinc-500">Maşın tapılmadı.</p> : null}
+          {filtered.length === 0 ? (
+            <p className="px-4 py-8 text-sm text-zinc-500">Sığorta işi yoxdur. «Yeni sığorta» ilə açın — hər maşın avtomatik sığorta deyil.</p>
+          ) : null}
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
