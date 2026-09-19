@@ -262,6 +262,7 @@ export function ContractSign({ token, requireLanguage = false }: { token: string
           </div>
         </section>
       ) : (
+      <>
       <ol className="mt-8 grid grid-cols-5 gap-2 text-[11px] uppercase tracking-wide">
         {STEPS.map((step, i) => (
           <li
@@ -459,6 +460,7 @@ export function ContractSign({ token, requireLanguage = false }: { token: string
           </a>
         </section>
       )}
+      </>
       )}
     </article>
   );
