@@ -206,6 +206,8 @@ export default function AdminHomePage() {
   const [journey, setJourney] = useState("step:PURCHASED");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [smsText, setSmsText] = useState("");
+  const [photoSmsReady, setPhotoSmsReady] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [insurance, setInsurance] = useState(EMPTY_INSURANCE);
   const [liveOcean, setLiveOcean] = useState<OceanLookup | null>(null);
@@ -305,6 +307,8 @@ export default function AdminHomePage() {
     setInsurance(EMPTY_INSURANCE);
     setVoyage(EMPTY_VOYAGE);
     setPhotos(emptyPhotos());
+    setSmsText("");
+    setPhotoSmsReady(false);
     setLiveOcean(null);
   }
 
@@ -317,6 +321,8 @@ export default function AdminHomePage() {
     setInsurance(EMPTY_INSURANCE);
     setVoyage(EMPTY_VOYAGE);
     setPhotos(emptyPhotos());
+    setSmsText("");
+    setPhotoSmsReady(false);
     setNotice("");
   }
 
@@ -356,6 +362,8 @@ export default function AdminHomePage() {
       status: order.insurance?.status || "DRAFT",
     });
     setNotice("");
+    setSmsText("");
+    setPhotoSmsReady(Boolean(order.photos?.length));
     const linked = contracts.find((row) => row.trackingCode === order.trackingCode && row.status === "SIGNED");
     setContractId(linked?.id ?? "");
   }
@@ -400,6 +408,41 @@ export default function AdminHomePage() {
       next,
       ...list.filter((row) => row.trackingCode !== oldCode && row.trackingCode !== next.trackingCode),
     ]);
+  }
+
+  async function sendCustomerSms(order: TrackingShipment, kind: "photos" | "custom") {
+    if (!order.id) {
+      setNotice("Əvvəl maşını Yadda saxla, sonra SMS göndər.");
+      return;
+    }
+    if (kind === "custom" && !smsText.trim()) {
+      setNotice("SMS mətnini yazın.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const saved = await api.sendCustomerSms(order.id, {
+        kind,
+        text: kind === "custom" ? smsText.trim() : undefined,
+      });
+      if (saved.notify?.sent) {
+        setNotice(
+          kind === "photos"
+            ? "Yeni şəkillər haqqında SMS/WhatsApp getdi (marka, model və track linki daxil)."
+            : "Müştəriyə SMS/WhatsApp getdi (marka, model və track linki avtomatik əlavə olundu).",
+        );
+        if (kind === "photos") setPhotoSmsReady(false);
+        if (kind === "custom") setSmsText("");
+      } else if (saved.notify?.error === "no_phone") {
+        setNotice("WhatsApp nömrəsi yoxdur — SMS getmədi.");
+      } else {
+        setNotice(saved.notify?.error ? `SMS getmədi: ${saved.notify.error}` : "SMS getmədi.");
+      }
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "SMS göndərilmədi.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function saveInsurance(order: TrackingShipment, notify: boolean) {
@@ -566,6 +609,7 @@ export default function AdminHomePage() {
     };
 
     persist(next, order.trackingCode);
+    const hadNewPhotos = flattenPhotos(photos).some((row) => row.url.startsWith("data:image/"));
     let saved = next;
     let serverOk = Boolean(order.id);
 
@@ -618,12 +662,15 @@ export default function AdminHomePage() {
     if (serverOk) {
       const localCount = flattenPhotos(photos).length;
       const remoteCount = saved.photos?.filter((p) => !p.url.startsWith("data:")).length ?? 0;
+      if (hadNewPhotos && remoteCount > 0) setPhotoSmsReady(true);
       setNotice(
         localCount && remoteCount < localCount
           ? `Maşın yazıldı, amma ${localCount - remoteCount} şəkil müştəri səhifəsinə düşmədi. Yenidən Yadda saxla basın.`
-          : localCount
-            ? "Yadda saxlanıldı. Şəkillər müştəri izləmə səhifəsində görünməlidir."
-            : "Yadda saxlanıldı. Müştəri izləmə linkindən görə bilər.",
+          : hadNewPhotos
+            ? "Yadda saxlanıldı. Aşağıda «Yeni şəkillər SMS» ilə müştəriyə xəbər verin."
+            : localCount
+              ? "Yadda saxlanıldı. Şəkillər müştəri izləmə səhifəsində görünməlidir."
+              : "Yadda saxlanıldı. Müştəri izləmə linkindən görə bilər.",
       );
     }
     setEditingCode(trackingCode);
@@ -966,6 +1013,42 @@ export default function AdminHomePage() {
 
           <VoyageFields value={voyage} onChange={setVoyage} />
           <PhotoFields value={photos} onChange={setPhotos} />
+
+          {photoSmsReady ? (
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+              <p className="text-sm text-emerald-200">Yeni şəkillər yükləndi. Müştəriyə track linki + marka/model ilə SMS getsin?</p>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void sendCustomerSms(editingOrder, "photos")}
+                className="mt-3 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-medium text-black disabled:opacity-50"
+              >
+                Yeni şəkillər haqqında SMS göndər
+              </button>
+            </div>
+          ) : null}
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Müştəriyə SMS</p>
+            <p className="mt-2 text-sm text-zinc-400">
+              Mətnə avtomatik marka, model və track linki əlavə olunur. Nömrə: {form.phone || editingOrder.customerPhone || "yoxdur"}
+            </p>
+            <textarea
+              value={smsText}
+              onChange={(e) => setSmsText(e.target.value)}
+              rows={3}
+              placeholder="Məs: Maşın limana çatıb, şəkillərə baxın."
+              className={`${inp} mt-3`}
+            />
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void sendCustomerSms(editingOrder, "custom")}
+              className="mt-3 rounded-xl bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-50"
+            >
+              Sistemdən SMS göndər
+            </button>
+          </div>
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">

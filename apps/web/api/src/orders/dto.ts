@@ -226,6 +226,16 @@ export class UpdateInsuranceDto {
   notify?: boolean;
 }
 
+export class CustomerSmsDto {
+  @IsOptional()
+  @IsString()
+  kind?: string;
+
+  @IsOptional()
+  @IsString()
+  text?: string;
+}
+
 export class PrunePhotosDto {
   @IsOptional()
   @IsArray()

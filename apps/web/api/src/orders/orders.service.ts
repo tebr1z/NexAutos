@@ -306,6 +306,36 @@ export class OrdersService {
     return this.insurancePublic(order);
   }
 
+  async sendCustomerSms(id: string, dto: { kind?: string; text?: string }, userId?: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { customer: true, vehicle: true },
+    });
+    if (!order) throw new NotFoundException('Göndəriş tapılmadı');
+    const kind = (dto.kind || 'custom').trim();
+    const intro =
+      kind === 'photos'
+        ? 'Auto Nex: maşınınıza yeni şəkillər əlavə olundu. Track linkindən baxın.'
+        : dto.text?.trim() || 'Auto Nex: göndərişiniz haqqında yenilik.';
+    const notify = await this.notify.customerUpdate({
+      phone: order.customer.phone,
+      trackingCode: order.trackingCode,
+      make: order.vehicle?.make,
+      model: order.vehicle?.model,
+      intro,
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'CUSTOMER_SMS',
+        entity: 'Order',
+        entityId: id,
+        meta: { kind, notify },
+      },
+    });
+    return { ...mapOrder(await this.prisma.order.findUniqueOrThrow({ where: { id }, include: ORDER_INCLUDE })), notify };
+  }
+
   async updateInsurance(id: string, dto: UpdateInsuranceDto, userId?: string) {
     const existing = await this.prisma.order.findUnique({
       where: { id },

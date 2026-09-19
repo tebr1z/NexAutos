@@ -249,6 +249,11 @@ export const api = {
       status: string;
       notifiedAt?: string;
     }>(`/insurance/${encodeURIComponent(code)}`),
+  sendCustomerSms: (id: string, payload: { kind?: string; text?: string }) =>
+    request<TrackingShipment & { notify?: { sent: boolean; channel?: string; error?: string } }>(
+      `/orders/${id}/sms`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
   updateInsurance: (
     id: string,
     payload: {

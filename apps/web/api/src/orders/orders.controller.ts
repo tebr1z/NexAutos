@@ -2,7 +2,7 @@ import { Body, Controller, Get, Header, Param, Patch, Post, Put, StreamableFile,
 import { SkipThrottle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { OrdersService } from './orders.service';
-import { CreateOrderDto, OrderPhotoDto, PrunePhotosDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
+import { CreateOrderDto, CustomerSmsDto, OrderPhotoDto, PrunePhotosDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -52,6 +52,17 @@ export class OrdersController {
     @CurrentUser() user: { id: string },
   ) {
     return this.orders.attachContainer(id, body.containerNumber, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...STAFF)
+  @Post('orders/:id/sms')
+  sms(
+    @Param('id') id: string,
+    @Body() dto: CustomerSmsDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.orders.sendCustomerSms(id, dto, user.id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

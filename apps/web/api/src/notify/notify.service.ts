@@ -61,6 +61,21 @@ export function shouldNotifyStatus(status: string) {
   return SMS_NOTIFY_STATUSES.has(status);
 }
 
+export function siteBase() {
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.CORS_ORIGIN ?? 'https://nex.autos').replace(/\/$/, '');
+}
+
+export function trackSmsFooter(input: { trackingCode: string; make?: string | null; model?: string | null }) {
+  const car = [input.make, input.model].filter(Boolean).join(' ');
+  return [
+    car ? `Avtomobil: ${car}` : null,
+    `Kod: ${input.trackingCode}`,
+    `İzləmə: ${siteBase()}/track/${input.trackingCode}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 export function statusSmsBody(input: {
   trackingCode: string;
   status: string;
@@ -69,19 +84,10 @@ export function statusSmsBody(input: {
   siteUrl?: string;
 }) {
   const label = STATUS_AZ[input.status] ?? input.status.replaceAll('_', ' ');
-  const car = [input.make, input.model].filter(Boolean).join(' ');
-  const site = (input.siteUrl ?? process.env.NEXT_PUBLIC_SITE_URL ?? process.env.CORS_ORIGIN ?? 'https://nex.autos').replace(
-    /\/$/,
-    '',
-  );
   return [
     `Auto Nex: maşınınızın hazırkı mərhələsi — ${label}.`,
-    car ? `Avtomobil: ${car}` : null,
-    `Kod: ${input.trackingCode}`,
-    `İzləmə: ${site}/track/${input.trackingCode}`,
-  ]
-    .filter(Boolean)
-    .join('\n');
+    trackSmsFooter(input),
+  ].join('\n');
 }
 
 @Injectable()
@@ -121,17 +127,27 @@ export class NotifyService {
   }): Promise<NotifyResult> {
     const to = normalizePhone(input.phone);
     if (!to) return { sent: false, error: 'no_phone' };
-    const site = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.CORS_ORIGIN ?? 'https://nex.autos').replace(/\/$/, '');
-    const car = [input.make, input.model].filter(Boolean).join(' ');
     const body = [
       'Auto Nex: maşınınızın sığorta məlumatı yeniləndi.',
-      car ? `Avtomobil: ${car}` : null,
       input.statusLabel ? `Status: ${input.statusLabel}` : null,
-      `Kod: ${input.trackingCode}`,
-      `Sığorta: ${site}/insurance/${input.trackingCode}`,
+      trackSmsFooter(input),
+      `Sığorta: ${siteBase()}/insurance/${input.trackingCode}`,
     ]
       .filter(Boolean)
       .join('\n');
+    return this.sendMessage(to, body);
+  }
+
+  async customerUpdate(input: {
+    phone?: string | null;
+    trackingCode: string;
+    make?: string | null;
+    model?: string | null;
+    intro: string;
+  }): Promise<NotifyResult> {
+    const to = normalizePhone(input.phone);
+    if (!to) return { sent: false, error: 'no_phone' };
+    const body = [input.intro.trim() || 'Auto Nex: göndərişiniz haqqında yenilik.', trackSmsFooter(input)].join('\n');
     return this.sendMessage(to, body);
   }
 
