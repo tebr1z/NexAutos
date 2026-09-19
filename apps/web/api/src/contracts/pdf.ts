@@ -19,13 +19,16 @@ function fontFile(weight: 'regular' | 'bold') {
     weight === 'bold'
       ? ['NotoSans-Bold.ttf', 'arialbd.ttf', 'segoeuib.ttf', 'DejaVuSans-Bold.ttf']
       : ['NotoSans-Regular.ttf', 'arial.ttf', 'segoeui.ttf', 'DejaVuSans.ttf'];
-  const dirs = [
+    const dirs = [
     join(process.cwd(), 'assets', 'fonts'),
+    join(process.cwd(), 'api', 'assets', 'fonts'),
     join(__dirname, '..', '..', 'assets', 'fonts'),
     join(__dirname, '..', '..', '..', 'assets', 'fonts'),
     'C:\\Windows\\Fonts',
     '/usr/share/fonts/truetype/dejavu',
+    '/usr/share/fonts/dejavu',
     '/usr/share/fonts/truetype/noto',
+    '/usr/share/fonts/noto',
   ];
   for (const dir of dirs) {
     for (const name of names) {
@@ -68,15 +71,22 @@ export function renderContractPdf(body: ContractBody, evidence: PdfEvidence): Pr
     doc.moveDown(0.6);
     heading().fontSize(14).fillColor('#0b0b0d').text(body.title, { width: 490 });
     doc.moveDown(0.4);
-    bodyFont().fontSize(9).fillColor('#334155').text(body.intro, { width: 490, align: 'justify' });
+    bodyFont().fontSize(10).fillColor('#334155').text(body.intro, { width: 490, align: 'left', lineGap: 3 });
 
     for (const section of body.sections) {
       doc.moveDown(0.8);
-      heading().fontSize(11).fillColor('#0b0b0d').text(section.title, { width: 490 });
-      doc.moveDown(0.25);
+      heading().fontSize(12).fillColor('#0b0b0d').text(section.title, { width: 490 });
+      doc.moveDown(0.35);
+      for (const fact of section.facts ?? []) {
+        const y = doc.y;
+        bodyFont().fontSize(9).fillColor('#64748b').text(`${fact.label}`, 52, y, { width: 168 });
+        heading().fontSize(10).fillColor('#0b0b0d').text(fact.value, 228, y, { width: 314 });
+        doc.x = 52;
+        doc.moveDown(0.35);
+      }
       for (const p of section.paragraphs) {
-        bodyFont().fontSize(9).fillColor('#1e293b').text(p, { width: 490, align: 'justify' });
-        doc.moveDown(0.25);
+        bodyFont().fontSize(10).fillColor('#1e293b').text(p, { width: 490, align: 'left', lineGap: 3 });
+        doc.moveDown(0.35);
       }
     }
 

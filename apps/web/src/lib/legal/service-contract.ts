@@ -17,7 +17,8 @@ export type ContractFields = {
   extraTerms?: string | null;
 };
 
-export type ContractSection = { id: string; title: string; paragraphs: string[] };
+export type ContractFact = { label: string; value: string };
+export type ContractSection = { id: string; title: string; paragraphs: string[]; facts?: ContractFact[] };
 
 export type ContractBody = {
   kicker: string;
@@ -55,9 +56,18 @@ export function buildContractBody(fields: ContractFields): ContractBody {
       {
         id: 'terefler',
         title: '1. Tərəflər',
+        facts: [
+          { label: 'İcraçı', value: 'Auto Nex' },
+          { label: 'Ünvan', value: 'Bakı şəhəri, Bakıxanov qəsəbəsi' },
+          { label: 'E-poçt', value: 'auto@nex.autos' },
+          { label: 'Telefon', value: '070 966 81 11, 070 964 64 66, 099 730 03 13' },
+          { label: 'Müştəri', value: dash(fields.customerName) },
+          { label: 'Müştəri telefonu', value: dash(fields.customerPhone) },
+          { label: 'E-poçt (müştəri)', value: dash(fields.customerEmail) },
+          { label: 'Ünvan (müştəri)', value: dash(fields.customerAddress) },
+          { label: 'Şəxsiyyət vəsiqəsi seriyası', value: dash(fields.customerIdNumber) },
+        ],
         paragraphs: [
-          `İcraçı: Auto Nex. Fəaliyyət yeri: Bakı şəhəri, Bakıxanov qəsəbəsi. E-poçt: auto@nex.autos. Telefon və WhatsApp: 070 966 81 11 (əsas), 070 964 64 66, 099 730 03 13.`,
-          `Müştəri: ${dash(fields.customerName)}. Telefon: ${dash(fields.customerPhone)}. E-poçt: ${dash(fields.customerEmail)}. Ünvan: ${dash(fields.customerAddress)}. Şəxsiyyət vəsiqəsinin FİN / sənəd nömrəsi: ${dash(fields.customerIdNumber)}.`,
           'Müştəri bəyan edir ki, verdiyi məlumatlar doğrudur, o, müqavilə bağlamaq hüquq qabiliyyətinə malikdir və bu sənədi öz iradəsi ilə imzalayır. Hüquqi şəxs adından imza atılırsa, imza edən şəxs təmsil səlahiyyətini təsdiq edir.',
         ],
       },

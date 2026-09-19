@@ -74,6 +74,9 @@ export type TrackingShipment = {
     trustee?: string;
     status?: string;
     notifiedAt?: string;
+    paidOutAt?: string;
+    receiptToken?: string;
+    receiptUrl?: string;
   };
 };
 

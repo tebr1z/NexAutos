@@ -77,7 +77,7 @@ export type ContractBody = {
   kicker: string;
   title: string;
   intro: string;
-  sections: { id: string; title: string; paragraphs: string[] }[];
+  sections: { id: string; title: string; paragraphs: string[]; facts?: { label: string; value: string }[] }[];
 };
 
 export type PublicContract = {
@@ -86,6 +86,7 @@ export type PublicContract = {
   kind?: string;
   status: ContractRecord["status"];
   customerName: string;
+  customerIdNumber?: string | null;
   maskedPhone: string;
   hasEmail: boolean;
   trackingCode?: string | null;
@@ -250,7 +251,27 @@ export const api = {
       trustee?: string;
       status: string;
       notifiedAt?: string;
+      paidOutAt?: string;
+      receiptUrl?: string;
     }>(`/insurance/${encodeURIComponent(code)}`),
+  insuranceReceipt: (token: string) =>
+    request<{
+      trackingCode: string;
+      customerName: string;
+      docSeries?: string;
+      trustee?: string;
+      make?: string;
+      model?: string;
+      year?: number;
+      vinHint?: string;
+      paidOutAt: string;
+      message: string;
+    }>(`/insurance/receipt/${encodeURIComponent(token)}`),
+  confirmInsurancePayout: (id: string) =>
+    request<TrackingShipment & { notify?: { sent: boolean; channel?: string; error?: string }; receiptUrl: string }>(
+      `/orders/${id}/insurance/payout`,
+      { method: "POST" },
+    ),
   sendCustomerSms: (id: string, payload: { kind?: string; text?: string }) =>
     request<TrackingShipment & { notify?: { sent: boolean; channel?: string; error?: string } }>(
       `/orders/${id}/sms`,

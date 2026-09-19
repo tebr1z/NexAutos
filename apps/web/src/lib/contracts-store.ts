@@ -263,6 +263,7 @@ export async function publicView(token: string, session?: string) {
     kind: row.kind,
     status: row.status,
     customerName: row.customerName,
+    customerIdNumber: row.customerIdNumber,
     maskedPhone: maskPhone(row.customerPhone),
     hasEmail: Boolean(row.customerEmail),
     trackingCode: row.trackingCode,
@@ -399,13 +400,16 @@ export async function contractHtml(token: string, requireSigned = true) {
   if (requireSigned && row.status !== "SIGNED") fail("PDF yalnız imzadan sonra əlçatandır.", 403);
   const body = row.bodySnapshot;
   const sections = body.sections
-    .map(
-      (s) =>
-        `<h2>${s.title}</h2>${s.paragraphs.map((p) => `<p>${p}</p>`).join("")}`,
-    )
+    .map((s) => {
+      const facts = (s.facts ?? [])
+        .map((f) => `<tr><th>${f.label}</th><td>${f.value}</td></tr>`)
+        .join("");
+      const table = facts ? `<table>${facts}</table>` : "";
+      return `<h2>${s.title}</h2>${table}${s.paragraphs.map((p) => `<p>${p}</p>`).join("")}`;
+    })
     .join("");
   return `<!doctype html><html lang="az"><head><meta charset="utf-8"/><title>${row.number}</title>
-<style>body{font:14px/1.55 Georgia,serif;max-width:720px;margin:40px auto;color:#111;padding:0 24px}h1{font-size:22px}h2{font-size:16px;margin-top:28px}p{text-align:justify}.sig{max-width:280px;border:1px solid #ddd;background:#fff} .meta{font-size:12px;color:#444}</style></head><body>
+<style>body{font:15px/1.7 system-ui,Segoe UI,sans-serif;max-width:720px;margin:40px auto;color:#111;padding:0 24px}h1{font-size:22px}h2{font-size:16px;margin-top:28px}p{text-align:left}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{border-bottom:1px solid #e5e7eb;padding:8px 10px;text-align:left;vertical-align:top}th{width:38%;color:#64748b;font-weight:500;font-size:13px}td{font-weight:600;font-size:14px}.sig{max-width:280px;border:1px solid #ddd;background:#fff} .meta{font-size:12px;color:#444}</style></head><body>
 <p class="meta">AUTO NEX · BAKIXANOV, BAKI · AUTO@NEX.AUTOS · 070 966 81 11</p>
 <h1>${body.title}</h1><p>${body.intro}</p>${sections}
 <h2>Elektron imza və sübut jurnalı</h2>

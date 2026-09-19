@@ -84,6 +84,8 @@ export function mapOrder(order: {
   insuranceTrustee?: string | null;
   insuranceStatus?: string | null;
   insuranceNotifiedAt?: Date | null;
+  insuranceReceiptToken?: string | null;
+  insurancePaidOutAt?: Date | null;
 }) {
   const invoice = order.invoices[0];
   return {
@@ -149,6 +151,11 @@ export function mapOrder(order: {
       trustee: order.insuranceTrustee || undefined,
       status: order.insuranceStatus || undefined,
       notifiedAt: order.insuranceNotifiedAt?.toISOString(),
+      paidOutAt: order.insurancePaidOutAt?.toISOString(),
+      receiptToken: order.insuranceReceiptToken || undefined,
+      receiptUrl: order.insuranceReceiptToken
+        ? `/insurance-check/${order.insuranceReceiptToken}`
+        : undefined,
     },
   };
 }

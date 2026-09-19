@@ -18,6 +18,11 @@ export class OrdersController {
     return this.orders.findByCode(code);
   }
 
+  @Get('insurance/receipt/:token')
+  insuranceReceipt(@Param('token') token: string) {
+    return this.orders.findInsuranceReceipt(token);
+  }
+
   @Get('insurance/:code')
   insuranceByCode(@Param('code') code: string) {
     return this.orders.findInsuranceByCode(code);
@@ -74,6 +79,13 @@ export class OrdersController {
     @CurrentUser() user: { id: string },
   ) {
     return this.orders.updateInsurance(id, dto, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...STAFF)
+  @Post('orders/:id/insurance/payout')
+  insurancePayout(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    return this.orders.confirmInsurancePayout(id, user.id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

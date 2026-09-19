@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ContainersService } from '../containers/containers.service';
@@ -6,7 +7,7 @@ import { VesselsService } from '../vessels/vessels.service';
 import { attachPortCoords, enrichKnownContainer, lookupCarrier } from '../containers/registry';
 import { CreateOrderDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { generateTrackingCode, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
-import { NotifyService, statusLabelAz, type NotifyResult } from '../notify/notify.service';
+import { NotifyService, siteBase, statusLabelAz, type NotifyResult } from '../notify/notify.service';
 import { CloudinaryStorage } from '../storage/cloudinary.storage';
 
 function opt(value?: string) {
@@ -293,7 +294,65 @@ export class OrdersService {
       trustee: mapped.insurance.trustee,
       status: mapped.insurance.status || 'DRAFT',
       notifiedAt: mapped.insurance.notifiedAt,
+      paidOutAt: mapped.insurance.paidOutAt,
+      receiptUrl: mapped.insurance.receiptUrl,
     };
+  }
+
+  async findInsuranceReceipt(token: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { insuranceReceiptToken: token },
+      include: ORDER_INCLUDE,
+    });
+    if (!order?.insurancePaidOutAt) throw new NotFoundException('Çek tapılmadı');
+    const mapped = mapOrder(order);
+    const fullName = [mapped.insurance.firstName, mapped.insurance.lastName].filter(Boolean).join(' ') || mapped.customerName;
+    return {
+      trackingCode: mapped.trackingCode,
+      customerName: fullName,
+      docSeries: mapped.insurance.docSeries,
+      trustee: mapped.insurance.trustee,
+      make: mapped.make,
+      model: mapped.model,
+      year: mapped.year,
+      vinHint: order.vin && order.vin.length > 4 ? `••••${order.vin.slice(-4)}` : order.vin,
+      paidOutAt: order.insurancePaidOutAt.toISOString(),
+      message: 'Pul sizə köçürülmüşdür',
+    };
+  }
+
+  async confirmInsurancePayout(id: string, userId?: string) {
+    const existing = await this.prisma.order.findUnique({
+      where: { id },
+      include: { customer: true, vehicle: true },
+    });
+    if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
+    const token = existing.insuranceReceiptToken || randomBytes(16).toString('base64url');
+    const order = await this.prisma.order.update({
+      where: { id },
+      data: {
+        insuranceStatus: 'TRANSFERRED',
+        insuranceReceiptToken: token,
+        insurancePaidOutAt: existing.insurancePaidOutAt ?? new Date(),
+      },
+      include: ORDER_INCLUDE,
+    });
+    const receiptUrl = `${siteBase()}/insurance-check/${token}`;
+    const notify = await this.notify.insurancePayout({
+      phone: order.customer.phone,
+      trackingCode: order.trackingCode,
+      receiptUrl,
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'INSURANCE_PAYOUT',
+        entity: 'Order',
+        entityId: id,
+        meta: { token, notify } as object,
+      },
+    });
+    return { ...mapOrder(order), notify, receiptUrl };
   }
 
   async findInsuranceByCode(code: string) {
@@ -343,7 +402,7 @@ export class OrdersService {
     });
     if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
 
-    const allowed = new Set(['DRAFT', 'PENDING', 'PROCESSING', 'PAID', 'ACTIVE']);
+    const allowed = new Set(['DRAFT', 'PENDING', 'PROCESSING', 'PAID', 'TRANSFERRED', 'ACTIVE']);
     const status = dto.status === undefined ? undefined : opt(dto.status);
     if (status && !allowed.has(status)) throw new BadRequestException('Sığorta statusu səhvdir.');
 
@@ -352,6 +411,7 @@ export class OrdersService {
       PENDING: 'Sənədlər gözlənilir',
       PROCESSING: 'Sığorta rəsmiləşdirilir',
       PAID: 'Sığorta ödənilib',
+      TRANSFERRED: 'Pul köçürülüb',
       ACTIVE: 'Sığorta aktivdir',
     };
 

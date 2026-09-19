@@ -101,8 +101,13 @@ export default function AdminInsurancePage() {
       return;
     }
     const customerName = [form.firstName, form.lastName].filter(Boolean).join(" ").trim() || selected.customerName;
+    const docSeries = form.docSeries.trim() || selected.insurance?.docSeries?.trim() || "";
     if (!customerName?.trim()) {
       setError("Ad və soyad yazın.");
+      return;
+    }
+    if (!docSeries) {
+      setError("Şəxsiyyət vəsiqəsi seriyasını yazın — müqaviləyə düşəcək.");
       return;
     }
     setBusy(true);
@@ -112,18 +117,18 @@ export default function AdminInsurancePage() {
       const saved = await api.updateInsurance(selected.id, {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
-        docSeries: form.docSeries.trim(),
+        docSeries,
         trustee: form.trustee.trim(),
         status: "PROCESSING",
         notify: false,
       });
       setOrders((list) => list.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)));
-      setForm((prev) => ({ ...prev, status: "PROCESSING" }));
+      setForm((prev) => ({ ...prev, status: "PROCESSING", docSeries }));
       const created = await api.createContract({
         kind: "INSURANCE",
         customerName: customerName.trim(),
         customerPhone: phone,
-        customerIdNumber: form.docSeries.trim() || undefined,
+        customerIdNumber: docSeries,
         extraTerms: form.trustee.trim() || undefined,
         orderId: selected.id,
         trackingCode: selected.trackingCode,
@@ -145,12 +150,47 @@ export default function AdminInsurancePage() {
     }
   }
 
+  async function sendPayoutCheck() {
+    if (!selected?.id) {
+      setError("Bu maşın serverdə yoxdur. Əvvəl Maşınlar səhifəsində yadda saxlayın.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      if (form.docSeries.trim() || form.firstName.trim() || form.lastName.trim()) {
+        const saved = await api.updateInsurance(selected.id, {
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          docSeries: form.docSeries.trim(),
+          trustee: form.trustee.trim(),
+          notify: false,
+        });
+        setOrders((list) => list.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)));
+      }
+      const result = await api.confirmInsurancePayout(selected.id);
+      setOrders((list) => list.map((row) => (row.id === result.id ? { ...row, ...result } : row)));
+      setForm((prev) => ({ ...prev, status: result.insurance?.status || "TRANSFERRED" }));
+      const sent = result.notify?.sent;
+      setNotice(
+        sent
+          ? `Çek göndərildi: pul sizə köçürülmüşdür. ${result.receiptUrl}`
+          : result.notify?.error || `Çek hazırdır: ${result.receiptUrl}`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Çek göndərilmədi.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
       <h1 className="font-display text-3xl">Sığorta</h1>
       <p className="mt-2 text-sm text-zinc-400">
-        Bütün maşınların sığortası buradadır. Vəsiqəni doldurub sığorta müqaviləsini SMS ilə göndərin;
-        müştəri OTP və əl imzası atır, imzadan sonra pulun hesaba köçəcəyi barədə qısa SMS gedir.
+        Vəsiqə seriyasını yazın — müqaviləyə sistemdən düşür. İmza və köçürmədən sonra «Pul köçürüldü» ilə
+        müştəriyə çek linki gedir.
       </p>
       {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
       {notice ? <p className="mt-4 text-sm text-emerald-400">{notice}</p> : null}
@@ -256,6 +296,14 @@ export default function AdminInsurancePage() {
                 <button
                   type="button"
                   disabled={busy}
+                  onClick={() => void sendPayoutCheck()}
+                  className="rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50"
+                >
+                  Pul köçürüldü — çek göndər
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
                   onClick={() => void save(true)}
                   className="rounded-xl border border-sky-400/40 px-4 py-2.5 text-sm text-sky-200 disabled:opacity-50"
                 >
@@ -276,6 +324,15 @@ export default function AdminInsurancePage() {
                 >
                   Müştəri səhifəsi ↗
                 </Link>
+                {selected.insurance?.receiptUrl ? (
+                  <Link
+                    href={selected.insurance.receiptUrl}
+                    target="_blank"
+                    className="rounded-xl border border-emerald-400/40 px-4 py-2.5 text-sm text-emerald-200"
+                  >
+                    Çek ↗
+                  </Link>
+                ) : null}
               </div>
             </>
           )}

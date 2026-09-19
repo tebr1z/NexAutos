@@ -166,6 +166,7 @@ export function ContractSign({ token }: { token: string }) {
       <h1 className="font-display mt-3 text-3xl text-fg md:text-4xl">№ {data.number}</h1>
       <p className="mt-2 text-sm text-muted">
         {data.customerName} · {data.maskedPhone}
+        {data.customerIdNumber ? ` · Vəsiqə ${data.customerIdNumber}` : ""}
         {data.vin ? ` · VIN ${data.vin}` : ""}
       </p>
 
@@ -232,16 +233,26 @@ export function ContractSign({ token }: { token: string }) {
           <div
             ref={readerRef}
             onScroll={onReadScroll}
-            className="mt-6 max-h-[28rem] overflow-y-auto rounded-2xl border border-line bg-card p-5 md:p-8"
+            className="mt-6 max-h-[32rem] overflow-y-auto rounded-2xl border border-line bg-white p-5 text-[#111] md:p-8"
           >
-            <p className="text-[11px] uppercase tracking-[0.28em] text-muted">{data.body.kicker}</p>
-            <h3 className="font-display mt-2 text-xl">{data.body.title}</h3>
-            <p className="mt-4 text-sm leading-7 text-muted">{data.body.intro}</p>
+            <p className="text-[11px] uppercase tracking-[0.28em] text-zinc-500">{data.body.kicker}</p>
+            <h3 className="mt-2 font-sans text-xl font-semibold leading-snug">{data.body.title}</h3>
+            <p className="mt-4 font-sans text-[15px] leading-8 text-zinc-700">{data.body.intro}</p>
             {data.body.sections.map((section) => (
               <section key={section.id} className="mt-8">
-                <h4 className="font-display text-lg">{section.title}</h4>
+                <h4 className="font-sans text-base font-semibold">{section.title}</h4>
+                {section.facts?.length ? (
+                  <dl className="mt-3 divide-y divide-zinc-200 rounded-xl border border-zinc-200">
+                    {section.facts.map((fact) => (
+                      <div key={`${section.id}-${fact.label}`} className="grid grid-cols-1 gap-1 px-3 py-2.5 sm:grid-cols-[13rem_1fr] sm:gap-4">
+                        <dt className="font-sans text-xs text-zinc-500">{fact.label}</dt>
+                        <dd className="font-sans text-sm font-medium text-zinc-900">{fact.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : null}
                 {section.paragraphs.map((p, i) => (
-                  <p key={`${section.id}-${i}`} className="mt-3 text-sm leading-7 text-muted">
+                  <p key={`${section.id}-${i}`} className="mt-3 font-sans text-[15px] leading-8 text-zinc-700">
                     {p}
                   </p>
                 ))}
@@ -336,7 +347,7 @@ export function ContractSign({ token }: { token: string }) {
         <section className="mt-10 space-y-4">
           <h2 className="font-display text-2xl">Müqavilə imzalandı</h2>
           <p className="text-sm leading-7 text-muted">
-            {data?.kind === "INSURANCE"}
+            {data.kind === "INSURANCE"
               ? "Sığorta müqaviləsi təsdiqləndi. Qısa sonra sığorta haqqı hesabınıza köçürüləcək — SMS də göndərilir."
               : "Sənəd Auto Nex reyestrinə düşdü. PDF keçidi WhatsApp və e-poçtunuza da göndərilir."}
           </p>

@@ -101,12 +101,22 @@ export class ContractsService {
 
     let orderId = dto.orderId?.trim() || null;
     let trackingCode = dto.trackingCode?.trim().toUpperCase() || null;
-    if (!orderId && trackingCode) {
-      const order = await this.prisma.order.findFirst({ where: { trackingCode } });
-      if (order) orderId = order.id;
+    let orderDocSeries: string | null = null;
+    if (orderId || trackingCode) {
+      const order = await this.prisma.order.findFirst({
+        where: orderId ? { id: orderId } : { trackingCode },
+      });
+      if (order) {
+        orderId = order.id;
+        trackingCode = order.trackingCode || trackingCode;
+        orderDocSeries = order.insuranceDocSeries?.trim() || null;
+      }
     }
 
     const kind = dto.kind === 'INSURANCE' ? 'INSURANCE' : 'SERVICE';
+    if (kind === 'INSURANCE' && !(dto.customerIdNumber?.trim() || orderDocSeries)) {
+      throw new BadRequestException('Şəxsiyyət vəsiqəsi seriyası sistemdə yoxdur — əvvəl Sığorta səhifəsində yazın.');
+    }
     const year = new Date().getFullYear();
     const count = await this.prisma.contract.count({
       where: { createdAt: { gte: new Date(`${year}-01-01T00:00:00.000Z`) } },
@@ -124,7 +134,7 @@ export class ContractsService {
       customerPhone: phone,
       customerEmail: dto.customerEmail?.trim() || null,
       customerAddress: dto.customerAddress?.trim() || null,
-      customerIdNumber: dto.customerIdNumber?.trim() || null,
+      customerIdNumber: dto.customerIdNumber?.trim() || orderDocSeries,
       trackingCode,
       vin: dto.vin?.trim().toUpperCase() || null,
       make: dto.make?.trim() || null,
@@ -251,6 +261,7 @@ export class ContractsService {
       kind: row.kind,
       status: row.status,
       customerName: row.customerName,
+      customerIdNumber: row.customerIdNumber,
       maskedPhone: maskPhone(row.customerPhone),
       hasEmail: Boolean(row.customerEmail),
       trackingCode: row.trackingCode,

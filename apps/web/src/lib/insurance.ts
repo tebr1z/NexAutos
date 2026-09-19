@@ -3,6 +3,7 @@ export const INSURANCE_STATUSES = [
   { key: "PENDING", az: "Sənədlər gözlənilir" },
   { key: "PROCESSING", az: "Sığorta rəsmiləşdirilir" },
   { key: "PAID", az: "Sığorta ödənilib" },
+  { key: "TRANSFERRED", az: "Pul köçürülüb" },
   { key: "ACTIVE", az: "Sığorta aktivdir" },
 ] as const;
 

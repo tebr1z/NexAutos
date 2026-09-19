@@ -18,6 +18,7 @@ type InsuranceView = {
   docSeries?: string;
   trustee?: string;
   status: string;
+  receiptUrl?: string;
 };
 
 export function InsuranceStatus({ code }: { code: string }) {
@@ -85,6 +86,11 @@ export function InsuranceStatus({ code }: { code: string }) {
       </div>
 
       <div className="mt-6 flex flex-wrap justify-center gap-3">
+        {data.receiptUrl ? (
+          <Link href={data.receiptUrl} className="rounded-2xl bg-emerald-400 px-5 py-3 text-sm font-medium text-black">
+            Pul köçürmə çeki
+          </Link>
+        ) : null}
         <Link
           href={`/track/${data.trackingCode}`}
           className="rounded-2xl bg-fg px-5 py-3 text-sm font-medium text-bg"

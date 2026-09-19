@@ -138,6 +138,19 @@ export class NotifyService {
     return this.sendMessage(to, body);
   }
 
+  async insurancePayout(input: {
+    phone?: string | null;
+    trackingCode: string;
+    receiptUrl: string;
+  }): Promise<NotifyResult> {
+    const to = normalizePhone(input.phone);
+    if (!to) return { sent: false, error: 'no_phone' };
+    return this.sendMessage(
+      to,
+      `Auto Nex: pul sizə köçürülmüşdür.\nÇek: ${input.receiptUrl}`,
+    );
+  }
+
   async customerUpdate(input: {
     phone?: string | null;
     trackingCode: string;

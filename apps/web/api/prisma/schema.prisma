@@ -183,6 +183,8 @@ model Order {
   insuranceTrustee   String?
   insuranceStatus    String?
   insuranceNotifiedAt DateTime?
+  insuranceReceiptToken String?   @unique
+  insurancePaidOutAt    DateTime?
   createdById     String?
   createdBy       User?           @relation("OrderCreator", fields: [createdById], references: [id])
   createdAt       DateTime        @default(now())
