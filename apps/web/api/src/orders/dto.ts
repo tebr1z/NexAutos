@@ -228,6 +228,23 @@ export class UpdateInsuranceDto {
   @IsOptional()
   @IsBoolean()
   notify?: boolean;
+
+  @IsOptional()
+  @IsString()
+  vin?: string;
+
+  @IsOptional()
+  @IsString()
+  make?: string;
+
+  @IsOptional()
+  @IsString()
+  model?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  year?: number;
 }
 
 export class CreateInsuranceDto {
@@ -252,6 +269,23 @@ export class CreateInsuranceDto {
   @IsOptional()
   @IsString()
   amountAzn?: string;
+
+  @IsOptional()
+  @IsString()
+  vin?: string;
+
+  @IsOptional()
+  @IsString()
+  make?: string;
+
+  @IsOptional()
+  @IsString()
+  model?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  year?: number;
 }
 
 export class CustomerSmsDto {

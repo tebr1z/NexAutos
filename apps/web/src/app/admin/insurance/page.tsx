@@ -18,6 +18,10 @@ const EMPTY = {
   docSeries: "",
   trustee: "",
   amountAzn: "",
+  vin: "",
+  make: "",
+  model: "",
+  year: "",
   status: "DRAFT",
 };
 
@@ -58,6 +62,10 @@ export default function AdminInsurancePage() {
       docSeries: order.insurance?.docSeries ?? "",
       trustee: order.insurance?.trustee ?? "",
       amountAzn: order.insurance?.amountAzn ?? "",
+      vin: order.vin?.startsWith("SIG") ? "" : order.vin ?? "",
+      make: order.make ?? "",
+      model: order.model ?? "",
+      year: order.year ? String(order.year) : "",
       status: normalizeInsuranceStatus(order.insurance?.status),
     });
     setNotice("");
@@ -84,6 +92,10 @@ export default function AdminInsurancePage() {
       docSeries: form.docSeries.trim() || undefined,
       trustee: form.trustee.trim() || undefined,
       amountAzn: form.amountAzn.trim() || undefined,
+      vin: form.vin.trim() || undefined,
+      make: form.make.trim() || undefined,
+      model: form.model.trim() || undefined,
+      year: form.year.trim() ? Number(form.year) : undefined,
     });
     setOrders((list) => [created, ...list.filter((row) => row.id !== created.id)]);
     pick(created);
@@ -103,6 +115,10 @@ export default function AdminInsurancePage() {
         docSeries: form.docSeries.trim(),
         trustee: form.trustee.trim(),
         amountAzn: form.amountAzn.trim(),
+        vin: form.vin.trim() || undefined,
+        make: form.make.trim() || undefined,
+        model: form.model.trim() || undefined,
+        year: form.year.trim() ? Number(form.year) : undefined,
         status: form.status,
         notify,
       });
@@ -143,6 +159,10 @@ export default function AdminInsurancePage() {
         docSeries,
         trustee: form.trustee.trim(),
         amountAzn: form.amountAzn.trim(),
+        vin: form.vin.trim() || undefined,
+        make: form.make.trim() || undefined,
+        model: form.model.trim() || undefined,
+        year: form.year.trim() ? Number(form.year) : undefined,
         status: "SIGN_WAIT",
         notify: false,
       });
@@ -157,10 +177,10 @@ export default function AdminInsurancePage() {
         amountAzn: form.amountAzn.trim() || undefined,
         orderId: target.id,
         trackingCode: target.trackingCode,
-        vin: target.vin?.startsWith("SIG") ? undefined : target.vin,
-        make: target.make,
-        model: target.model,
-        year: target.year,
+        vin: form.vin.trim() || (target.vin?.startsWith("SIG") ? undefined : target.vin),
+        make: form.make.trim() || target.make,
+        model: form.model.trim() || target.model,
+        year: form.year.trim() ? Number(form.year) : target.year,
       });
       const sent = created.notify?.whatsapp?.sent || created.notify?.email?.sent;
       setNotice(
@@ -324,6 +344,33 @@ export default function AdminInsurancePage() {
                   onChange={(e) => setForm({ ...form, amountAzn: e.target.value })}
                   className={inp}
                 />
+                <p className="text-xs text-zinc-500">Maşın sistemdə yoxdursa VIN, marka, model yazın.</p>
+                <input
+                  placeholder="VIN (alınmamış / sistemdə olmayan maşın)"
+                  value={form.vin}
+                  onChange={(e) => setForm({ ...form, vin: e.target.value.toUpperCase() })}
+                  className={`${inp} font-mono`}
+                />
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <input
+                    placeholder="Marka"
+                    value={form.make}
+                    onChange={(e) => setForm({ ...form, make: e.target.value })}
+                    className={inp}
+                  />
+                  <input
+                    placeholder="Model"
+                    value={form.model}
+                    onChange={(e) => setForm({ ...form, model: e.target.value })}
+                    className={inp}
+                  />
+                  <input
+                    placeholder="İl"
+                    value={form.year}
+                    onChange={(e) => setForm({ ...form, year: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                    className={inp}
+                  />
+                </div>
                 <select
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value })}

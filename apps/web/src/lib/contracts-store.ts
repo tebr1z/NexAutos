@@ -253,14 +253,40 @@ export async function assignContract(
   return toAdmin(row);
 }
 
-export async function publicView(token: string, session?: string) {
+export async function publicView(token: string, session?: string, lang?: string) {
   const { row } = await byToken(token);
   const ok = sessionOk(row, session);
   const signed = row.status === "SIGNED";
+  const insurance = row.kind === "INSURANCE";
+  const body = insurance
+    ? buildInsuranceContractBody(
+        {
+          number: row.number,
+          customerName: row.customerName,
+          customerPhone: row.customerPhone,
+          customerEmail: row.customerEmail,
+          customerAddress: row.customerAddress,
+          customerIdNumber: row.customerIdNumber,
+          trackingCode: row.trackingCode,
+          vin: row.vin?.startsWith("SIG") ? null : row.vin,
+          make: row.make,
+          model: row.model,
+          year: row.year,
+          amountUsd: row.amountUsd,
+          amountAzn: row.amountAzn,
+          paymentNote: row.paymentNote,
+          extraTerms: row.extraTerms,
+        },
+        lang,
+      )
+    : signed || ok
+      ? row.bodySnapshot
+      : null;
   return {
     id: row.id,
     number: row.number,
     kind: row.kind,
+    locale: insurance ? lang || "az" : "az",
     status: row.status,
     customerName: row.customerName,
     customerIdNumber: row.customerIdNumber,
@@ -276,7 +302,7 @@ export async function publicView(token: string, session?: string) {
     signedAt: row.signedAt,
     documentHash: signed ? row.documentHash : null,
     signaturePng: signed ? row.signaturePng : null,
-    body: signed || ok ? row.bodySnapshot : null,
+    body,
     step: row.status === "SIGNED" ? "done" : row.status === "VOID" ? "void" : !ok ? "otp" : row.readAt ? "sign" : "read",
   };
 }

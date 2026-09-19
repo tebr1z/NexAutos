@@ -84,6 +84,7 @@ export type PublicContract = {
   id: string;
   number: string;
   kind?: string;
+  locale?: string;
   status: ContractRecord["status"];
   customerName: string;
   customerIdNumber?: string | null;
@@ -264,6 +265,10 @@ export const api = {
     docSeries?: string;
     trustee?: string;
     amountAzn?: string;
+    vin?: string;
+    make?: string;
+    model?: string;
+    year?: number;
   }) => request<TrackingShipment>("/insurance", { method: "POST", body: JSON.stringify(payload) }),
   insuranceReceipt: (token: string) =>
     request<{
@@ -296,6 +301,10 @@ export const api = {
       docSeries?: string;
       trustee?: string;
       amountAzn?: string;
+      vin?: string;
+      make?: string;
+      model?: string;
+      year?: number;
       status?: string;
       notify?: boolean;
     },
@@ -409,9 +418,15 @@ export const api = {
     }
     return res.blob();
   },
-  publicContract: (token: string, session?: string) =>
+  publicContract: (token: string, session?: string, lang?: string) =>
     requestWithLocal<PublicContract>(
-      `/contracts/public/${encodeURIComponent(token)}${session ? `?session=${encodeURIComponent(session)}` : ""}`,
+      `/contracts/public/${encodeURIComponent(token)}${(() => {
+        const q = new URLSearchParams();
+        if (session) q.set("session", session);
+        if (lang) q.set("lang", lang);
+        const s = q.toString();
+        return s ? `?${s}` : "";
+      })()}`,
     ),
   publicContractOtp: (token: string, payload: { purpose: "PHONE_VERIFY" | "SIGN_CONFIRM"; sessionToken?: string }) =>
     requestWithLocal<{ sent: boolean; channel?: string; error?: string; cooldownSec: number; expiresMin: number; devCode?: string | null }>(
@@ -437,6 +452,7 @@ export const api = {
       readFully: boolean;
       acceptedEsign: boolean;
       acceptedTerms: boolean;
+      locale?: string;
     },
   ) =>
     requestWithLocal<{ ok: boolean; status: string; signedAt: string; documentHash: string; publicUrl: string }>(

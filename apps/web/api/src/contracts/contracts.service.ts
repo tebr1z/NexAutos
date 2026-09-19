@@ -10,7 +10,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotifyService, normalizePhone } from '../notify/notify.service';
 import { buildContractBody, type ContractBody } from './contract-text';
-import { buildInsuranceContractBody } from './insurance-contract-text';
+import { buildInsuranceContractBody, normalizeContractLocale } from './insurance-contract-text';
+import type { ContractFields } from './contract-text';
 import { renderContractPdf } from './pdf';
 import { CreateContractDto, SignContractDto, AssignContractDto } from './dto';
 
@@ -103,15 +104,24 @@ export class ContractsService {
     let trackingCode = dto.trackingCode?.trim().toUpperCase() || null;
     let orderDocSeries: string | null = null;
     let orderAmount: string | null = null;
+    let orderVin: string | null = null;
+    let orderMake: string | null = null;
+    let orderModel: string | null = null;
+    let orderYear: number | null = null;
     if (orderId || trackingCode) {
       const order = await this.prisma.order.findFirst({
         where: orderId ? { id: orderId } : { trackingCode: trackingCode! },
+        include: { vehicle: true },
       });
       if (order) {
         orderId = order.id;
         trackingCode = order.trackingCode || trackingCode;
         orderDocSeries = order.insuranceDocSeries?.trim() || null;
         orderAmount = order.insuranceAmountAzn?.trim() || null;
+        orderVin = order.vin && !order.vin.startsWith('SIG') ? order.vin : null;
+        orderMake = order.vehicle?.make ?? null;
+        orderModel = order.vehicle?.model ?? null;
+        orderYear = order.vehicle?.year ?? null;
       }
     }
 
@@ -138,10 +148,10 @@ export class ContractsService {
       customerAddress: dto.customerAddress?.trim() || null,
       customerIdNumber: dto.customerIdNumber?.trim() || orderDocSeries,
       trackingCode,
-      vin: dto.vin?.trim().toUpperCase() || null,
-      make: dto.make?.trim() || null,
-      model: dto.model?.trim() || null,
-      year: dto.year ?? null,
+      vin: dto.vin?.trim().toUpperCase() || orderVin,
+      make: dto.make?.trim() || orderMake,
+      model: dto.model?.trim() || orderModel,
+      year: dto.year ?? orderYear,
       origin: dto.origin?.trim() || null,
       amountUsd: dto.amountUsd?.trim() || null,
       amountAzn: dto.amountAzn?.trim() || orderAmount,
@@ -252,22 +262,27 @@ export class ContractsService {
     return this.toAdmin(updated);
   }
 
-  async publicView(token: string, sessionToken?: string) {
+  async publicView(token: string, sessionToken?: string, locale?: string) {
     const row = await this.requireByToken(token);
     const sessionOk = this.sessionOk(row, sessionToken);
     const signed = row.status === 'SIGNED';
-    const body = (signed || sessionOk ? row.bodySnapshot : null) as ContractBody | null;
+    const lang = normalizeContractLocale(locale);
+    const insurance = row.kind === 'INSURANCE';
+    const body = insurance
+      ? buildInsuranceContractBody(this.fieldsFromRow(row), lang)
+      : ((signed || sessionOk ? row.bodySnapshot : null) as ContractBody | null);
     return {
       id: row.id,
       number: row.number,
       kind: row.kind,
+      locale: insurance ? lang : 'az',
       status: row.status,
       customerName: row.customerName,
       customerIdNumber: row.customerIdNumber,
       maskedPhone: maskPhone(row.customerPhone),
       hasEmail: Boolean(row.customerEmail),
       trackingCode: row.trackingCode,
-      vin: row.vin,
+      vin: row.vin && row.vin.startsWith('SIG') ? null : row.vin,
       make: row.make,
       model: row.model,
       year: row.year,
@@ -411,7 +426,11 @@ export class ContractsService {
     const signedAt = new Date();
     const ip = clientIp(req as { ip?: string; headers?: Record<string, string | string[] | undefined> });
     const userAgent = String(req?.headers?.['user-agent'] ?? '').slice(0, 400) || null;
-    const body = row.bodySnapshot as unknown as ContractBody;
+    const locale = normalizeContractLocale(dto.locale);
+    const body =
+      row.kind === 'INSURANCE'
+        ? buildInsuranceContractBody(this.fieldsFromRow(row), locale)
+        : (row.bodySnapshot as unknown as ContractBody);
     const documentHash = createHash('sha256')
       .update(
         JSON.stringify({
@@ -442,6 +461,7 @@ export class ContractsService {
         signedAt,
         readAt: row.readAt ?? signedAt,
         signaturePng: dto.signaturePng,
+        bodySnapshot: body as unknown as Prisma.InputJsonValue,
         documentHash,
         signerIp: ip,
         signerUserAgent: userAgent,
@@ -580,6 +600,44 @@ export class ContractsService {
     if (!sessionOk) return 'otp';
     if (!row.readAt && row.status !== 'READ') return 'read';
     return 'sign';
+  }
+
+  private fieldsFromRow(row: {
+    number: string;
+    customerName: string;
+    customerPhone: string;
+    customerEmail?: string | null;
+    customerAddress?: string | null;
+    customerIdNumber?: string | null;
+    trackingCode?: string | null;
+    vin?: string | null;
+    make?: string | null;
+    model?: string | null;
+    year?: number | null;
+    origin?: string | null;
+    amountUsd?: unknown;
+    amountAzn?: unknown;
+    paymentNote?: string | null;
+    extraTerms?: string | null;
+  }): ContractFields {
+    return {
+      number: row.number,
+      customerName: row.customerName,
+      customerPhone: row.customerPhone,
+      customerEmail: row.customerEmail,
+      customerAddress: row.customerAddress,
+      customerIdNumber: row.customerIdNumber,
+      trackingCode: row.trackingCode,
+      vin: row.vin && row.vin.startsWith('SIG') ? null : row.vin,
+      make: row.make,
+      model: row.model,
+      year: row.year,
+      origin: row.origin,
+      amountUsd: row.amountUsd != null ? String(row.amountUsd) : null,
+      amountAzn: row.amountAzn != null ? String(row.amountAzn) : null,
+      paymentNote: row.paymentNote,
+      extraTerms: row.extraTerms,
+    };
   }
 
   private adminSelect() {

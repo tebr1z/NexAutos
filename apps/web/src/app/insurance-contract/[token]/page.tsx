@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 
 export default async function InsuranceContractPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  return <ContractSign token={token} />;
+  return <ContractSign token={token} requireLanguage />;
 }

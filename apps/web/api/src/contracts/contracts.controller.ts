@@ -24,8 +24,8 @@ export class PublicContractsController {
   constructor(private contracts: ContractsService) {}
 
   @Get(':token')
-  view(@Param('token') token: string, @Query('session') session?: string) {
-    return this.contracts.publicView(token, session);
+  view(@Param('token') token: string, @Query('session') session?: string, @Query('lang') lang?: string) {
+    return this.contracts.publicView(token, session, lang);
   }
 
   @Throttle({ default: { limit: 8, ttl: 60000 } })

@@ -39,7 +39,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ path?: string[]
       return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
     if (path[0] === "public" && path[1] && path.length === 2) {
-      return Response.json(await publicView(path[1], url.searchParams.get("session") ?? undefined));
+      return Response.json(
+        await publicView(path[1], url.searchParams.get("session") ?? undefined, url.searchParams.get("lang") ?? undefined),
+      );
     }
     if (path[1] === "pdf") {
       const api = nestApiBase();

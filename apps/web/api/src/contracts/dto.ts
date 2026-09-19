@@ -156,4 +156,8 @@ export class SignContractDto {
 
   @IsBoolean()
   acceptedTerms: boolean;
+
+  @IsOptional()
+  @IsIn(['az', 'en', 'ru', 'tr'])
+  locale?: string;
 }

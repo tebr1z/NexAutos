@@ -400,7 +400,24 @@ export class OrdersService {
       });
     }
 
-    const vin = `SIG${randomBytes(8).toString('hex').toUpperCase()}`.slice(0, 17);
+    const vinRaw = dto.vin?.trim().toUpperCase() || '';
+    const realVin = vinRaw.length >= 8 && !vinRaw.startsWith('SIG') ? vinRaw : null;
+    const vin = (realVin || `SIG${randomBytes(8).toString('hex').toUpperCase()}`).slice(0, 17);
+    let vehicleId: string | undefined;
+    if (realVin) {
+      const vehicle = await this.prisma.vehicle.upsert({
+        where: { vin: realVin },
+        update: { make: opt(dto.make), model: opt(dto.model), year: dto.year ?? undefined },
+        create: {
+          vin: realVin,
+          auctionHouse: 'OTHER',
+          make: opt(dto.make) ?? undefined,
+          model: opt(dto.model) ?? undefined,
+          year: dto.year ?? undefined,
+        },
+      });
+      vehicleId = vehicle.id;
+    }
     let trackingCode = `SIG-${String(Date.now()).slice(-6)}`;
     while (await this.prisma.order.findUnique({ where: { trackingCode } })) {
       trackingCode = `SIG-${randomBytes(3).toString('hex').toUpperCase()}`;
@@ -410,6 +427,7 @@ export class OrdersService {
       data: {
         trackingCode,
         customerId: customer.id,
+        vehicleId,
         vin,
         auctionHouse: 'OTHER',
         insuranceFirstName: firstName,
@@ -505,6 +523,10 @@ export class OrdersService {
         ...(dto.trustee !== undefined ? { insuranceTrustee: opt(dto.trustee) } : {}),
         ...(dto.amountAzn !== undefined ? { insuranceAmountAzn: opt(dto.amountAzn) } : {}),
         ...(status !== undefined ? { insuranceStatus: status } : {}),
+        ...(dto.vin !== undefined && dto.vin.trim() && !dto.vin.toUpperCase().startsWith('SIG')
+          ? { vin: dto.vin.trim().toUpperCase() }
+          : {}),
+      },
       },
       include: ORDER_INCLUDE,
     });

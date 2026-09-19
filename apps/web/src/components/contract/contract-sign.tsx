@@ -3,20 +3,60 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type PublicContract } from "@/lib/api";
 import { SignaturePad } from "@/components/contract/signature-pad";
+import { LOCALES, type Locale } from "@/lib/constants";
 
 const STEPS = [
-  { id: "otp", label: "Telefon" },
-  { id: "read", label: "Müqavilə" },
-  { id: "sign", label: "Əl imzası" },
-  { id: "confirm", label: "OTP təsdiq" },
-  { id: "done", label: "PDF" },
+  { id: "otp", az: "Telefon", en: "Phone", ru: "Телефон", tr: "Telefon" },
+  { id: "read", az: "Müqavilə", en: "Contract", ru: "Договор", tr: "Sözleşme" },
+  { id: "sign", az: "Əl imzası", en: "Signature", ru: "Подпись", tr: "İmza" },
+  { id: "confirm", az: "OTP təsdiq", en: "OTP confirm", ru: "OTP", tr: "OTP" },
+  { id: "done", az: "PDF", en: "PDF", ru: "PDF", tr: "PDF" },
 ] as const;
+
+const UI = {
+  az: {
+    pick: "Müqavilə dilini seçin",
+    pickSub: "İmza səhifəsi seçdiyiniz dildə açılacaq.",
+    continue: "Davam et",
+    loading: "Müqavilə yüklənir…",
+    missing: "Müqavilə tapılmadı",
+    econtract: "Elektron müqavilə",
+  },
+  en: {
+    pick: "Choose contract language",
+    pickSub: "The signing page opens in the language you pick.",
+    continue: "Continue",
+    loading: "Loading contract…",
+    missing: "Contract not found",
+    econtract: "Electronic contract",
+  },
+  ru: {
+    pick: "Выберите язык договора",
+    pickSub: "Страница подписи откроется на выбранном языке.",
+    continue: "Далее",
+    loading: "Загрузка…",
+    missing: "Договор не найден",
+    econtract: "Электронный договор",
+  },
+  tr: {
+    pick: "Sözleşme dilini seçin",
+    pickSub: "İmza sayfası seçtiğiniz dilde açılır.",
+    continue: "Devam",
+    loading: "Yükleniyor…",
+    missing: "Sözleşme bulunamadı",
+    econtract: "Elektronik sözleşme",
+  },
+} as const;
 
 function sessionKey(token: string) {
   return `anx_contract_session_${token}`;
 }
 
-export function ContractSign({ token }: { token: string }) {
+function langKey(token: string) {
+  return `anx_contract_lang_${token}`;
+}
+
+export function ContractSign({ token, requireLanguage = false }: { token: string; requireLanguage?: boolean }) {
   const [data, setData] = useState<PublicContract | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -29,12 +69,14 @@ export function ContractSign({ token }: { token: string }) {
   const [acceptedEsign, setAcceptedEsign] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [signOtpSent, setSignOtpSent] = useState(false);
-  const [phase, setPhase] = useState<(typeof STEPS)[number]["id"]>("otp");
+  const [phase, setPhase] = useState<(typeof STEPS)[number]["id"] | "lang">("otp");
+  const [lang, setLang] = useState<Locale>("az");
   const readerRef = useRef<HTMLDivElement>(null);
+  const ui = UI[lang];
 
   const load = useCallback(
-    async (sessionToken?: string) => {
-      const next = await api.publicContract(token, sessionToken);
+    async (sessionToken?: string, locale?: Locale) => {
+      const next = await api.publicContract(token, sessionToken, locale ?? lang);
       setData(next);
       if (next.step === "done") setPhase("done");
       else if (next.step === "void") setError("Bu müqavilə ləğv edilib.");
@@ -43,14 +85,28 @@ export function ContractSign({ token }: { token: string }) {
       else setPhase("otp");
       return next;
     },
-    [token],
+    [token, lang],
   );
 
   useEffect(() => {
     const stored = sessionStorage.getItem(sessionKey(token)) ?? "";
+    const savedLang = (sessionStorage.getItem(langKey(token)) as Locale | null) ?? null;
     setSession(stored);
-    load(stored || undefined).catch((err: Error) => setError(err.message || "Müqavilə açılmadı."));
-  }, [load, token]);
+    if (requireLanguage && !savedLang) {
+      setPhase("lang");
+      api.publicContract(token, stored || undefined).then(setData).catch((err: Error) => setError(err.message || "Müqavilə açılmadı."));
+      return;
+    }
+    if (savedLang) setLang(savedLang);
+    load(stored || undefined, savedLang || undefined).catch((err: Error) => setError(err.message || "Müqavilə açılmadı."));
+  }, [load, requireLanguage, token]);
+
+  async function pickLanguage(next: Locale) {
+    sessionStorage.setItem(langKey(token), next);
+    setLang(next);
+    const stored = sessionStorage.getItem(sessionKey(token)) ?? "";
+    await load(stored || undefined, next).catch((err: Error) => setError(err.message || ui.missing));
+  }
 
   const activeIndex = useMemo(() => STEPS.findIndex((s) => s.id === phase), [phase]);
 
@@ -133,6 +189,7 @@ export function ContractSign({ token }: { token: string }) {
         readFully: true,
         acceptedEsign: true,
         acceptedTerms: true,
+        locale: lang,
       });
       sessionStorage.removeItem(sessionKey(token));
       await load();
@@ -146,13 +203,13 @@ export function ContractSign({ token }: { token: string }) {
   }
 
   if (!data && !error) {
-    return <p className="px-5 pt-32 text-sm text-muted">Müqavilə yüklənir…</p>;
+    return <p className="px-5 pt-32 text-sm text-muted">{ui.loading}</p>;
   }
 
   if (error && !data) {
     return (
       <article className="mx-auto max-w-lg px-5 pt-32 pb-24">
-        <h1 className="font-display text-3xl">Müqavilə tapılmadı</h1>
+        <h1 className="font-display text-3xl">{ui.missing}</h1>
         <p className="mt-4 text-sm text-muted">{error}</p>
       </article>
     );
@@ -162,14 +219,49 @@ export function ContractSign({ token }: { token: string }) {
 
   return (
     <article className="mx-auto max-w-3xl px-5 pt-28 pb-24 md:px-8">
-      <p className="text-[11px] uppercase tracking-[0.32em] text-muted">Elektron müqavilə</p>
+      {requireLanguage || data.kind === "INSURANCE" ? (
+        <div className="mb-6 flex flex-wrap gap-2">
+          {LOCALES.map((item) => (
+            <button
+              key={item.code}
+              type="button"
+              onClick={() => void pickLanguage(item.code)}
+              className={`rounded-full border px-3 py-1.5 text-xs ${
+                lang === item.code ? "border-fg bg-fg text-bg" : "border-line text-muted"
+              }`}
+            >
+              {item.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <p className="text-[11px] uppercase tracking-[0.32em] text-muted">{ui.econtract}</p>
       <h1 className="font-display mt-3 text-3xl text-fg md:text-4xl">№ {data.number}</h1>
       <p className="mt-2 text-sm text-muted">
         {data.customerName} · {data.maskedPhone}
         {data.customerIdNumber ? ` · Vəsiqə ${data.customerIdNumber}` : ""}
         {data.vin ? ` · VIN ${data.vin}` : ""}
+        {data.make || data.model ? ` · ${[data.year, data.make, data.model].filter(Boolean).join(" ")}` : ""}
       </p>
 
+      {phase === "lang" ? (
+        <section className="mt-10 space-y-5">
+          <h2 className="font-display text-3xl">{ui.pick}</h2>
+          <p className="text-sm text-muted">{ui.pickSub}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {LOCALES.map((item) => (
+              <button
+                key={item.code}
+                type="button"
+                onClick={() => void pickLanguage(item.code)}
+                className="rounded-2xl border border-line px-5 py-4 text-left text-lg hover:border-fg"
+              >
+                {item.name}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : (
       <ol className="mt-8 grid grid-cols-5 gap-2 text-[11px] uppercase tracking-wide">
         {STEPS.map((step, i) => (
           <li
@@ -178,7 +270,7 @@ export function ContractSign({ token }: { token: string }) {
               i <= activeIndex ? "bg-fg text-bg" : "border border-line text-muted"
             }`}
           >
-            {step.label}
+            {step[lang]}
           </li>
         ))}
       </ol>
@@ -366,6 +458,7 @@ export function ContractSign({ token }: { token: string }) {
             PDF-i aç
           </a>
         </section>
+      )}
       )}
     </article>
   );
