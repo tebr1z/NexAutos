@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { probeAisKey, resetAisstreamBackoff } from '../vessels/ais';
-import { probeCloudinary } from '../storage/cloudinary.storage';
+import { probeCloudinary } from '../storage/cloudinary-probe';
 import {
   CLOUDINARY_SETTING,
   cloudinaryReady,
