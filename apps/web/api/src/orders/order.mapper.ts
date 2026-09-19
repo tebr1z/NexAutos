@@ -160,6 +160,7 @@ export function mapOrder(order: {
           docSeries: order.insuranceDocSeries || undefined,
           trustee: order.insuranceTrustee || undefined,
           status: order.insuranceStatus || undefined,
+          amountUsd: order.insuranceAmountAzn || undefined,
           amountAzn: order.insuranceAmountAzn || undefined,
           notifiedAt: order.insuranceNotifiedAt?.toISOString(),
           paidOutAt: order.insurancePaidOutAt?.toISOString(),

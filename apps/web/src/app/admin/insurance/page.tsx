@@ -17,7 +17,7 @@ const EMPTY = {
   phone: "",
   docSeries: "",
   trustee: "",
-  amountAzn: "",
+  amountUsd: "",
   vin: "",
   make: "",
   model: "",
@@ -62,7 +62,7 @@ export default function AdminInsurancePage() {
       phone: order.customerPhone ?? "",
       docSeries: order.insurance?.docSeries ?? "",
       trustee: order.insurance?.trustee ?? "",
-      amountAzn: order.insurance?.amountAzn ?? "",
+      amountUsd: order.insurance?.amountUsd || order.insurance?.amountAzn || "",
       vin: order.vin?.startsWith("SIG") ? "" : order.vin ?? "",
       make: order.make ?? "",
       model: order.model ?? "",
@@ -92,7 +92,7 @@ export default function AdminInsurancePage() {
       phone,
       docSeries: form.docSeries.trim() || undefined,
       trustee: form.trustee.trim() || undefined,
-      amountAzn: form.amountAzn.trim() || undefined,
+      amountUsd: form.amountUsd.trim() || undefined,
       vin: form.vin.trim() || undefined,
       make: form.make.trim() || undefined,
       model: form.model.trim() || undefined,
@@ -115,7 +115,7 @@ export default function AdminInsurancePage() {
         lastName: form.lastName.trim(),
         docSeries: form.docSeries.trim(),
         trustee: form.trustee.trim(),
-        amountAzn: form.amountAzn.trim(),
+        amountUsd: form.amountUsd.trim(),
         vin: form.vin.trim() || undefined,
         make: form.make.trim() || undefined,
         model: form.model.trim() || undefined,
@@ -159,7 +159,7 @@ export default function AdminInsurancePage() {
         lastName: form.lastName.trim(),
         docSeries,
         trustee: form.trustee.trim(),
-        amountAzn: form.amountAzn.trim(),
+        amountUsd: form.amountUsd.trim(),
         vin: form.vin.trim() || undefined,
         make: form.make.trim() || undefined,
         model: form.model.trim() || undefined,
@@ -175,7 +175,7 @@ export default function AdminInsurancePage() {
         customerPhone: phone,
         customerIdNumber: docSeries,
         extraTerms: form.trustee.trim() || undefined,
-        amountUsd: form.amountAzn.trim() || undefined,
+        amountUsd: form.amountUsd.trim() || undefined,
         orderId: target.id,
         trackingCode: target.trackingCode,
         vin: form.vin.trim() || (target.vin?.startsWith("SIG") ? undefined : target.vin),
@@ -207,7 +207,7 @@ export default function AdminInsurancePage() {
         lastName: form.lastName.trim(),
         docSeries: form.docSeries.trim(),
         trustee: form.trustee.trim(),
-        amountAzn: form.amountAzn.trim(),
+        amountUsd: form.amountUsd.trim(),
         notify: false,
       });
       setOrders((list) => list.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)));
@@ -232,7 +232,7 @@ export default function AdminInsurancePage() {
       <h1 className="font-display text-3xl">Sığorta</h1>
       <p className="mt-2 text-sm text-zinc-400">
         Maşın seçmədən də sığorta aça bilərsiniz. İmza gözləyəndə müştəri mütləq imzalamalıdır.
-        Ayrılan məbləğ əvvəldən boş qala bilər — sonra yazırsınız.
+        Məbləğ yalnız USD-dir. İlk başda boş qala bilər — sonra yazırsınız.
       </p>
       {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
       {notice ? <p className="mt-4 text-sm text-emerald-400">{notice}</p> : null}
@@ -284,8 +284,10 @@ export default function AdminInsurancePage() {
                     <td className="px-4 py-3 text-zinc-300">{row.customerName}</td>
                     <td className="px-4 py-3 text-zinc-400">
                       <p>{insuranceStatusLabel(row.insurance?.status)}</p>
-                      {row.insurance?.amountAzn ? (
-                        <p className="mt-0.5 text-[11px] text-zinc-500">{row.insurance.amountAzn} USD</p>
+                      {row.insurance?.amountUsd || row.insurance?.amountAzn ? (
+                        <p className="mt-0.5 text-[11px] text-zinc-500">
+                          {row.insurance.amountUsd || row.insurance.amountAzn} USD
+                        </p>
                       ) : null}
                     </td>
                   </tr>
@@ -341,12 +343,16 @@ export default function AdminInsurancePage() {
                   onChange={(e) => setForm({ ...form, trustee: e.target.value })}
                   className={inp}
                 />
-                <input
-                  placeholder="Ayrılan məbləğ USD (ilk başda boş ola bilər)"
-                  value={form.amountAzn}
-                  onChange={(e) => setForm({ ...form, amountAzn: e.target.value })}
-                  className={inp}
-                />
+                <label className="block text-xs text-zinc-400">
+                  Ayrılan məbləğ — yalnız USD
+                  <input
+                    placeholder="Məs: 1500 (ilk başda boş ola bilər)"
+                    value={form.amountUsd}
+                    onChange={(e) => setForm({ ...form, amountUsd: e.target.value })}
+                    className={`${inp} mt-1`}
+                    inputMode="decimal"
+                  />
+                </label>
                 <p className="text-xs text-zinc-500">Maşın sistemdə yoxdursa VIN, marka, model yazın.</p>
                 <input
                   placeholder="VIN (alınmamış / sistemdə olmayan maşın)"

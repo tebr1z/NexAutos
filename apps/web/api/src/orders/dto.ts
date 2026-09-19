@@ -231,6 +231,10 @@ export class UpdateInsuranceDto {
 
   @IsOptional()
   @IsString()
+  amountUsd?: string;
+
+  @IsOptional()
+  @IsString()
   amountAzn?: string;
 
   @IsOptional()
@@ -277,6 +281,10 @@ export class CreateInsuranceDto {
   @IsOptional()
   @IsString()
   trustee?: string;
+
+  @IsOptional()
+  @IsString()
+  amountUsd?: string;
 
   @IsOptional()
   @IsString()

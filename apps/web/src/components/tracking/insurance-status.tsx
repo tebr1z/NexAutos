@@ -17,6 +17,7 @@ type InsuranceView = {
   lastName?: string;
   docSeries?: string;
   trustee?: string;
+  amountUsd?: string;
   amountAzn?: string;
   status: string;
   signRequired?: boolean;
@@ -93,7 +94,7 @@ export function InsuranceStatus({ code }: { code: string }) {
           {data.vinHint ? <Row label="VIN" value={data.vinHint} /> : null}
           <Row label={t.track.insuranceName} value={person || t.track.insuranceLater} />
           <Row label={t.track.insuranceDoc} value={data.docSeries || t.track.insuranceLater} />
-          <Row label="Ayrılan məbləğ" value={data.amountAzn ? `${data.amountAzn} USD` : "Hələ yazılmayıb"} />
+          <Row label="Ayrılan məbləğ" value={(data.amountUsd || data.amountAzn) ? `${data.amountUsd || data.amountAzn} USD` : "Hələ yazılmayıb"} />
           {data.trustee ? <Row label={t.track.insuranceTrustee} value={data.trustee} /> : null}
         </dl>
       </div>

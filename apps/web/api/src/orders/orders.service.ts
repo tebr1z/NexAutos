@@ -397,7 +397,8 @@ export class OrdersService {
       lastName: mapped.insurance?.lastName,
       docSeries: mapped.insurance?.docSeries,
       trustee: mapped.insurance?.trustee,
-      amountAzn: mapped.insurance?.amountAzn,
+      amountUsd: mapped.insurance?.amountUsd || mapped.insurance?.amountAzn,
+      amountAzn: mapped.insurance?.amountUsd || mapped.insurance?.amountAzn,
       status: mapped.insurance?.status || 'DRAFT',
       signRequired: waiting,
       signUrl,
@@ -423,7 +424,8 @@ export class OrdersService {
       make: mapped.make,
       model: mapped.model,
       year: mapped.year,
-      amountAzn: mapped.insurance?.amountAzn,
+      amountUsd: mapped.insurance?.amountUsd || mapped.insurance?.amountAzn,
+      amountAzn: mapped.insurance?.amountUsd || mapped.insurance?.amountAzn,
       vinHint: order.vin?.startsWith('SIG') ? '' : order.vin && order.vin.length > 4 ? `••••${order.vin.slice(-4)}` : order.vin,
       paidOutAt: order.insurancePaidOutAt.toISOString(),
       message: 'Pul sizə köçürülmüşdür',
@@ -525,7 +527,7 @@ export class OrdersService {
         insuranceLastName: lastName || null,
         insuranceDocSeries: opt(dto.docSeries) ?? null,
         insuranceTrustee: opt(dto.trustee) ?? null,
-        insuranceAmountAzn: opt(dto.amountAzn) ?? null,
+        insuranceAmountAzn: opt(dto.amountUsd ?? dto.amountAzn) ?? null,
         insuranceStatus: 'DRAFT',
         createdById: userId,
         events: {
@@ -617,7 +619,9 @@ export class OrdersService {
         ...(dto.lastName !== undefined ? { insuranceLastName: opt(dto.lastName) } : {}),
         ...(dto.docSeries !== undefined ? { insuranceDocSeries: opt(dto.docSeries) } : {}),
         ...(dto.trustee !== undefined ? { insuranceTrustee: opt(dto.trustee) } : {}),
-        ...(dto.amountAzn !== undefined ? { insuranceAmountAzn: opt(dto.amountAzn) } : {}),
+        ...(dto.amountUsd !== undefined || dto.amountAzn !== undefined
+          ? { insuranceAmountAzn: opt(dto.amountUsd ?? dto.amountAzn) }
+          : {}),
         ...(status !== undefined ? { insuranceStatus: status } : {}),
         ...(dto.vin !== undefined && dto.vin.trim() && !dto.vin.toUpperCase().startsWith('SIG')
           ? { vin: dto.vin.trim().toUpperCase() }

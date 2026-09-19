@@ -251,6 +251,7 @@ export const api = {
       lastName?: string;
       docSeries?: string;
       trustee?: string;
+      amountUsd?: string;
       amountAzn?: string;
       status: string;
       signRequired?: boolean;
@@ -265,7 +266,7 @@ export const api = {
     phone: string;
     docSeries?: string;
     trustee?: string;
-    amountAzn?: string;
+    amountUsd?: string;
     vin?: string;
     make?: string;
     model?: string;
@@ -280,6 +281,8 @@ export const api = {
       make?: string;
       model?: string;
       year?: number;
+      amountUsd?: string;
+      amountAzn?: string;
       vinHint?: string;
       paidOutAt: string;
       message: string;
@@ -301,7 +304,7 @@ export const api = {
       lastName?: string;
       docSeries?: string;
       trustee?: string;
-      amountAzn?: string;
+      amountUsd?: string;
       vin?: string;
       make?: string;
       model?: string;

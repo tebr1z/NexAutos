@@ -24,7 +24,6 @@ const EMPTY = {
   customerIdNumber: "",
   origin: "",
   amountUsd: "",
-  amountAzn: "",
   paymentNote: "",
   extraTerms: "",
 };
@@ -94,7 +93,6 @@ export function ContractsAdmin() {
         customerIdNumber: form.customerIdNumber || undefined,
         origin: form.origin || undefined,
         amountUsd: form.amountUsd || undefined,
-        amountAzn: form.amountAzn || undefined,
         paymentNote: form.paymentNote || undefined,
         extraTerms: form.extraTerms || undefined,
       });
@@ -157,8 +155,7 @@ export function ContractsAdmin() {
               <option value="CN">Çin</option>
               <option value="OTHER">Digər</option>
             </select>
-            <input placeholder="Büdcə / depozit USD (istəyə bağlı)" value={form.amountUsd} onChange={(e) => setForm({ ...form, amountUsd: e.target.value })} className={inp} />
-            <input placeholder="Büdcə AZN" value={form.amountAzn} onChange={(e) => setForm({ ...form, amountAzn: e.target.value })} className={inp} />
+            <input placeholder="Büdcə / depozit — yalnız USD" value={form.amountUsd} onChange={(e) => setForm({ ...form, amountUsd: e.target.value })} className={inp} />
             <input placeholder="Ödəniş qeydi" value={form.paymentNote} onChange={(e) => setForm({ ...form, paymentNote: e.target.value })} className={`${inp} md:col-span-2`} />
             <textarea placeholder="Əlavə şərt" value={form.extraTerms} onChange={(e) => setForm({ ...form, extraTerms: e.target.value })} className={`${inp} min-h-24 md:col-span-2`} />
           </div>
@@ -188,7 +185,7 @@ export function ContractsAdmin() {
           <Item label="E-poçt" value={current.customerEmail} />
           <Item label="FİN" value={current.customerIdNumber} />
           <Item label="Ünvan" value={current.customerAddress} />
-          <Item label="Büdcə" value={[current.amountUsd && `${current.amountUsd} USD`, current.amountAzn && `${current.amountAzn} AZN`].filter(Boolean).join(" · ")} />
+          <Item label="Büdcə" value={current.amountUsd ? `${current.amountUsd} USD` : "—"} />
           <Item label="Təyin olunmuş maşın" value={[current.year, current.make, current.model].filter(Boolean).join(" ") || (current.trackingCode ? "təyin edilib" : "hələ alınmayıb")} />
           <Item label="İzləmə kodu" value={current.trackingCode} />
           <Item label="VIN" value={current.vin} />
