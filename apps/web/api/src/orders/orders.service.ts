@@ -579,7 +579,7 @@ export class OrdersService {
     const count = await this.prisma.orderPhoto.count({ where: { orderId } });
     if (count >= 40) throw new BadRequestException('Maksimum 40 şəkil.');
     const parsed = decodeDataUrl(rows[0].url);
-    if (this.r2.enabled() && parsed) {
+    if ((await this.r2.isEnabled()) && parsed) {
       const created = await this.prisma.orderPhoto.create({
         data: { orderId, url: 'pending', caption: rows[0].caption, category: rows[0].category },
       });

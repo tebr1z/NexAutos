@@ -469,6 +469,35 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ key: key ?? "" }),
     }),
+  r2Settings: () =>
+    request<{
+      configured: boolean;
+      source: "admin" | "env" | "none";
+      accountId: string;
+      endpoint: string;
+      bucket: string;
+      publicUrl: string;
+      accessKeyPreview: string;
+      secretPreview: string;
+      tokenPreview: string;
+    }>("/settings/r2"),
+  saveR2Settings: (payload: Record<string, unknown>) =>
+    request<{
+      configured: boolean;
+      source: "admin" | "env" | "none";
+      accountId: string;
+      endpoint: string;
+      bucket: string;
+      publicUrl: string;
+      accessKeyPreview: string;
+      secretPreview: string;
+      tokenPreview: string;
+    }>("/settings/r2", { method: "PUT", body: JSON.stringify(payload) }),
+  testR2Settings: (payload: Record<string, unknown>) =>
+    request<{ ok: boolean; message: string }>("/settings/r2/test", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   catalogManage: () => request<CatalogCar[]>("/catalog/manage"),
   createCatalogCar: (payload: Record<string, unknown>) =>
     request<CatalogCar>("/catalog", { method: "POST", body: JSON.stringify(payload) }),

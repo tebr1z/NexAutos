@@ -3,7 +3,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { Roles } from '../common/decorators/roles.decorator';
-import { AisKeyDto } from './dto';
+import { AisKeyDto, R2SettingsDto } from './dto';
 import { SettingsService } from './settings.service';
 
 const STAFF: Role[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'];
@@ -28,5 +28,21 @@ export class SettingsController {
   @Post('ais/test')
   testAis(@Body() dto: AisKeyDto) {
     return this.settings.testAis(dto.key);
+  }
+
+  @Get('r2')
+  r2() {
+    return this.settings.r2Status();
+  }
+
+  @Put('r2')
+  saveR2(@Body() dto: R2SettingsDto) {
+    return this.settings.saveR2(dto);
+  }
+
+  @SkipThrottle()
+  @Post('r2/test')
+  testR2(@Body() dto: R2SettingsDto) {
+    return this.settings.testR2(dto);
   }
 }
