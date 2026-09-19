@@ -122,6 +122,23 @@ export class OrdersService {
     private cloud: CloudinaryStorage,
   ) {}
 
+  private async syncCustomer(customerId: string, dto: { phone?: string; customerName?: string }) {
+    const name = dto.customerName?.trim();
+    const rawPhone = dto.phone;
+    const phone = rawPhone !== undefined ? normalizePhone(rawPhone) : undefined;
+    if (rawPhone !== undefined && rawPhone.trim() && !phone) {
+      throw new BadRequestException('Düzgün telefon yazın — məsələn 050 719 75 57 və ya 994705990399.');
+    }
+    if (phone === undefined && !name) return;
+    await this.prisma.customer.update({
+      where: { id: customerId },
+      data: {
+        ...(phone ? { phone } : {}),
+        ...(name ? { name } : {}),
+      },
+    });
+  }
+
   async create(dto: CreateOrderDto, userId?: string) {
     let customer = await this.prisma.customer.findFirst({
       where: { email: (dto.email ?? `${dto.customerName}@autonex.local`).toLowerCase() },
@@ -131,9 +148,12 @@ export class OrdersService {
         data: {
           name: dto.customerName,
           email: (dto.email ?? `${dto.vin.toLowerCase()}@autonex.local`).toLowerCase(),
-          phone: dto.phone ?? '',
+          phone: normalizePhone(dto.phone) ?? dto.phone ?? '',
         },
       });
+    } else if (dto.phone || dto.customerName) {
+      await this.syncCustomer(customer.id, { phone: dto.phone, customerName: dto.customerName });
+      customer = await this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id } });
     }
 
     const vehicle = await this.prisma.vehicle.upsert({
@@ -533,19 +553,24 @@ export class OrdersService {
     return mapOrder(order);
   }
 
-  async sendCustomerSms(id: string, dto: { kind?: string; text?: string }, userId?: string) {
-    const order = await this.prisma.order.findUnique({
+  async sendCustomerSms(id: string, dto: { kind?: string; text?: string; phone?: string }, userId?: string) {
+    const existing = await this.prisma.order.findUnique({
       where: { id },
       include: { customer: true, vehicle: true },
     });
-    if (!order) throw new NotFoundException('Göndəriş tapılmadı');
+    if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
+    if (dto.phone !== undefined) await this.syncCustomer(existing.customerId, { phone: dto.phone });
+    const order = await this.prisma.order.findUniqueOrThrow({
+      where: { id },
+      include: { customer: true, vehicle: true },
+    });
     const kind = (dto.kind || 'custom').trim();
     const intro =
       kind === 'photos'
         ? 'Auto Nex: maşınınıza yeni şəkillər əlavə olundu. Track linkindən baxın.'
         : dto.text?.trim() || 'Auto Nex: göndərişiniz haqqında yenilik.';
     const notify = await this.notify.customerUpdate({
-      phone: order.customer.phone,
+      phone: dto.phone || order.customer.phone,
       trackingCode: order.trackingCode,
       make: order.vehicle?.make,
       model: order.vehicle?.model,
@@ -674,6 +699,13 @@ export class OrdersService {
     if (trackingCode && trackingCode !== existing.trackingCode) {
       const clash = await this.prisma.order.findUnique({ where: { trackingCode } });
       if (clash) throw new ConflictException('This tracking code is already in use.');
+    }
+
+    if (dto.phone !== undefined || dto.customerName !== undefined) {
+      await this.syncCustomer(existing.customerId, {
+        phone: dto.phone,
+        customerName: dto.customerName,
+      });
     }
 
     const order = await this.prisma.order.update({
@@ -825,8 +857,11 @@ export class OrdersService {
     await this.prisma.auditLog.create({
       data: { userId, action: 'STATUS_UPDATE', entity: 'Order', entityId: id, meta: { status } },
     });
+    if (dto.phone !== undefined) {
+      await this.syncCustomer(existing.customerId, { phone: dto.phone });
+    }
     const notify = await this.notify.statusChanged({
-      phone: order.customer.phone,
+      phone: dto.phone || order.customer.phone,
       trackingCode: order.trackingCode,
       status,
       make: order.vehicle?.make,

@@ -111,6 +111,10 @@ export class UpdateStatusDto {
   note?: string;
 
   @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   currentTransitIndex?: number;
@@ -175,6 +179,14 @@ export class UpdateVoyageDto {
   @IsOptional()
   @IsString()
   trackingCode?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  customerName?: string;
 
   @IsOptional()
   @IsString()
@@ -296,6 +308,10 @@ export class CustomerSmsDto {
   @IsOptional()
   @IsString()
   text?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
 }
 
 export class PrunePhotosDto {

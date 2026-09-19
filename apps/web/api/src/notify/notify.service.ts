@@ -32,7 +32,8 @@ export function normalizePhone(raw?: string | null): string | null {
   let digits = raw.replace(/\D/g, '');
   if (digits.startsWith('00')) digits = digits.slice(2);
   if (digits.length === 10 && digits.startsWith('0')) digits = `994${digits.slice(1)}`;
-  if (digits.length === 9 && digits.startsWith('5')) digits = `994${digits}`;
+  if (digits.length === 9 && /^[57]/.test(digits)) digits = `994${digits}`;
+  if (digits.length === 12 && digits.startsWith('994')) return digits;
   if (digits.length < 11) return null;
   return digits;
 }

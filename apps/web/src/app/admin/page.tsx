@@ -406,6 +406,7 @@ export default function AdminHomePage() {
       const saved = await api.sendCustomerSms(order.id, {
         kind,
         text: kind === "custom" ? smsText.trim() : undefined,
+        phone: form.phone.trim() || order.customerPhone,
       });
       if (saved.notify?.sent) {
         setNotice(
@@ -473,15 +474,16 @@ export default function AdminHomePage() {
       deliveredAt: status === "DELIVERED" ? new Date().toISOString() : order.deliveredAt,
       events: [...(order.events ?? []), event],
     };
-    const localNext = { ...order, ...patch };
+    const phone = form.phone.trim() || order.customerPhone;
+    const localNext = { ...order, ...patch, customerPhone: phone };
     persist(localNext, order.trackingCode);
 
     let notify: NotifyInfo | undefined;
     try {
       if (order.id) {
-        const remote = await api.updateOrderStatus(order.id, status, event.description, transitIdx);
+        const remote = await api.updateOrderStatus(order.id, status, event.description, transitIdx, phone);
         notify = remote.notify;
-        const next = mergeRemotePreserveLocal(localNext, { ...remote, ...patch, customerPhone: remote.customerPhone ?? order.customerPhone });
+        const next = mergeRemotePreserveLocal(localNext, { ...remote, ...patch, customerPhone: remote.customerPhone || phone });
         persist(next, order.trackingCode);
         setNotice(stageNotice(label, next.customerPhone, notify));
         return next;
@@ -490,9 +492,9 @@ export default function AdminHomePage() {
       /* local copy */
     }
     notify = await notifyLocal(localNext, status);
-    const saved = updateLocalOrder(order.trackingCode, patch) ?? localNext;
+    const saved = updateLocalOrder(order.trackingCode, { ...patch, customerPhone: phone }) ?? localNext;
     persist(saved, order.trackingCode);
-    setNotice(stageNotice(label, order.customerPhone, notify));
+    setNotice(stageNotice(label, phone, notify));
     return saved;
   }
 
@@ -566,6 +568,8 @@ export default function AdminHomePage() {
       if (order.id) {
         const remote = await api.updateVoyage(order.id, {
           trackingCode,
+          phone: form.phone.trim(),
+          customerName: form.customerName.trim(),
           containerNumber: next.containerNumber ?? "",
           vesselName: next.vesselName ?? "",
           vesselImo: imo,

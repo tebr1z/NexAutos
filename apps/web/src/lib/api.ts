@@ -227,12 +227,12 @@ export const api = {
   myOrders: () => request<TrackingShipment[]>("/orders/mine"),
   createOrder: (payload: Record<string, unknown>) =>
     request<TrackingShipment>("/orders", { method: "POST", body: JSON.stringify(payload) }),
-  updateOrderStatus: (id: string, status: string, note?: string, currentTransitIndex?: number) =>
+  updateOrderStatus: (id: string, status: string, note?: string, currentTransitIndex?: number, phone?: string) =>
     request<TrackingShipment & { notify?: { sent: boolean; channel?: string; error?: string } }>(
       `/orders/${id}/status`,
       {
         method: "PATCH",
-        body: JSON.stringify({ status, note, currentTransitIndex }),
+        body: JSON.stringify({ status, note, currentTransitIndex, phone }),
       },
     ),
   updateVoyage: (id: string, payload: Record<string, unknown>) =>
@@ -289,7 +289,7 @@ export const api = {
       `/orders/${id}/insurance/payout`,
       { method: "POST" },
     ),
-  sendCustomerSms: (id: string, payload: { kind?: string; text?: string }) =>
+  sendCustomerSms: (id: string, payload: { kind?: string; text?: string; phone?: string }) =>
     request<TrackingShipment & { notify?: { sent: boolean; channel?: string; error?: string } }>(
       `/orders/${id}/sms`,
       { method: "POST", body: JSON.stringify(payload) },
