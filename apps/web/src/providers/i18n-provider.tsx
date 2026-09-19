@@ -27,7 +27,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ locale, setLocale, t: dictionaries[locale] }),
+    () => ({ locale, setLocale, t: dictionaries[locale] ?? dictionaries.az }),
     [locale],
   );
 

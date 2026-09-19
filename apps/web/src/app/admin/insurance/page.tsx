@@ -425,9 +425,9 @@ export default function AdminInsurancePage() {
                     Müştəri səhifəsi ↗
                   </Link>
                 ) : null}
-                {selected.insurance?.receiptUrl ? (
+                {selected?.insurance?.receiptUrl ? (
                   <Link
-                    href={selected.insurance.receiptUrl}
+                    href={selected.insurance?.receiptUrl || "#"}
                     target="_blank"
                     className="rounded-xl border border-emerald-400/40 px-4 py-2.5 text-sm text-emerald-200"
                   >
