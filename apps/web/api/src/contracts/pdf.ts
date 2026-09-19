@@ -1,4 +1,4 @@
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import PDFDocument from 'pdfkit';
 import type { ContractBody } from './contract-text';
@@ -14,29 +14,48 @@ export type PdfEvidence = {
   signaturePng?: string | null;
 };
 
+function walkFonts(dir: string, want: string[]): string | null {
+  if (!existsSync(dir)) return null;
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const nested = walkFonts(full, want);
+      if (nested) return nested;
+    } else if (want.includes(entry.name)) {
+      return full;
+    }
+  }
+  return null;
+}
+
 function fontFile(weight: 'regular' | 'bold') {
   const names =
     weight === 'bold'
-      ? ['NotoSans-Bold.ttf', 'arialbd.ttf', 'segoeuib.ttf', 'DejaVuSans-Bold.ttf']
-      : ['NotoSans-Regular.ttf', 'arial.ttf', 'segoeui.ttf', 'DejaVuSans.ttf'];
-    const dirs = [
+      ? ['DejaVuSans-Bold.ttf', 'NotoSans-Bold.ttf', 'arialbd.ttf', 'segoeuib.ttf']
+      : ['DejaVuSans.ttf', 'NotoSans-Regular.ttf', 'arial.ttf', 'segoeui.ttf'];
+  const dirs = [
     join(process.cwd(), 'assets', 'fonts'),
     join(process.cwd(), 'api', 'assets', 'fonts'),
     join(__dirname, '..', '..', 'assets', 'fonts'),
     join(__dirname, '..', '..', '..', 'assets', 'fonts'),
     'C:\\Windows\\Fonts',
-    '/usr/share/fonts/truetype/dejavu',
-    '/usr/share/fonts/dejavu',
-    '/usr/share/fonts/truetype/noto',
-    '/usr/share/fonts/noto',
+    '/usr/share/fonts',
   ];
   for (const dir of dirs) {
     for (const name of names) {
       const file = join(dir, name);
       if (existsSync(file)) return file;
     }
+    const found = walkFonts(dir, names);
+    if (found) return found;
   }
-  return null;
+  throw new Error('Unicode font missing — DejaVuSans.ttf must ship with the API.');
 }
 
 function pngBuffer(dataUrl?: string | null) {
@@ -51,21 +70,17 @@ function pngBuffer(dataUrl?: string | null) {
 export function renderContractPdf(body: ContractBody, evidence: PdfEvidence): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const regular = fontFile('regular');
-    const bold = fontFile('bold') ?? regular;
+    const bold = fontFile('bold');
     const doc = new PDFDocument({ size: 'A4', margin: 52, info: { Title: body.title, Author: 'Auto Nex' } });
     const chunks: Buffer[] = [];
     doc.on('data', (c: Buffer) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    if (regular) {
-      doc.registerFont('AN-R', regular);
-      doc.registerFont('AN-B', bold ?? regular);
-      doc.font('AN-B');
-    }
-
-    const heading = () => (regular ? doc.font('AN-B') : doc.font('Helvetica-Bold'));
-    const bodyFont = () => (regular ? doc.font('AN-R') : doc.font('Helvetica'));
+    doc.registerFont('AN-R', regular);
+    doc.registerFont('AN-B', bold);
+    const heading = () => doc.font('AN-B');
+    const bodyFont = () => doc.font('AN-R');
 
     heading().fontSize(9).fillColor('#64748b').text('AUTO NEX  ·  BAKIXANOV, BAKI  ·  AUTO@NEX.AUTOS  ·  070 966 81 11');
     doc.moveDown(0.6);
@@ -79,7 +94,7 @@ export function renderContractPdf(body: ContractBody, evidence: PdfEvidence): Pr
       doc.moveDown(0.35);
       for (const fact of section.facts ?? []) {
         const y = doc.y;
-        bodyFont().fontSize(9).fillColor('#64748b').text(`${fact.label}`, 52, y, { width: 168 });
+        bodyFont().fontSize(9).fillColor('#64748b').text(fact.label, 52, y, { width: 168 });
         heading().fontSize(10).fillColor('#0b0b0d').text(fact.value, 228, y, { width: 314 });
         doc.x = 52;
         doc.moveDown(0.35);

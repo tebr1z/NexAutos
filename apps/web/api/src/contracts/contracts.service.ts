@@ -500,7 +500,7 @@ export class ContractsService {
   }
 
   private async pdfFile(row: { number: string; pdfBytes: Buffer | Uint8Array | null; bodySnapshot: unknown; customerName: string; customerPhone: string; documentHash: string | null; signedAt: Date | null; signaturePng: string | null; signerIp: string | null; signerUserAgent: string | null }) {
-    const stored = row.pdfBytes ? Buffer.from(row.pdfBytes) : await renderContractPdf(row.bodySnapshot as unknown as ContractBody, {
+    const stored = await renderContractPdf(row.bodySnapshot as unknown as ContractBody, {
       number: row.number,
       signedAt: row.signedAt?.toLocaleString('az-AZ') ?? 'imzalanmayıb',
       customerName: row.customerName,

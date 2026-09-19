@@ -397,8 +397,16 @@ export const api = {
     let res = await fetch(`${API}/contracts/${id}/pdf`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    if (!res.ok) res = await fetch(`/api/contracts/${id}/pdf`);
+    if (!res.ok) {
+      res = await fetch(`/api/contracts/${id}/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    }
     if (!res.ok) throw new Error("PDF yüklənmədi");
+    const type = res.headers.get("content-type") ?? "";
+    if (!type.includes("pdf") && !type.includes("octet-stream")) {
+      throw new Error("PDF yüklənmədi");
+    }
     return res.blob();
   },
   publicContract: (token: string, session?: string) =>

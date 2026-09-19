@@ -28,24 +28,28 @@ export async function GET(req: Request, ctx: { params: Promise<{ path?: string[]
     const url = new URL(req.url);
     if (path.length === 0) return Response.json(await listContracts());
     if (path[0] === "public" && path[1] && path[2] === "pdf") {
-      try {
-        const html = await contractHtml(path[1], true);
-        return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
-      } catch (err) {
-        const api = nestApiBase();
-        const res = await fetch(`${api}/contracts/public/${path[1]}/pdf`);
-        if (res.ok) {
-          return new Response(res.body, {
-            headers: { "Content-Type": res.headers.get("content-type") ?? "application/pdf" },
-          });
-        }
-        return jsonError(err);
+      const api = nestApiBase();
+      const res = await fetch(`${api}/contracts/public/${path[1]}/pdf`);
+      if (res.ok) {
+        return new Response(res.body, {
+          headers: { "Content-Type": "application/pdf" },
+        });
       }
+      const html = await contractHtml(path[1], true);
+      return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
     if (path[0] === "public" && path[1] && path.length === 2) {
       return Response.json(await publicView(path[1], url.searchParams.get("session") ?? undefined));
     }
     if (path[1] === "pdf") {
+      const api = nestApiBase();
+      const auth = req.headers.get("authorization");
+      const res = await fetch(`${api}/contracts/${path[0]}/pdf`, {
+        headers: auth ? { Authorization: auth } : {},
+      });
+      if (res.ok) {
+        return new Response(res.body, { headers: { "Content-Type": "application/pdf" } });
+      }
       const html = await adminPdfHtml(path[0]);
       return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
