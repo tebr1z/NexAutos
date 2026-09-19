@@ -527,7 +527,6 @@ export class OrdersService {
           ? { vin: dto.vin.trim().toUpperCase() }
           : {}),
       },
-      },
       include: ORDER_INCLUDE,
     });
 
