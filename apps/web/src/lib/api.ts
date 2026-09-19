@@ -269,29 +269,15 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ keepIds, keepUrls }),
     }),
-  addOrderPhoto: async (id: string, payload: { url: string; category?: string; caption?: string }) => {
-    const { dataUrlToBlob } = await import("./fit-image");
-    const form = new FormData();
-    form.append("orderId", id);
-    form.append("category", payload.category || "auction");
-    form.append("caption", payload.caption || "");
-    const blob = dataUrlToBlob(payload.url);
-    form.append("file", new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" }));
-    const token = typeof window !== "undefined" ? localStorage.getItem("anx_token") : null;
-    const res = await fetch("/api/order-photos", {
+  addOrderPhoto: (id: string, payload: { url: string; category?: string; caption?: string }) =>
+    request<TrackingShipment>(`/orders/${id}/photos`, {
       method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form,
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const raw = (body as { message?: string | string[] }).message;
-      const message = Array.isArray(raw) ? raw.join(" ") : raw;
-      throw new Error(message ?? `Şəkil yazılmadı (${res.status})`);
-    }
-    return res.json() as Promise<TrackingShipment>;
-  },
+      body: JSON.stringify({
+        url: payload.url,
+        category: payload.category || "auction",
+        caption: payload.caption || "",
+      }),
+    }),
   testimonials: () =>
     request<{ name: string; role?: string; rating: number; body: string; avatarUrl?: string }[]>(
       "/testimonials",
