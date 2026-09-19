@@ -15,6 +15,8 @@ import type { ContractFields } from './contract-text';
 import { renderContractPdf } from './pdf';
 import { CreateContractDto, SignContractDto, AssignContractDto } from './dto';
 
+const INSURANCE_SIGN_ALERT_PHONE = '0507197557';
+
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_COOLDOWN_MS = 55 * 1000;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -153,8 +155,8 @@ export class ContractsService {
       model: dto.model?.trim() || orderModel,
       year: dto.year ?? orderYear,
       origin: dto.origin?.trim() || null,
-      amountUsd: dto.amountUsd?.trim() || null,
-      amountAzn: dto.amountAzn?.trim() || orderAmount,
+      amountUsd: (kind === 'INSURANCE' ? dto.amountUsd?.trim() || dto.amountAzn?.trim() || orderAmount : dto.amountUsd?.trim()) || null,
+      amountAzn: kind === 'INSURANCE' ? null : dto.amountAzn?.trim() || orderAmount,
       paymentNote: dto.paymentNote?.trim() || null,
       extraTerms: dto.extraTerms?.trim() || null,
     };
@@ -178,8 +180,8 @@ export class ContractsService {
         model: fields.model,
         year: fields.year,
         origin: fields.origin,
-        amountUsd: money(dto.amountUsd),
-        amountAzn: money(fields.amountAzn || undefined),
+        amountUsd: money(fields.amountUsd || undefined),
+        amountAzn: kind === 'INSURANCE' ? null : money(fields.amountAzn || undefined),
         paymentNote: fields.paymentNote,
         extraTerms: fields.extraTerms,
         bodySnapshot: bodySnapshot as unknown as Prisma.InputJsonValue,
@@ -263,11 +265,25 @@ export class ContractsService {
   }
 
   async publicView(token: string, sessionToken?: string, locale?: string) {
-    const row = await this.requireByToken(token);
-    const sessionOk = this.sessionOk(row, sessionToken);
+    let row = await this.requireByToken(token);
+    let sessionOk = this.sessionOk(row, sessionToken);
     const signed = row.status === 'SIGNED';
     const lang = normalizeContractLocale(locale);
     const insurance = row.kind === 'INSURANCE';
+    let issuedSession: string | undefined;
+    if (insurance && !signed && row.status !== 'VOID' && !sessionOk) {
+      issuedSession = randomBytes(32).toString('base64url');
+      row = await this.prisma.contract.update({
+        where: { id: row.id },
+        data: {
+          phoneVerifiedAt: row.phoneVerifiedAt ?? new Date(),
+          status: row.status === 'DRAFT' || row.status === 'SENT' ? 'PHONE_VERIFIED' : row.status,
+          sessionTokenHash: hashToken(issuedSession),
+          sessionExpiresAt: new Date(Date.now() + SESSION_TTL_MS),
+        },
+      });
+      sessionOk = true;
+    }
     const body = insurance
       ? buildInsuranceContractBody(this.fieldsFromRow(row), lang)
       : ((signed || sessionOk ? row.bodySnapshot : null) as ContractBody | null);
@@ -286,13 +302,14 @@ export class ContractsService {
       make: row.make,
       model: row.model,
       year: row.year,
-      phoneVerified: Boolean(row.phoneVerifiedAt) && sessionOk,
+      phoneVerified: insurance ? sessionOk : Boolean(row.phoneVerifiedAt) && sessionOk,
       readAt: row.readAt,
       signedAt: row.signedAt,
       documentHash: signed ? row.documentHash : null,
       signaturePng: signed ? row.signaturePng : null,
       body,
-      step: this.step(row, sessionOk),
+      sessionToken: issuedSession,
+      step: this.step(row, sessionOk, insurance),
     };
   }
 
@@ -300,8 +317,11 @@ export class ContractsService {
     const row = await this.requireByToken(token);
     if (row.status === 'VOID') throw new BadRequestException('Müqavilə ləğv edilib.');
     if (row.status === 'SIGNED') throw new BadRequestException('Müqavilə artıq imzalanıb.');
+    if (purpose === 'PHONE_VERIFY' && row.kind === 'INSURANCE') {
+      throw new BadRequestException('Sığortada kod yalnız imzadan sonra göndərilir.');
+    }
     if (purpose === 'SIGN_CONFIRM') {
-      if (!this.sessionOk(row, sessionToken)) {
+      if (!this.sessionOk(row, sessionToken) && row.kind !== 'INSURANCE') {
         throw new ForbiddenException('Əvvəlcə telefonu SMS kodu ilə təsdiqləyin.');
       }
     }
@@ -490,6 +510,19 @@ export class ContractsService {
             .filter(Boolean)
             .join('\n');
     await this.notify.sendMessage(row.customerPhone, signedMsg);
+    if (row.kind === 'INSURANCE') {
+      await this.notify.sendMessage(
+        INSURANCE_SIGN_ALERT_PHONE,
+        [
+          'Auto Nex: müştəri sığorta müqaviləsini imzaladı.',
+          row.customerName,
+          row.trackingCode ? `Kod: ${row.trackingCode}` : `Müqavilə: ${row.number}`,
+          row.customerPhone ? `Tel: ${row.customerPhone}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      );
+    }
     if (row.customerEmail) {
       await this.notify.sendEmail({
         to: row.customerEmail,
@@ -594,10 +627,14 @@ export class ContractsService {
     return safeEqual(row.sessionTokenHash, hashToken(sessionToken));
   }
 
-  private step(row: { status: string; phoneVerifiedAt: Date | null; readAt: Date | null }, sessionOk: boolean) {
+  private step(
+    row: { status: string; phoneVerifiedAt: Date | null; readAt: Date | null },
+    sessionOk: boolean,
+    insurance = false,
+  ) {
     if (row.status === 'SIGNED') return 'done';
     if (row.status === 'VOID') return 'void';
-    if (!sessionOk) return 'otp';
+    if (!insurance && !sessionOk) return 'otp';
     if (!row.readAt && row.status !== 'READ') return 'read';
     return 'sign';
   }

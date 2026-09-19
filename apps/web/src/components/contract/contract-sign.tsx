@@ -78,10 +78,15 @@ export function ContractSign({ token, requireLanguage = false }: { token: string
     async (sessionToken?: string, locale?: Locale) => {
       const next = await api.publicContract(token, sessionToken, locale ?? lang);
       setData(next);
+      if (next.sessionToken) {
+        sessionStorage.setItem(sessionKey(token), next.sessionToken);
+        setSession(next.sessionToken);
+      }
+      const insurance = next.kind === "INSURANCE";
       if (next.step === "done") setPhase("done");
       else if (next.step === "void") setError("Bu müqavilə ləğv edilib.");
       else if (next.step === "sign") setPhase("sign");
-      else if (next.step === "read") setPhase("read");
+      else if (next.step === "read" || insurance) setPhase("read");
       else setPhase("otp");
       return next;
     },
@@ -94,7 +99,16 @@ export function ContractSign({ token, requireLanguage = false }: { token: string
     setSession(stored);
     if (requireLanguage && !savedLang) {
       setPhase("lang");
-      api.publicContract(token, stored || undefined).then(setData).catch((err: Error) => setError(err.message || "Müqavilə açılmadı."));
+      api
+        .publicContract(token, stored || undefined)
+        .then((next) => {
+          setData(next);
+          if (next.sessionToken) {
+            sessionStorage.setItem(sessionKey(token), next.sessionToken);
+            setSession(next.sessionToken);
+          }
+        })
+        .catch((err: Error) => setError(err.message || "Müqavilə açılmadı."));
       return;
     }
     if (savedLang) setLang(savedLang);
@@ -108,7 +122,12 @@ export function ContractSign({ token, requireLanguage = false }: { token: string
     await load(stored || undefined, next).catch((err: Error) => setError(err.message || ui.missing));
   }
 
-  const activeIndex = useMemo(() => STEPS.findIndex((s) => s.id === phase), [phase]);
+  const insurance = data?.kind === "INSURANCE";
+  const visibleSteps = useMemo(
+    () => (insurance ? STEPS.filter((s) => s.id !== "otp") : [...STEPS]),
+    [insurance],
+  );
+  const activeIndex = useMemo(() => visibleSteps.findIndex((s) => s.id === phase), [phase, visibleSteps]);
 
   async function sendPhoneOtp() {
     setBusy("otp");
@@ -150,10 +169,19 @@ export function ContractSign({ token, requireLanguage = false }: { token: string
   }
 
   async function continueFromRead() {
-    if (!session || !readFully || !scrolled) return;
+    let sessionToken = session;
+    if (!sessionToken && insurance) {
+      const next = await api.publicContract(token, undefined, lang);
+      if (next.sessionToken) {
+        sessionStorage.setItem(sessionKey(token), next.sessionToken);
+        setSession(next.sessionToken);
+        sessionToken = next.sessionToken;
+      }
+    }
+    if (!sessionToken || !readFully || !scrolled) return;
     setBusy("read");
     try {
-      await api.publicContractRead(token, session);
+      await api.publicContractRead(token, sessionToken);
       setPhase("sign");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Davam etmək olmadı.");
@@ -263,8 +291,8 @@ export function ContractSign({ token, requireLanguage = false }: { token: string
         </section>
       ) : (
       <>
-      <ol className="mt-8 grid grid-cols-5 gap-2 text-[11px] uppercase tracking-wide">
-        {STEPS.map((step, i) => (
+      <ol className={`mt-8 grid gap-2 text-[11px] uppercase tracking-wide ${insurance ? "grid-cols-4" : "grid-cols-5"}`}>
+        {visibleSteps.map((step, i) => (
           <li
             key={step.id}
             className={`rounded-lg px-2 py-2 text-center ${
@@ -278,7 +306,7 @@ export function ContractSign({ token, requireLanguage = false }: { token: string
 
       {error && <p className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>}
 
-      {phase === "otp" && (
+      {phase === "otp" && !insurance && (
         <section className="mt-10 space-y-5">
           <h2 className="font-display text-2xl">Telefon nömrəsinin təsdiqi</h2>
           <p className="text-sm leading-7 text-muted">
@@ -388,10 +416,11 @@ export function ContractSign({ token, requireLanguage = false }: { token: string
 
       {phase === "confirm" && (
         <section className="mt-10 space-y-5">
-          <h2 className="font-display text-2xl">İkinci OTP — imzanın təsdiqi</h2>
+          <h2 className="font-display text-2xl">{insurance ? "SMS kod — imzanın təsdiqi" : "İkinci OTP — imzanın təsdiqi"}</h2>
           <p className="text-sm leading-7 text-muted">
-            Əl imzası kifayət deyil. Eyni telefon nömrəsinə ikinci kod gəlir. Hər iki element olmadan müqavilə bağlanmış
-            sayılmır.
+            {insurance
+              ? "Əl imzasından sonra telefonunuza bir dəfə SMS kod gəlir. Bu kod olmadan sığorta müqaviləsi bağlanmış sayılmır."
+              : "Əl imzası kifayət deyil. Eyni telefon nömrəsinə ikinci kod gəlir. Hər iki element olmadan müqavilə bağlanmış sayılmır."}
           </p>
           {signature && (
             <img src={signature} alt="İmza önbaxış" className="h-24 rounded-xl border border-line bg-white" />

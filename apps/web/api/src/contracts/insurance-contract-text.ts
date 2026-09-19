@@ -34,6 +34,7 @@ export function buildInsuranceContractBody(fields: ContractFields, locale?: stri
       tr: "Belirtilmedi — sigortalı Müşterinin kendisidir",
     }[lang]);
   const amount =
+    fields.amountUsd?.trim() ||
     fields.amountAzn?.trim() ||
     ({
       az: "İlk mərhələdə yazılmayıb — sonra əlavə olunacaq",
@@ -46,7 +47,7 @@ export function buildInsuranceContractBody(fields: ContractFields, locale?: stri
     az: {
       kicker: "Sığorta müqaviləsi · elektron sənəd",
       title: `Nəqliyyat vasitəsinin sığorta müqaviləsi № ${fields.number}`,
-      intro: `Bu sığorta müqaviləsi ${today} tarixindən Auto Nex ilə Müştəri arasında bağlanır. Müştəri telefon OTP kodu və əl imzası ilə şərtləri qəbul edir. İmza tamamlandıqdan sonra sığorta haqqı qısa müddətdə göstərilən hesaba köçürülür.`,
+      intro: `Bu sığorta müqaviləsi ${today} tarixindən Auto Nex ilə Müştəri arasında bağlanır. Müştəri əl imzası və imzadan sonra bir dəfə göndərilən SMS kodu ilə şərtləri qəbul edir. Sığorta haqqı yalnız USD ilə göstərilir. İmza tamamlandıqdan sonra sığorta haqqı qısa müddətdə göstərilən hesaba köçürülür.`,
       s1: "1. Tərəflər",
       s2: "2. Müqavilənin predmeti",
       s3: "3. Sığorta haqqı və köçürmə",
@@ -63,14 +64,14 @@ export function buildInsuranceContractBody(fields: ContractFields, locale?: stri
       car: "Avtomobil",
       vin: "VIN",
       track: "İzləmə kodu",
-      amount: "Ayrılan məbləğ (AZN)",
+      amount: "Ayrılan məbləğ (USD)",
       p2a: "Bu müqavilə idxal olunan və ya hələ alınmamış avtomobil üzrə sığorta təşkili, sənədləşmə və sığorta haqqının rəsmiləşdirilməsini əhatə edir. Avtomobil sistemdə olmasa belə VIN, marka və model bu sənədə yazılır.",
       p2b: "Sığorta şərtləri, müddət və ödəniş Auto Nex-in sığorta tərəfdaşı ilə razılaşdırılmış tarifə uyğundur.",
       p3a: "Hesab rekvizitləri Auto Nex tərəfindən Müştəriyə bildirilir.",
       p3b: "Müştəri bu müqaviləni imzaladıqdan sonra sığorta haqqı qısa müddətdə göstərilən bank hesabına köçürülür.",
       p3c: "Köçürmə tamamlanandan sonra Auto Nex admin təsdiqi ilə müştəriyə elektron çek göndərir: pul sizə köçürülmüşdür.",
       p4a: "Müqavilə «Elektron imza və elektron sənəd haqqında» Qanuna uyğun elektron sənəd sayılır.",
-      p4b: "Telefon OTP və əl imzası Müştərinin iradə ifadəsidir. İmza edilmədən sığorta aktiv sayılmır.",
+      p4b: "Əl imzası və imzadan sonra bir dəfə göndərilən SMS kodu Müştərinin iradə ifadəsidir. İmza edilmədən sığorta aktiv sayılmır.",
       p5a: "Müştəri doğru ad, soyad, vəsiqə seriyası və (varsa) VIN / marka / model verir.",
       p5b: "Auto Nex sığorta sənədlərini hazırlayır və imzadan sonra ödənişi təşkil edir.",
       date: "İmza tarixi",
@@ -97,14 +98,14 @@ export function buildInsuranceContractBody(fields: ContractFields, locale?: stri
       car: "Vehicle",
       vin: "VIN",
       track: "Tracking code",
-      amount: "Allocated amount (AZN)",
+      amount: "Allocated amount (USD)",
       p2a: "This contract covers arranging insurance, paperwork and the premium for an imported vehicle, including a car that is not yet purchased or not yet in the Auto Nex system. VIN, make and model are written on this document.",
       p2b: "Terms, period and payment follow the tariff agreed with Auto Nex’s insurance partner.",
       p3a: "Account details are provided to the Customer by Auto Nex.",
       p3b: "After the Customer signs, the insurance amount is transferred to the stated bank account shortly.",
       p3c: "After the transfer, Auto Nex sends an electronic cheque: the money has been transferred to you.",
       p4a: "This is an electronic document under the Law on Electronic Signature and Electronic Document.",
-      p4b: "SMS OTP plus handwritten signature is the Customer’s consent. Insurance is not active until signed.",
+      p4b: "A handwritten signature and one SMS code after signing are the Customer’s consent. Insurance is not active until signed.",
       p5a: "The Customer provides a correct name, ID series and, if available, VIN / make / model.",
       p5b: "Auto Nex prepares the insurance documents and arranges payment after signature.",
       date: "Signature date",
@@ -131,7 +132,7 @@ export function buildInsuranceContractBody(fields: ContractFields, locale?: stri
       car: "Автомобиль",
       vin: "VIN",
       track: "Код отслеживания",
-      amount: "Выделенная сумма (AZN)",
+      amount: "Выделенная сумма (USD)",
       p2a: "Договор покрывает организацию страховки, документы и премию по импортному автомобилю, в том числе ещё не купленному и отсутствующему в системе. VIN, марка и модель вносятся в этот документ.",
       p2b: "Условия, срок и оплата соответствуют тарифу партнёра Auto Nex.",
       p3a: "Реквизиты счёта сообщает Auto Nex.",
@@ -165,7 +166,7 @@ export function buildInsuranceContractBody(fields: ContractFields, locale?: stri
       car: "Araç",
       vin: "VIN",
       track: "Takip kodu",
-      amount: "Ayrılan tutar (AZN)",
+      amount: "Ayrılan tutar (USD)",
       p2a: "Bu sözleşme ithal veya henüz satın alınmamış, sistemde olmayan bir araç için sigorta düzenlemesini kapsar. VIN, marka ve model bu belgeye yazılır.",
       p2b: "Şartlar, süre ve ödeme Auto Nex sigorta ortağı tarifesine göredir.",
       p3a: "Hesap bilgilerini Auto Nex bildirir.",
@@ -215,8 +216,7 @@ export function buildInsuranceContractBody(fields: ContractFields, locale?: stri
         id: "odenis",
         title: copy.s3,
         facts: [
-          { label: copy.amount, value: amount },
-          { label: "USD", value: dash(fields.amountUsd, lang) },
+          { label: copy.amount, value: amount.includes("USD") || /[A-Za-zА-Яа-яƏəİı]/.test(amount) ? amount : `${amount} USD` },
         ],
         paragraphs: [
           fields.paymentNote?.trim() ? fields.paymentNote.trim() : copy.p3a,

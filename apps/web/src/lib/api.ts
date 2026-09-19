@@ -101,6 +101,7 @@ export type PublicContract = {
   documentHash?: string | null;
   signaturePng?: string | null;
   body: ContractBody | null;
+  sessionToken?: string;
   step: "otp" | "read" | "sign" | "done" | "void";
 };
 

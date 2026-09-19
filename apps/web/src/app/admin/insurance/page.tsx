@@ -175,7 +175,7 @@ export default function AdminInsurancePage() {
         customerPhone: phone,
         customerIdNumber: docSeries,
         extraTerms: form.trustee.trim() || undefined,
-        amountAzn: form.amountAzn.trim() || undefined,
+        amountUsd: form.amountAzn.trim() || undefined,
         orderId: target.id,
         trackingCode: target.trackingCode,
         vin: form.vin.trim() || (target.vin?.startsWith("SIG") ? undefined : target.vin),
@@ -285,7 +285,7 @@ export default function AdminInsurancePage() {
                     <td className="px-4 py-3 text-zinc-400">
                       <p>{insuranceStatusLabel(row.insurance?.status)}</p>
                       {row.insurance?.amountAzn ? (
-                        <p className="mt-0.5 text-[11px] text-zinc-500">{row.insurance.amountAzn} AZN</p>
+                        <p className="mt-0.5 text-[11px] text-zinc-500">{row.insurance.amountAzn} USD</p>
                       ) : null}
                     </td>
                   </tr>
@@ -342,7 +342,7 @@ export default function AdminInsurancePage() {
                   className={inp}
                 />
                 <input
-                  placeholder="Ayrılan məbləğ AZN (ilk başda boş ola bilər)"
+                  placeholder="Ayrılan məbləğ USD (ilk başda boş ola bilər)"
                   value={form.amountAzn}
                   onChange={(e) => setForm({ ...form, amountAzn: e.target.value })}
                   className={inp}

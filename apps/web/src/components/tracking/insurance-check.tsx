@@ -57,7 +57,7 @@ export function InsuranceCheck({ token }: { token: string }) {
         <dl className="mt-8 divide-y divide-white/10 rounded-2xl border border-white/10 bg-black/20">
           <Row label="Müştəri" value={data.customerName} />
           <Row label="Şəxsiyyət vəsiqəsi seriyası" value={data.docSeries || "—"} />
-          {data.amountAzn ? <Row label="Ayrılan məbləğ" value={`${data.amountAzn} AZN`} /> : null}
+          {data.amountAzn ? <Row label="Ayrılan məbləğ" value={`${data.amountAzn} USD`} /> : null}
           {data.trustee ? <Row label="Etibar edilən" value={data.trustee} /> : null}
           <Row label="Avtomobil" value={car || "—"} />
           <Row label="VIN" value={data.vinHint || "—"} />
