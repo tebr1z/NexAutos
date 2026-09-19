@@ -90,7 +90,7 @@ export class SettingsService {
       accessKeyId: this.config.get<string>('R2_ACCESS_KEY_ID')?.trim() || '',
       secretAccessKey: this.config.get<string>('R2_SECRET_ACCESS_KEY')?.trim() || '',
       apiToken: this.config.get<string>('R2_API_TOKEN')?.trim() || '',
-      bucket: this.config.get<string>('R2_BUCKET')?.trim() || 'nex-autos',
+      bucket: this.config.get<string>('R2_BUCKET')?.trim() || 'nexautos',
       publicUrl: this.config.get<string>('R2_PUBLIC_URL')?.trim() || '',
     };
   }
@@ -108,7 +108,7 @@ export class SettingsService {
       accessKeyId: pick('accessKeyId'),
       secretAccessKey: pick('secretAccessKey'),
       apiToken: pick('apiToken'),
-      bucket: pick('bucket') || 'nex-autos',
+      bucket: pick('bucket') || 'nexautos',
       publicUrl: pick('publicUrl'),
     };
     return r2Ready(creds) || creds.accountId ? creds : null;
@@ -156,7 +156,7 @@ export class SettingsService {
       accessKeyId: take(input.accessKeyId, prev.accessKeyId),
       secretAccessKey: take(input.secretAccessKey, prev.secretAccessKey),
       apiToken: take(input.apiToken, prev.apiToken),
-      bucket: take(input.bucket, prev.bucket) || 'nex-autos',
+      bucket: take(input.bucket, prev.bucket) || 'nexautos',
       publicUrl: take(input.publicUrl, prev.publicUrl),
     };
     await this.prisma.setting.upsert({
@@ -180,7 +180,7 @@ export class SettingsService {
       accessKeyId: take(input?.accessKeyId, saved.accessKeyId),
       secretAccessKey: take(input?.secretAccessKey, saved.secretAccessKey),
       apiToken: take(input?.apiToken, saved.apiToken),
-      bucket: take(input?.bucket, saved.bucket) || 'nex-autos',
+      bucket: take(input?.bucket, saved.bucket) || 'nexautos',
       publicUrl: take(input?.publicUrl, saved.publicUrl),
     });
   }

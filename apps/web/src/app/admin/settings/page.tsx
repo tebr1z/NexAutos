@@ -25,7 +25,7 @@ const EMPTY_R2 = {
   accessKeyId: "",
   secretAccessKey: "",
   apiToken: "",
-  bucket: "nex-autos",
+  bucket: "nexautos",
   publicUrl: "",
 };
 
@@ -49,7 +49,7 @@ export default function AdminSettingsPage() {
         accessKeyId: cloud.accessKeyPreview || "",
         secretAccessKey: cloud.secretPreview || "",
         apiToken: cloud.tokenPreview || "",
-        bucket: cloud.bucket || "nex-autos",
+        bucket: cloud.bucket || "nexautos",
         publicUrl: cloud.publicUrl || "",
       });
     } catch {
@@ -288,7 +288,7 @@ export default function AdminSettingsPage() {
             value={r2Form.bucket}
             onChange={(e) => setR2Form({ ...r2Form, bucket: e.target.value.trim() })}
             className={`${inp} mt-1 font-mono`}
-            placeholder="nex-autos"
+            placeholder="nexautos"
             autoComplete="off"
           />
         </label>

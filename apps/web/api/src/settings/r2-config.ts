@@ -17,7 +17,7 @@ export function emptyR2(): R2Creds {
     accessKeyId: "",
     secretAccessKey: "",
     apiToken: "",
-    bucket: "nex-autos",
+    bucket: "nexautos",
     publicUrl: "",
   };
 }
