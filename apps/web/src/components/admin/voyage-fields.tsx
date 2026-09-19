@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 export type VoyageValues = {
   vesselName: string;
   vesselImo: string;
+  vesselMmsi: string;
   originPort: string;
   destinationPort: string;
   currentPort: string;
@@ -23,6 +24,7 @@ export type VoyageValues = {
 export const EMPTY_VOYAGE: VoyageValues = {
   vesselName: "",
   vesselImo: "",
+  vesselMmsi: "",
   originPort: "",
   destinationPort: "",
   currentPort: "",
@@ -91,34 +93,43 @@ export function VoyageFields({
 
   async function pinFromImo() {
     const imo = isValidImo(value.vesselImo);
-    if (!imo) {
-      setMapNotice("IMO səhvdir. 0000000 işləməz — konosamentdəki real 7 rəqəmli IMO-nu yazın.");
+    const mmsi = value.vesselMmsi.replace(/\D/g, "");
+    if (!imo && mmsi.length !== 9) {
+      setMapNotice("IMO (7 rəqəm) və ya MMSI (9 rəqəm) yazın — ikisini də yaza bilərsiniz.");
       return;
     }
     setMapBusy("imo");
     setMapNotice("");
     try {
-      const pos = await api.vesselByImo(imo, {
-        lat: Number(value.mapLat) || undefined,
-        lng: Number(value.mapLng) || undefined,
-      });
-      const nextName = pos?.name?.trim() || value.vesselName;
+      const pos = imo
+        ? await api.vesselByImo(imo, {
+            lat: Number(value.mapLat) || undefined,
+            lng: Number(value.mapLng) || undefined,
+            mmsi: mmsi.length === 9 ? mmsi : undefined,
+            name: value.vesselName.trim() || undefined,
+          })
+        : await api.vesselPosition(mmsi);
+      const typedName = value.vesselName.trim();
+      const lookupName = pos?.name?.trim() || "";
+      const nextName = typedName || lookupName;
+      const nextMmsi = pos?.mmsi && String(pos.mmsi).replace(/\D/g, "").length === 9 ? String(pos.mmsi) : mmsi;
+      const nextImo = imo || (pos?.imo && isValidImo(String(pos.imo))) || value.vesselImo;
       const live = pos?.hasCoordinates && pos.latitude != null && pos.longitude != null;
       onChange({
         ...value,
-        vesselImo: imo,
+        vesselImo: nextImo,
+        vesselMmsi: nextMmsi,
         vesselName: nextName,
         ...(live ? { mapLat: pos.latitude!.toFixed(5), mapLng: pos.longitude!.toFixed(5) } : {}),
       });
+      const shown = nextName || lookupName || (nextImo ? `IMO ${nextImo}` : `MMSI ${nextMmsi}`);
       if (!live) {
         setMapNotice(
-          pos?.name
-            ? `Gəmi tapıldı (${pos.name}). Canlı AIS hələ gəlməyib — 1-2 dəq sonra yenə basın və ya koordinatı əl ilə yazın.`
-            : "Bu IMO üçün canlı AIS tapılmadı. Koordinatı əl ilə yazın.",
+          `Gəmi tapıldı (${shown}). Canlı AIS hələ gəlməyib — 1-2 dəq sonra yenə basın və ya koordinatı əl ilə yazın.`,
         );
         return;
       }
-      setMapNotice(`Gəmi AIS: ${pos.name || "IMO " + imo}`);
+      setMapNotice(`Gəmi AIS: ${shown}`);
     } catch (err) {
       setMapNotice(err instanceof Error ? err.message : "AIS-ə çıxılmadı. Koordinatı əl ilə yazın.");
     } finally {
@@ -202,6 +213,16 @@ export function VoyageFields({
           maxLength={7}
           autoComplete="off"
         />
+        <input
+          name="vesselMmsi"
+          placeholder="MMSI — 9 rəqəm (məs. 255803480)"
+          value={value.vesselMmsi}
+          onChange={(e) => set("vesselMmsi", e.target.value.replace(/\D/g, "").slice(0, 9))}
+          className={`${field} font-mono md:col-span-2`}
+          inputMode="numeric"
+          maxLength={9}
+          autoComplete="off"
+        />
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <input
@@ -226,7 +247,7 @@ export function VoyageFields({
           disabled={mapBusy === "imo"}
           className="rounded-lg border border-white/15 px-3 py-2 text-xs text-sky-300 disabled:opacity-50"
         >
-          {mapBusy === "imo" ? "IMO axtarılır…" : "IMO-dan tap"}
+          {mapBusy === "imo" ? "IMO axtarılır…" : "IMO / MMSI-dən tap"}
         </button>
         <button
           type="button"

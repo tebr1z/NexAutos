@@ -14,7 +14,6 @@ export class VesselsController {
     const mmsi = query.mmsi?.trim();
     const imo = query.imo?.trim();
     const name = query.name?.trim();
-    if (mmsi) return this.vessels.position(mmsi);
     if (imo) {
       if (!isValidImo(imo)) {
         throw new BadRequestException('IMO səhvdir. 0000000 olmaz — gəminin real 7 rəqəmli IMO-sunu yazın.');
@@ -22,11 +21,14 @@ export class VesselsController {
       return this.vessels.positionByImo(imo, {
         lat: query.nearLat ? Number(query.nearLat) : undefined,
         lng: query.nearLng ? Number(query.nearLng) : undefined,
+        mmsi: mmsi && /^\d{9}$/.test(mmsi) ? mmsi : undefined,
+        name: query.hintName?.trim() || name,
       }).then((pos) => {
         if (!pos) throw new NotFoundException('Bu IMO üçün AIS tapılmadı. MMSI/AIS hələ gəlmir — əl ilə pin yazın.');
         return pos;
       });
     }
+    if (mmsi) return this.vessels.position(mmsi);
     if (name) return this.vessels.search(name);
     throw new BadRequestException('Send a vessel name, IMO or 9-digit MMSI.');
   }

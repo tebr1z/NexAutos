@@ -2,17 +2,20 @@ import { nestApiBase } from "@/lib/nest-url";
 import { lookupPositionByImo } from "@/lib/imo-position";
 
 export async function GET(req: Request) {
-  const imo = new URL(req.url).searchParams.get("imo") ?? "";
+  const src = new URL(req.url).searchParams;
   const nest = nestApiBase();
+  const q = new URLSearchParams();
+  for (const key of ["imo", "mmsi", "nearLat", "nearLng", "hintName", "name"] as const) {
+    const value = src.get(key);
+    if (value) q.set(key, value);
+  }
   try {
-    const res = await fetch(`${nest}/vessels?imo=${encodeURIComponent(imo.replace(/\D/g, ""))}`, {
-      cache: "no-store",
-    });
+    const res = await fetch(`${nest}/vessels?${q.toString()}`, { cache: "no-store" });
     if (res.ok) return Response.json(await res.json());
   } catch {
     /* Nest may be down — use Wikidata + Digitraffic */
   }
-  const pos = await lookupPositionByImo(imo);
-  if (!pos) return Response.json({ message: "No AIS position for this IMO." }, { status: 404 });
+  const pos = await lookupPositionByImo(src.get("imo") ?? "", src.get("mmsi") ?? "");
+  if (!pos) return Response.json({ message: "IMO və ya MMSI ilə gəmi tapılmadı." }, { status: 404 });
   return Response.json(pos);
 }

@@ -92,22 +92,39 @@ export async function mmsiFromWikidata(imo: string): Promise<{ mmsi: string; nam
   return hit;
 }
 
-async function mmsiFromWikipedia(imo: string): Promise<{ mmsi: string; name: string | null } | null> {
-  const search = (await timedJson(
-    `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(`IMO ${imo}`)}&format=json`,
-    { 'User-Agent': UA, Accept: 'application/json' },
-    8_000,
-  )) as { query?: { search?: { title?: string }[] } } | null;
-  const title = search?.query?.search?.[0]?.title?.trim();
-  if (!title) return null;
+function pageMentionsImo(text: string, imo: string): boolean {
+  const compact = text.replace(/\s+/g, ' ');
+  return (
+    new RegExp(`\\bIMO\\s*(?:Number)?\\s*[|=:]?\\s*${imo}\\b`, 'i').test(compact) ||
+    compact.includes(`{{IMO Number|${imo}}}`) ||
+    compact.includes(`|IMO=${imo}`) ||
+    compact.includes(`|imo=${imo}`)
+  );
+}
+
+async function wikipediaPageText(title: string): Promise<string> {
   const page = (await timedJson(
     `https://en.wikipedia.org/w/api.php?action=query&prop=revisions&rvprop=content&rvslots=main&format=json&titles=${encodeURIComponent(title)}`,
     { 'User-Agent': UA, Accept: 'application/json' },
     8_000,
   )) as { query?: { pages?: Record<string, { revisions?: { slots?: { main?: { '*': string } } }[] }> } } | null;
   const pages = page?.query?.pages ?? {};
-  const text = Object.values(pages)[0]?.revisions?.[0]?.slots?.main?.['*'] ?? '';
-  const mmsi = nineDigit(text.match(/\bMMSI\s*[|=:]\s*(\d{9})\b/i)?.[1]);
-  if (!mmsi) return null;
-  return { mmsi, name: title };
+  return Object.values(pages)[0]?.revisions?.[0]?.slots?.main?.['*'] ?? '';
+}
+
+async function mmsiFromWikipedia(imo: string): Promise<{ mmsi: string; name: string | null } | null> {
+  const search = (await timedJson(
+    `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(`IMO ${imo}`)}&srlimit=8&format=json`,
+    { 'User-Agent': UA, Accept: 'application/json' },
+    8_000,
+  )) as { query?: { search?: { title?: string }[] } } | null;
+  const titles = (search?.query?.search ?? []).map((row) => row.title?.trim()).filter(Boolean) as string[];
+  for (const title of titles) {
+    if (/^list of /i.test(title) || /disambiguation/i.test(title)) continue;
+    const text = await wikipediaPageText(title);
+    if (!text || !pageMentionsImo(text, imo)) continue;
+    const mmsi = nineDigit(text.match(/\bMMSI\s*[|=:]\s*(\d{9})\b/i)?.[1]);
+    return { mmsi: mmsi ?? '', name: title };
+  }
+  return null;
 }

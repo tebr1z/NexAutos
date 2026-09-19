@@ -332,6 +332,7 @@ export default function AdminHomePage() {
     setVoyage({
       vesselName: order.vesselName ?? "",
       vesselImo: imoDigits(order.vesselImo ?? ""),
+      vesselMmsi: "",
       originPort: order.originPort ?? "",
       destinationPort: order.destinationPort ?? "",
       currentPort: order.currentPort ?? "",

@@ -345,11 +345,14 @@ export const api = {
   searchVessels: (name: string) =>
     request<{ results: VesselHit[] }>(`/vessels?name=${encodeURIComponent(name)}`),
   vesselPosition: (mmsi: string) => request<VesselPosition>(`/vessels?mmsi=${encodeURIComponent(mmsi)}`),
-  vesselByImo: async (imo: string, near?: { lat?: number; lng?: number }) => {
+  vesselByImo: async (imo: string, near?: { lat?: number; lng?: number; mmsi?: string; name?: string }) => {
     const digits = imo.replace(/\D/g, "");
     const q = new URLSearchParams({ imo: digits });
     if (near?.lat != null && Number.isFinite(near.lat)) q.set("nearLat", String(near.lat));
     if (near?.lng != null && Number.isFinite(near.lng)) q.set("nearLng", String(near.lng));
+    const mmsi = near?.mmsi?.replace(/\D/g, "") ?? "";
+    if (mmsi.length === 9) q.set("mmsi", mmsi);
+    if (near?.name?.trim()) q.set("hintName", near.name.trim());
     try {
       return await request<VesselPosition>(`/vessels?${q.toString()}`);
     } catch {

@@ -27,4 +27,9 @@ export class VesselQueryDto {
   @IsOptional()
   @IsString()
   nearLng?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  hintName?: string;
 }

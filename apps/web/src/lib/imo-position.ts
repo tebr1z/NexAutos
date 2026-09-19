@@ -63,17 +63,30 @@ async function positionDigitraffic(mmsi: string): Promise<VesselPosition | null>
   };
 }
 
-export async function lookupPositionByImo(imo: string): Promise<VesselPosition | null> {
+const KNOWN: Record<string, { mmsi: string; name: string }> = {
+  "9393307": { mmsi: "255803480", name: "MSC RIDA VIII" },
+};
+
+export async function lookupPositionByImo(imo: string, hintMmsi = ""): Promise<VesselPosition | null> {
   const digits = imo.replace(/\D/g, "");
-  if (digits.length !== 7) return null;
-  const mmsi = await mmsiFromWikidata(digits);
+  const givenMmsi = hintMmsi.replace(/\D/g, "");
+  const knownByMmsi = givenMmsi.length === 9
+    ? Object.entries(KNOWN).find(([, v]) => v.mmsi === givenMmsi)
+    : undefined;
+  const known = (digits.length === 7 ? KNOWN[digits] : undefined) ?? (knownByMmsi
+    ? { mmsi: knownByMmsi[1].mmsi, name: knownByMmsi[1].name, imo: knownByMmsi[0] }
+    : undefined);
+  const resolvedImo = digits.length === 7 ? digits : knownByMmsi?.[0];
+  if (!resolvedImo && givenMmsi.length !== 9) return null;
+  const mmsi = givenMmsi.length === 9 ? givenMmsi : known?.mmsi ?? (resolvedImo ? await mmsiFromWikidata(resolvedImo) : null);
   if (!mmsi) return null;
+  const imoNumber = Number(resolvedImo || knownByMmsi?.[0] || 0) || null;
   const pos = await positionDigitraffic(mmsi);
-  if (pos) return { ...pos, imo: Number(digits), mmsi: Number(mmsi) };
+  if (pos) return { ...pos, imo: imoNumber, mmsi: Number(mmsi), name: pos.name || known?.name || null };
   return {
     source: "imo",
-    name: null,
-    imo: Number(digits),
+    name: known?.name ?? null,
+    imo: imoNumber,
     mmsi: Number(mmsi),
     latitude: null,
     longitude: null,
