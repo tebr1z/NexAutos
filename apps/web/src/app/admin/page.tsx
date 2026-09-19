@@ -22,7 +22,6 @@ import { emptyPhotos, flattenPhotos, photosFromList, type PhotosByCategory } fro
 import { fitDataUrl } from "@/lib/fit-image";
 import { isValidImo } from "@/lib/imo";
 import { daysLeftInArchive, isDelivered, normalizeTrackingCode } from "@/lib/archive";
-import { INSURANCE_STATUSES, insurancePublicPath, insuranceStatusLabel } from "@/lib/insurance";
 
 type NotifyInfo = { sent?: boolean; channel?: string; error?: string };
 type Screen = "list" | "create" | "edit";
@@ -42,14 +41,6 @@ const EMPTY_FORM = {
   model: "",
   year: "",
   containerNumber: "",
-};
-
-const EMPTY_INSURANCE = {
-  firstName: "",
-  lastName: "",
-  docSeries: "",
-  trustee: "",
-  status: "DRAFT",
 };
 
 function parseCoord(raw?: string) {
@@ -209,7 +200,6 @@ export default function AdminHomePage() {
   const [smsText, setSmsText] = useState("");
   const [photoSmsReady, setPhotoSmsReady] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [insurance, setInsurance] = useState(EMPTY_INSURANCE);
   const [liveOcean, setLiveOcean] = useState<OceanLookup | null>(null);
   const [contracts, setContracts] = useState<ContractRecord[]>([]);
   const [contractId, setContractId] = useState("");
@@ -304,7 +294,6 @@ export default function AdminHomePage() {
     setCreated("");
     setContractId("");
     setForm(EMPTY_FORM);
-    setInsurance(EMPTY_INSURANCE);
     setVoyage(EMPTY_VOYAGE);
     setPhotos(emptyPhotos());
     setSmsText("");
@@ -318,7 +307,6 @@ export default function AdminHomePage() {
     setCreated("");
     setContractId("");
     setForm(EMPTY_FORM);
-    setInsurance(EMPTY_INSURANCE);
     setVoyage(EMPTY_VOYAGE);
     setPhotos(emptyPhotos());
     setSmsText("");
@@ -354,13 +342,6 @@ export default function AdminHomePage() {
       mapLng: order.mapLng != null ? String(order.mapLng) : "",
     });
     setPhotos(photosFromList(order.photos ?? []));
-    setInsurance({
-      firstName: order.insurance?.firstName ?? "",
-      lastName: order.insurance?.lastName ?? "",
-      docSeries: order.insurance?.docSeries ?? "",
-      trustee: order.insurance?.trustee ?? "",
-      status: order.insurance?.status || "DRAFT",
-    });
     setNotice("");
     setSmsText("");
     setPhotoSmsReady(Boolean(order.photos?.length));
@@ -440,39 +421,6 @@ export default function AdminHomePage() {
       }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "SMS göndərilmədi.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function saveInsurance(order: TrackingShipment, notify: boolean) {
-    if (!order.id) {
-      setNotice("Əvvəl maşını Yadda saxla, sonra sığortanı yaz.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const saved = await api.updateInsurance(order.id, {
-        firstName: insurance.firstName.trim(),
-        lastName: insurance.lastName.trim(),
-        docSeries: insurance.docSeries.trim(),
-        trustee: insurance.trustee.trim(),
-        status: insurance.status,
-        notify,
-      });
-      persist({ ...order, ...saved });
-      const label = insuranceStatusLabel(saved.insurance?.status || insurance.status);
-      if (!notify) {
-        setNotice(`Sığorta saxlanıldı — ${label}. SMS göndərilmədi.`);
-      } else if (!normalizePhone(form.phone || order.customerPhone)) {
-        setNotice(`Sığorta saxlanıldı. WhatsApp nömrəsi yoxdur — link getmədi.`);
-      } else if (saved.notify?.sent) {
-        setNotice(`Sığorta saxlanıldı. Müştəriyə link göndərildi (${label}).`);
-      } else {
-        setNotice(saved.notify?.error ? `Sığorta saxlanıldı. SMS: ${saved.notify.error}` : `Sığorta saxlanıldı — ${label}.`);
-      }
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Sığorta yazılmadı.");
     } finally {
       setSaving(false);
     }
@@ -1050,83 +998,6 @@ export default function AdminHomePage() {
             </button>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Sığorta</p>
-                <p className="mt-2 text-sm text-zinc-400">
-                  Ad, soyad və vəsiqə seriyasını sonra da yaza bilərsiniz. Etibar edilən şəxs istəyə bağlıdır.
-                  Saxlayanda link müştərinin nömrəsinə gedir.
-                </p>
-              </div>
-              <Link
-                href={insurancePublicPath(editingOrder.trackingCode)}
-                target="_blank"
-                className="rounded-full border border-white/15 px-4 py-2 text-xs text-sky-300"
-              >
-                Müştəri sığorta səhifəsi ↗
-              </Link>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <input
-                placeholder="Ad"
-                value={insurance.firstName}
-                onChange={(e) => setInsurance({ ...insurance, firstName: e.target.value })}
-                className={inp}
-              />
-              <input
-                placeholder="Soyad"
-                value={insurance.lastName}
-                onChange={(e) => setInsurance({ ...insurance, lastName: e.target.value })}
-                className={inp}
-              />
-              <input
-                placeholder="Vəsiqə seriyası"
-                value={insurance.docSeries}
-                onChange={(e) => setInsurance({ ...insurance, docSeries: e.target.value.toUpperCase() })}
-                className={`${inp} font-mono`}
-              />
-              <input
-                placeholder="Etibar edilən şəxs (istəyə bağlı)"
-                value={insurance.trustee}
-                onChange={(e) => setInsurance({ ...insurance, trustee: e.target.value })}
-                className={inp}
-              />
-              <label className="block text-xs text-zinc-400 md:col-span-2">
-                Sığorta statusu
-                <select
-                  value={insurance.status}
-                  onChange={(e) => setInsurance({ ...insurance, status: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-sm text-white"
-                >
-                  {INSURANCE_STATUSES.map((row) => (
-                    <option key={row.key} value={row.key}>
-                      {row.az}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void saveInsurance(editingOrder, true)}
-                className="rounded-xl bg-sky-400 px-5 py-3 text-sm font-medium text-black disabled:opacity-50"
-              >
-                {saving ? "Yazılır…" : "Saxla və link göndər"}
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void saveInsurance(editingOrder, false)}
-                className="rounded-xl border border-white/15 px-5 py-3 text-sm text-zinc-200 disabled:opacity-50"
-              >
-                Yalnız saxla
-              </button>
-            </div>
-          </div>
-
           <div className="flex flex-wrap gap-3">
             <button
               type="submit"
@@ -1140,6 +1011,9 @@ export default function AdminHomePage() {
             </Link>
             <Link href="/admin/contracts" className="rounded-xl border border-white/15 px-5 py-3 text-sm text-zinc-300">
               Müqavilələr
+            </Link>
+            <Link href="/admin/insurance" className="rounded-xl border border-white/15 px-5 py-3 text-sm text-zinc-300">
+              Sığorta
             </Link>
             <button type="button" onClick={goList} className="px-5 py-3 text-sm text-zinc-400">
               Ləğv et

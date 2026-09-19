@@ -10,7 +10,7 @@ import { formatDate } from "@/lib/utils";
 import { findPortCoords } from "@/lib/carriers";
 import { isValidImo } from "@/lib/imo";
 import { useI18n } from "@/providers/i18n-provider";
-import { groupPhotos } from "@/lib/photo-categories";
+import { PhotoCatalog } from "@/components/tracking/photo-catalog";
 import { journeyPosition, normalizeTransits } from "@/lib/journey";
 import { ShippingNotice } from "@/components/layout/shipping-notice";
 import {
@@ -334,19 +334,7 @@ export function TrackingDetail({ code }: { code: string }) {
         </div>
       </div>
 
-      {groupPhotos(data.photos ?? []).map((group) => (
-        <section key={group.key} className="mt-8 rounded-3xl border border-line bg-card p-6 sm:p-8">
-          <h2 className="text-lg font-medium">{t.photoCats[group.key] ?? t.track.photos}</h2>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {group.items.map((p) => (
-              <div key={p.id || p.url.slice(0, 80)} className="relative aspect-[16/10] overflow-hidden rounded-2xl">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.url} alt={p.caption ?? ""} className="h-full w-full object-cover" />
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
+      <PhotoCatalog photos={data.photos ?? []} />
     </div>
   );
 }

@@ -77,13 +77,13 @@ function CategoryDropzone({
         />
       </label>
       {urls.length > 0 && (
-        <div className="mt-2 grid grid-cols-3 gap-1.5">
+        <div className="mt-2 grid grid-cols-4 gap-1">
           {urls.map((src) => (
             <button
               key={src.slice(0, 48)}
               type="button"
               onClick={() => onRemove(src)}
-              className="relative aspect-[4/3] overflow-hidden rounded-md"
+              className="relative aspect-square overflow-hidden rounded-md"
               title="Sil"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
