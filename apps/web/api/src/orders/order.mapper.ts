@@ -78,6 +78,12 @@ export function mapOrder(order: {
   documents: { title: string; type: string; url: string }[];
   photos: { id?: string; url: string; caption: string | null; category?: string | null }[];
   invoices: { number: string; amountUsd: unknown; status: string }[];
+  insuranceFirstName?: string | null;
+  insuranceLastName?: string | null;
+  insuranceDocSeries?: string | null;
+  insuranceTrustee?: string | null;
+  insuranceStatus?: string | null;
+  insuranceNotifiedAt?: Date | null;
 }) {
   const invoice = order.invoices[0];
   return {
@@ -136,6 +142,14 @@ export function mapOrder(order: {
     invoice: invoice
       ? { number: invoice.number, amountUsd: Number(invoice.amountUsd), status: invoice.status }
       : undefined,
+    insurance: {
+      firstName: order.insuranceFirstName || undefined,
+      lastName: order.insuranceLastName || undefined,
+      docSeries: order.insuranceDocSeries || undefined,
+      trustee: order.insuranceTrustee || undefined,
+      status: order.insuranceStatus || undefined,
+      notifiedAt: order.insuranceNotifiedAt?.toISOString(),
+    },
   };
 }
 

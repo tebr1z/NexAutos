@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ContainersService } from '../containers/containers.service';
 import { VesselsService } from '../vessels/vessels.service';
 import { attachPortCoords, enrichKnownContainer, lookupCarrier } from '../containers/registry';
-import { CreateOrderDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
+import { CreateOrderDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { generateTrackingCode, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
 import { NotifyService, statusLabelAz } from '../notify/notify.service';
 import { R2Storage } from '../storage/r2.storage';
@@ -276,6 +276,96 @@ export class OrdersService {
       throw new NotFoundException('Göndəriş tapılmadı');
     }
     return mapOrder(order);
+  }
+
+  insurancePublic(order: Parameters<typeof mapOrder>[0]) {
+    const mapped = mapOrder(order);
+    const vin = order.vin || '';
+    return {
+      trackingCode: mapped.trackingCode,
+      make: mapped.make,
+      model: mapped.model,
+      year: mapped.year,
+      vinHint: vin.length > 4 ? `••••${vin.slice(-4)}` : vin,
+      firstName: mapped.insurance.firstName,
+      lastName: mapped.insurance.lastName,
+      docSeries: mapped.insurance.docSeries,
+      trustee: mapped.insurance.trustee,
+      status: mapped.insurance.status || 'DRAFT',
+      notifiedAt: mapped.insurance.notifiedAt,
+    };
+  }
+
+  async findInsuranceByCode(code: string) {
+    const raw = code.toUpperCase().replace(/\s+/g, '');
+    const order = await this.prisma.order.findFirst({
+      where: { trackingCode: { equals: raw, mode: 'insensitive' } },
+      include: ORDER_INCLUDE,
+    });
+    if (!order) throw new NotFoundException('Göndəriş tapılmadı');
+    return this.insurancePublic(order);
+  }
+
+  async updateInsurance(id: string, dto: UpdateInsuranceDto, userId?: string) {
+    const existing = await this.prisma.order.findUnique({
+      where: { id },
+      include: { customer: true, vehicle: true },
+    });
+    if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
+
+    const allowed = new Set(['DRAFT', 'PENDING', 'PROCESSING', 'PAID', 'ACTIVE']);
+    const status = dto.status === undefined ? undefined : opt(dto.status);
+    if (status && !allowed.has(status)) throw new BadRequestException('Sığorta statusu səhvdir.');
+
+    const labels: Record<string, string> = {
+      DRAFT: 'Hazırlanır',
+      PENDING: 'Sənədlər gözlənilir',
+      PROCESSING: 'Sığorta rəsmiləşdirilir',
+      PAID: 'Sığorta ödənilib',
+      ACTIVE: 'Sığorta aktivdir',
+    };
+
+    const order = await this.prisma.order.update({
+      where: { id },
+      data: {
+        ...(dto.firstName !== undefined ? { insuranceFirstName: opt(dto.firstName) } : {}),
+        ...(dto.lastName !== undefined ? { insuranceLastName: opt(dto.lastName) } : {}),
+        ...(dto.docSeries !== undefined ? { insuranceDocSeries: opt(dto.docSeries) } : {}),
+        ...(dto.trustee !== undefined ? { insuranceTrustee: opt(dto.trustee) } : {}),
+        ...(status !== undefined ? { insuranceStatus: status } : {}),
+      },
+      include: ORDER_INCLUDE,
+    });
+
+    const shouldNotify = dto.notify !== false;
+    let notify = { sent: false, error: 'skipped' as string | undefined, channel: undefined as string | undefined };
+    if (shouldNotify) {
+      notify = await this.notify.insuranceReady({
+        phone: order.customer.phone,
+        trackingCode: order.trackingCode,
+        make: order.vehicle?.make,
+        model: order.vehicle?.model,
+        statusLabel: labels[order.insuranceStatus || 'DRAFT'],
+      });
+      if (notify.sent) {
+        await this.prisma.order.update({
+          where: { id },
+          data: { insuranceNotifiedAt: new Date() },
+        });
+      }
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'INSURANCE_UPDATE',
+        entity: 'Order',
+        entityId: id,
+        meta: { status: order.insuranceStatus, notify },
+      },
+    });
+
+    return { ...mapOrder(await this.prisma.order.findUniqueOrThrow({ where: { id }, include: ORDER_INCLUDE })), notify };
   }
 
   async updateVoyage(id: string, dto: UpdateVoyageDto, userId?: string) {

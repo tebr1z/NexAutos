@@ -245,6 +245,9 @@ export function TrackingDetail({ code }: { code: string }) {
           </div>
           <h1 className="font-display mt-2 text-4xl md:text-5xl">
             {[data.year, data.make, data.model].filter(Boolean).join(" ") || t.track.yourCar}
+            <Link href={`/insurance/${data.trackingCode}`} className="ml-3 text-sm font-normal text-royal">
+              {t.track.insurance}
+            </Link>
           </h1>
           <p className="mt-2 font-mono text-sm text-muted">VIN {data.vin}</p>
         </div>

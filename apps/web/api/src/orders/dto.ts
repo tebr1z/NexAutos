@@ -1,6 +1,6 @@
 import type { AuctionHouse, Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsArray, IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 const AUCTION_HOUSES = {
   COPART: 'COPART',
@@ -198,6 +198,32 @@ export class OrderPhotoDto {
   @IsOptional()
   @IsString()
   caption?: string;
+}
+
+export class UpdateInsuranceDto {
+  @IsOptional()
+  @IsString()
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @IsOptional()
+  @IsString()
+  docSeries?: string;
+
+  @IsOptional()
+  @IsString()
+  trustee?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  notify?: boolean;
 }
 
 export class PrunePhotosDto {

@@ -2,7 +2,7 @@ import { Body, Controller, Get, Header, Param, Patch, Post, Put, StreamableFile,
 import { SkipThrottle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { OrdersService } from './orders.service';
-import { CreateOrderDto, OrderPhotoDto, PrunePhotosDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
+import { CreateOrderDto, OrderPhotoDto, PrunePhotosDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -16,6 +16,11 @@ export class OrdersController {
   @Get('tracking/:code')
   byCode(@Param('code') code: string) {
     return this.orders.findByCode(code);
+  }
+
+  @Get('insurance/:code')
+  insuranceByCode(@Param('code') code: string) {
+    return this.orders.findInsuranceByCode(code);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -47,6 +52,17 @@ export class OrdersController {
     @CurrentUser() user: { id: string },
   ) {
     return this.orders.attachContainer(id, body.containerNumber, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...STAFF)
+  @Patch('orders/:id/insurance')
+  insurance(
+    @Param('id') id: string,
+    @Body() dto: UpdateInsuranceDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.orders.updateInsurance(id, dto, user.id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

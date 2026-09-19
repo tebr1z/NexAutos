@@ -112,6 +112,29 @@ export class NotifyService {
     }
   }
 
+  async insuranceReady(input: {
+    phone?: string | null;
+    trackingCode: string;
+    make?: string | null;
+    model?: string | null;
+    statusLabel?: string;
+  }): Promise<NotifyResult> {
+    const to = normalizePhone(input.phone);
+    if (!to) return { sent: false, error: 'no_phone' };
+    const site = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.CORS_ORIGIN ?? 'https://nex.autos').replace(/\/$/, '');
+    const car = [input.make, input.model].filter(Boolean).join(' ');
+    const body = [
+      'Auto Nex: maşınınızın sığorta məlumatı yeniləndi.',
+      car ? `Avtomobil: ${car}` : null,
+      input.statusLabel ? `Status: ${input.statusLabel}` : null,
+      `Kod: ${input.trackingCode}`,
+      `Sığorta: ${site}/insurance/${input.trackingCode}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    return this.sendMessage(to, body);
+  }
+
   async sendMessage(phone?: string | null, body?: string): Promise<NotifyResult> {
     const to = normalizePhone(phone);
     if (!to || !body?.trim()) return { sent: false, error: 'no_phone' };

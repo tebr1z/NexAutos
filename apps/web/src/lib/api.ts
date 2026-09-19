@@ -235,6 +235,35 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+  insurance: (code: string) =>
+    request<{
+      trackingCode: string;
+      make?: string;
+      model?: string;
+      year?: number;
+      vinHint?: string;
+      firstName?: string;
+      lastName?: string;
+      docSeries?: string;
+      trustee?: string;
+      status: string;
+      notifiedAt?: string;
+    }>(`/insurance/${encodeURIComponent(code)}`),
+  updateInsurance: (
+    id: string,
+    payload: {
+      firstName?: string;
+      lastName?: string;
+      docSeries?: string;
+      trustee?: string;
+      status?: string;
+      notify?: boolean;
+    },
+  ) =>
+    request<TrackingShipment & { notify?: { sent: boolean; channel?: string; error?: string } }>(
+      `/orders/${id}/insurance`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
   pruneOrderPhotos: (id: string, keepIds: string[], keepUrls: string[] = []) =>
     request<TrackingShipment>(`/orders/${id}/photos`, {
       method: "PUT",
