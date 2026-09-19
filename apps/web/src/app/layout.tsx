@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { Geist, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider, type Theme } from "@/providers/theme-provider";
 import { I18nProvider } from "@/providers/i18n-provider";
 import { CurrencyProvider } from "@/providers/currency-provider";
@@ -10,14 +10,41 @@ import { SITE } from "@/lib/constants";
 import { JsonLd } from "@/components/seo/json-ld";
 import "./globals.css";
 
-const geist = Geist({
+const geist = localFont({
+  src: [
+    { path: "./fonts/Geist-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/Geist-Medium.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/Geist-SemiBold.woff2", weight: "600", style: "normal" },
+  ],
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  display: "swap",
 });
 
-const inter = Inter({
+const inter = localFont({
+  src: [
+    {
+      path: "./fonts/Inter-Latin-400.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/Inter-Latin-500.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "./fonts/Inter-LatinExt-400.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/Inter-Cyrillic-400.woff2",
+      weight: "400",
+      style: "normal",
+    },
+  ],
   variable: "--font-inter",
-  subsets: ["latin", "cyrillic", "latin-ext"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

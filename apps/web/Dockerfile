@@ -11,6 +11,7 @@ ENV NEXT_PUBLIC_API_URL=/api/v1
 ENV NEXT_PUBLIC_SITE_URL=https://nex.autos
 ENV CORS_ORIGIN=https://nex.autos
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
+ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS=--max-old-space-size=1536
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund \
