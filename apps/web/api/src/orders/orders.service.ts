@@ -6,7 +6,7 @@ import { VesselsService } from '../vessels/vessels.service';
 import { attachPortCoords, enrichKnownContainer, lookupCarrier } from '../containers/registry';
 import { CreateOrderDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { generateTrackingCode, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
-import { NotifyService, statusLabelAz } from '../notify/notify.service';
+import { NotifyService, statusLabelAz, type NotifyResult } from '../notify/notify.service';
 import { R2Storage } from '../storage/r2.storage';
 
 function opt(value?: string) {
@@ -338,7 +338,7 @@ export class OrdersService {
     });
 
     const shouldNotify = dto.notify !== false;
-    let notify = { sent: false, error: 'skipped' as string | undefined, channel: undefined as string | undefined };
+    let notify: NotifyResult = { sent: false, error: 'skipped' };
     if (shouldNotify) {
       notify = await this.notify.insuranceReady({
         phone: order.customer.phone,
