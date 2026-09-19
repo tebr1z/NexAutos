@@ -394,16 +394,16 @@ export class OrdersService {
     });
     if (!order?.insurancePaidOutAt) throw new NotFoundException('Çek tapılmadı');
     const mapped = mapOrder(order);
-    const fullName = [mapped.insurance.firstName, mapped.insurance.lastName].filter(Boolean).join(' ') || mapped.customerName;
+    const fullName = [mapped.insurance?.firstName, mapped.insurance?.lastName].filter(Boolean).join(' ') || mapped.customerName;
     return {
       trackingCode: mapped.trackingCode,
       customerName: fullName,
-      docSeries: mapped.insurance.docSeries,
-      trustee: mapped.insurance.trustee,
+      docSeries: mapped.insurance?.docSeries,
+      trustee: mapped.insurance?.trustee,
       make: mapped.make,
       model: mapped.model,
       year: mapped.year,
-      amountAzn: mapped.insurance.amountAzn,
+      amountAzn: mapped.insurance?.amountAzn,
       vinHint: order.vin?.startsWith('SIG') ? '' : order.vin && order.vin.length > 4 ? `••••${order.vin.slice(-4)}` : order.vin,
       paidOutAt: order.insurancePaidOutAt.toISOString(),
       message: 'Pul sizə köçürülmüşdür',
