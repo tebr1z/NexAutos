@@ -17,6 +17,7 @@ export default function ShippingRatesAdminPage() {
   const [url, setUrl] = useState("");
   const [price, setPrice] = useState("4500");
   const [auction, setAuction] = useState("");
+  const [titleKind, setTitleKind] = useState("SALVAGE");
   const [tirUsd, setTirUsd] = useState("200");
   const [quote, setQuote] = useState<Quote | null>(null);
   const [learn, setLearn] = useState("");
@@ -38,11 +39,16 @@ export default function ShippingRatesAdminPage() {
     setNotice("");
     setLearn("");
     try {
-      const next = await api.shippingQuote({ url: url.trim(), priceUsd: Number(price), auction: auction || undefined });
+      const next = await api.shippingQuote({
+        url: url.trim(),
+        priceUsd: Number(price),
+        auction: auction || undefined,
+        titleKind,
+      });
       setQuote(next);
       if (next.missing) {
         setNotice(
-          `$${Number(price).toLocaleString("en-US")} ${bandLabel(next.band)} aralığına düşür (${next.auction} · ${next.stateName || next.state}). Bu aralıq üçün yol pulu yaddaşda yoxdur — bir dəfə yazın, növbəti eyni aralıq avtomatik olacaq.`,
+          `$${Number(price).toLocaleString("en-US")} ${bandLabel(next.band)} aralığına düşür (${next.auction} · ${next.yard || next.lot?.location}, ${next.state}). Bu yard üçün yol pulu yaddaşda yoxdur — bir dəfə yazın, növbəti eyni yard avtomatik olacaq.`,
         );
       }
     } catch (err) {
@@ -70,7 +76,7 @@ export default function ShippingRatesAdminPage() {
       const total = ocean + (Number(tirUsd) || 0) + (quote.auctionFeeUsd ?? 0);
       setQuote({ ...quote, oceanUsd: ocean, totalUsd: total, freightUsd: ocean + (Number(tirUsd) || 0), missing: false, tirUsd: Number(tirUsd) || 0 });
       setNotice(
-        `${quote.auction} · ${quote.stateName || quote.state} · ${bandLabel(quote.band)} üçün $${ocean.toLocaleString("en-US")} yadda saxlanıldı. Eyni aralıq bir daha soruşulmayacaq.`,
+        `${quote.auction} · ${quote.yard || quote.lot?.location}, ${quote.state} · ${bandLabel(quote.band)} üçün $${ocean.toLocaleString("en-US")} yadda saxlanıldı. Eyni yard bir daha soruşulmayacaq.`,
       );
       setLearn("");
     } catch (err) {
@@ -94,7 +100,7 @@ export default function ShippingRatesAdminPage() {
     <div className="mx-auto max-w-3xl">
       <h1 className="font-display text-3xl">Yol pulu</h1>
       <p className="mt-2 text-sm text-zinc-400">
-        Bid.cars linki və hərrac qiyməti kifayətdir. 4500 → $3,001–7,000. Tarif yoxdursa bir dəfə yazırsız, baza yadda saxlayır.
+        Bid.cars linki və hərrac qiyməti kifayətdir. Yol pulu ştata görə yox, konkret yard-a görə saxlanır: CA Sun Valley ilə CA Los Angeles ayrıdır. 4500 → $3,001–7,000. Tarif yoxdursa bir dəfə yazırsız.
       </p>
       {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
       {notice ? <p className="mt-4 text-sm text-emerald-400">{notice}</p> : null}
@@ -116,8 +122,15 @@ export default function ShippingRatesAdminPage() {
             <option value="IAAI">IAAI</option>
           </select>
         </label>
+        <label className="block text-xs text-zinc-500">
+          Title
+          <select value={titleKind} onChange={(e) => setTitleKind(e.target.value)} className={`${inp} mt-1 bg-[#111]`}>
+            <option value="SALVAGE">Salvage / non-clean</option>
+            <option value="CLEAN">Clean title</option>
+          </select>
+        </label>
         <button disabled={busy} className="rounded-xl bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-50">
-          {busy ? "…" : "Ştatı oxu və aralığı tap"}
+          {busy ? "…" : "Yard-ı oxu və aralığı tap"}
         </button>
       </form>
 
@@ -135,7 +148,7 @@ export default function ShippingRatesAdminPage() {
         <div className="mt-8 space-y-4 rounded-2xl border border-white/10 p-5">
           <p className="text-sm text-white">{quote.lot?.title || quote.stateName}</p>
           <p className="text-xs text-zinc-500">
-            {[quote.lot?.location, quote.stateName, quote.auction, quote.year && String(quote.year), quote.engineCc && `${quote.engineCc} cm³`, quote.fuel]
+            {[quote.lot?.location || quote.yard, quote.state, quote.auction, quote.year && String(quote.year), quote.engineCc && `${quote.engineCc} cm³`, quote.fuel]
               .filter(Boolean)
               .join(" · ")}
           </p>
@@ -148,9 +161,9 @@ export default function ShippingRatesAdminPage() {
               <p className="mt-1 text-xs text-zinc-500">
                 {quote.auction} auction fee ${(quote.auctionFeeUsd ?? 0).toLocaleString("en-US")}
                 {quote.auctionFee
-                  ? ` (buyer ${quote.auctionFee.buyerUsd} + live ${quote.auctionFee.virtualUsd} + gate ${quote.auctionFee.gateUsd}${quote.auctionFee.envUsd ? ` + env ${quote.auctionFee.envUsd}` : ""}${quote.auctionFee.titleUsd ? ` + title ${quote.auctionFee.titleUsd}` : ""})`
+                  ? ` (${quote.auctionFee.titleKind === "CLEAN" ? "clean" : "salvage"} · buyer ${quote.auctionFee.buyerUsd} + live ${quote.auctionFee.virtualUsd} + gate ${quote.auctionFee.gateUsd}${quote.auctionFee.envUsd ? ` + env ${quote.auctionFee.envUsd}` : ""}${quote.auctionFee.titleUsd ? ` + title ${quote.auctionFee.titleUsd}` : ""})`
                   : ""}
-                . Ştat buyer fee-ni dəyişmir.
+                . Ştat auction fee-ni dəyişmir. Yol pulu yard-adır.
               </p>
               <p className="mt-1 text-xs text-zinc-500">
                 Hərrac ${quote.priceUsd.toLocaleString("en-US")} + fee ${(quote.auctionFeeUsd ?? 0).toLocaleString("en-US")} + US yol pulu $
@@ -160,7 +173,7 @@ export default function ShippingRatesAdminPage() {
           ) : (
             <form className="space-y-3" onSubmit={remember}>
               <label className="block text-xs text-zinc-500">
-                {quote.auction} · {quote.stateName || quote.state} · {bandLabel(quote.band)} üçün ABŞ yol pulu (USD)
+                {quote.auction} · {quote.yard || quote.lot?.location}, {quote.state} · {bandLabel(quote.band)} üçün ABŞ yol pulu (USD)
                 <input
                   required
                   inputMode="numeric"
@@ -171,7 +184,7 @@ export default function ShippingRatesAdminPage() {
                 />
               </label>
               <button disabled={busy} className="rounded-xl bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-50">
-                Bu aralığı yadda saxla
+                Bu yard-ı yadda saxla
               </button>
             </form>
           )}

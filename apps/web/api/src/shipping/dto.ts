@@ -18,6 +18,14 @@ export class ShippingQuoteDto {
   @IsOptional()
   @IsString()
   auction?: string;
+
+  @IsOptional()
+  @IsString()
+  titleKind?: string;
+
+  @IsOptional()
+  @IsString()
+  yard?: string;
 }
 
 export class ShippingRatesDto {

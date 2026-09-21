@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { knownState } from './zones';
+import { knownState, parseYardPlace } from './zones';
 
 const BROWSER_HEADERS = {
   Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
@@ -16,6 +16,8 @@ export type BidCarsLot = {
   auction?: 'COPART' | 'IAAI' | 'OTHER';
   location?: string;
   shippingFrom?: string;
+  yard?: string;
+  yardSlug?: string;
   state?: string;
   year?: number;
   engineCc?: number;
@@ -69,27 +71,37 @@ function parseYear(url: string, title?: string, text?: string) {
 
 function parseEngineCc(text: string) {
   const labeled =
-    text.match(/Engine(?:\s*(?:size|displacement|capacity))?\s*:?\s*([\d.,]+)\s*(L|l|Litr|liter|cc|cm3|cm³|CID|cu)/i) ||
-    text.match(/([\d.,]+)\s*(L|liter)\s*(?:engine|V\d)/i);
+    text.match(/Engine(?:\s*(?:size|displacement|capacity|type))?\s*:?\s*([\d.,]+)\s*(L|l|Litr|liter|cc|cm3|cm³|CID|cu)/i) ||
+    text.match(/\b([\d.,]+)\s*(L|liter)\s*(?:\d+\s*)?(?:cyl|cylinder|V\d|engine)/i) ||
+    text.match(/\b([\d.,]+)\s*L\b/i);
   if (labeled) {
     const n = Number(String(labeled[1]).replace(',', '.'));
-    const unit = labeled[2].toLowerCase();
-    if (!Number.isFinite(n)) return undefined;
+    const unit = (labeled[2] || 'L').toLowerCase();
+    if (!Number.isFinite(n) || n <= 0) return undefined;
     if (unit.startsWith('l')) return Math.round(n * 1000);
     if (unit === 'cid' || unit.startsWith('cu')) return Math.round(n * 16.387);
     return Math.round(n);
   }
-  const liters = text.match(/\b(\d(?:\.\d)?)\s*L\b/);
-  if (liters) return Math.round(Number(liters[1]) * 1000);
   const cc = text.match(/\b(\d{3,5})\s*(?:cc|cm³|cm3)\b/i);
   if (cc) return Number(cc[1]);
   return undefined;
 }
 
 function parseFuel(text: string) {
-  const labeled = field(text, 'Fuel Type') || field(text, 'Fuel');
+  const labeled = field(text, 'Fuel Type') || field(text, 'Fuel') || field(text, 'Engine Type');
+  const blob = `${labeled || ''} ${text}`.replace(/\s+/g, ' ');
+  const low = blob.toLowerCase();
+  if (/plug[\s-]?in|phev/.test(low) && /diesel|dizel/.test(low)) return 'Plug-in hybrid diesel';
+  if (/plug[\s-]?in|phev/.test(low)) return 'Plug-in hybrid';
+  if (/mild[\s-]?hybrid|mhev/.test(low) && /diesel|dizel/.test(low)) return 'Mild hybrid diesel';
+  if (/mild[\s-]?hybrid|mhev/.test(low)) return 'Mild hybrid';
+  if (/\bhybrid\b|\bhev\b/.test(low) && /diesel|dizel/.test(low)) return 'Hybrid diesel';
+  if (/\bhybrid\b|\bhev\b/.test(low)) return 'Hybrid';
+  if (/electric|battery|\bev\b/.test(low) && !/hybrid/.test(low)) return 'Electric';
+  if (/diesel|dizel/.test(low)) return 'Diesel';
+  if (/\blpg\b|\bcng\b|propane/.test(low)) return 'Gas';
   if (labeled) return labeled.replace(/\s+/g, ' ').slice(0, 40);
-  const hit = text.match(/\b(Gasoline|Petrol|Diesel|Hybrid|Plug-?in hybrid|Electric|Gas|Flex Fuel|CNG|LPG)\b/i);
+  const hit = blob.match(/\b(Gasoline|Petrol|Flex Fuel|Gas)\b/i);
   return hit?.[1];
 }
 
@@ -97,7 +109,9 @@ export function parseBidCarsHtml(html: string, url: string): BidCarsLot {
   const text = strip(html);
   const location = field(text, 'Location');
   const shippingFrom = field(text, 'Shipping from');
+  const place = parseYardPlace(location) || parseYardPlace(shippingFrom);
   const state =
+    place?.state ||
     (location || shippingFrom || '').match(/\(([A-Z]{2})\)/)?.[1] ||
     text.match(/\(([A-Z]{2})\)/)?.[1];
   const vin = text.match(/\b([A-HJ-NPR-Z0-9]{17})\b/)?.[1];
@@ -120,12 +134,27 @@ export function parseBidCarsHtml(html: string, url: string): BidCarsLot {
     auction,
     location,
     shippingFrom,
+    yard: place?.yard,
+    yardSlug: place?.slug,
     state,
     year,
     engineCc,
     engineLabel,
     fuel,
   };
+}
+
+function betterFuel(a?: string, b?: string) {
+  const rank = (v?: string) => {
+    const x = (v || "").toLowerCase();
+    if (/plug/.test(x)) return 5;
+    if (/mild/.test(x)) return 4;
+    if (/hybrid/.test(x)) return 3;
+    if (/electric/.test(x)) return 2;
+    if (x) return 1;
+    return 0;
+  };
+  return rank(a) >= rank(b) ? a || b : b || a;
 }
 
 function mergeLot(base: BidCarsLot, extra: Partial<BidCarsLot> | null | undefined): BidCarsLot {
@@ -138,11 +167,13 @@ function mergeLot(base: BidCarsLot, extra: Partial<BidCarsLot> | null | undefine
     auction: extra.auction && extra.auction !== 'OTHER' ? extra.auction : base.auction,
     location: extra.location || base.location,
     shippingFrom: extra.shippingFrom || base.shippingFrom,
+    yard: extra.yard || base.yard,
+    yardSlug: extra.yardSlug || base.yardSlug,
     state: extra.state || base.state,
     year: extra.year || base.year,
     engineCc: extra.engineCc || base.engineCc,
     engineLabel: extra.engineLabel || base.engineLabel,
-    fuel: extra.fuel || base.fuel,
+    fuel: betterFuel(extra.fuel, base.fuel),
   };
 }
 
@@ -230,22 +261,25 @@ async function fetchCopartLot(lotRaw?: string): Promise<{ hit: Partial<BidCarsLo
       const row = json.data?.lotDetails;
       if (json.returnCode !== 1 || !row || (row.ln != null && String(row.ln) !== lot)) continue;
       if (!row.mkn && !row.yn && !row.lcy) continue;
-      const yard = String(row.yn || '').trim();
-      const state = yard.match(/\b([A-Z]{2})\b/)?.[1] || yard.split('-')[0]?.trim();
+      const yardRaw = String(row.yn || '').trim();
+      const place = parseYardPlace(yardRaw);
+      const state = place?.state || yardRaw.match(/\b([A-Z]{2})\b/)?.[1] || yardRaw.split('-')[0]?.trim();
       const liters = String(row.egn || '').match(/(\d(?:\.\d)?)\s*L/i);
-      const engineCc = liters ? Math.round(Number(liters[1]) * 1000) : parseEngineCc(String(row.egn || ''));
+      const engineCc = liters ? Math.round(Number(liters[1]) * 1000) : parseEngineCc(String(row.egn || row.ld || ''));
       return {
         hit: {
           lot,
           auction: 'COPART',
           title: row.ld?.trim() || [row.lcy, row.mkn, row.lmg].filter(Boolean).join(' '),
           year: row.lcy || undefined,
-          location: yard || undefined,
+          location: yardRaw || undefined,
+          yard: place?.yard,
+          yardSlug: place?.slug,
           state: knownState(state) || undefined,
           vin: row.vin || (row.fv && !row.fv.includes('*') ? row.fv : undefined),
           engineCc,
           engineLabel: engineCc ? `${engineCc} cm³` : undefined,
-          fuel: row.ft || undefined,
+          fuel: parseFuel([row.ft, row.egn, row.ld].filter(Boolean).join(' ')) || row.ft || undefined,
         },
       };
     } catch {
