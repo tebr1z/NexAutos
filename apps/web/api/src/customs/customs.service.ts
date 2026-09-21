@@ -12,10 +12,11 @@ function langOf(raw?: string) {
 
 function issueDate(raw: string) {
   const value = raw.trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10) + 'T00:00:00';
-  const dots = value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  if (dots) return `${dots[3]}-${dots[2]}-${dots[1]}T00:00:00`;
-  throw new BadRequestException('İstehsal tarixi YYYY-MM-DD olmalıdır.');
+  const iso = value.match(/^(\d{4})-(\d{2})(?:-\d{2})?/);
+  if (iso) return `${iso[1]}-${iso[2]}-01T00:00:00`;
+  const dots = value.match(/^(?:\d{2}\.)?(\d{2})\.(\d{4})$/);
+  if (dots) return `${dots[2]}-${dots[1]}-01T00:00:00`;
+  throw new BadRequestException('İstehsal tarixi YYYY-MM olmalıdır.');
 }
 
 @Injectable()

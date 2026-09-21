@@ -120,32 +120,22 @@ function DateField({
   onChange: (iso: string) => void;
   locale: Locale;
 }) {
-  const [year, month, day] = value.split("-").map((part) => Number(part) || 0);
+  const [year, month] = value.split("-").map((part) => Number(part) || 0);
   const now = new Date().getFullYear();
   const years = Array.from({ length: 45 }, (_, i) => String(now - i));
   const months = Array.from({ length: 12 }, (_, i) => {
     const n = i + 1;
     return { value: String(n).padStart(2, "0"), label: monthLabel(n, locale) };
   });
-  const dim = year && month ? new Date(year, month, 0).getDate() : 31;
-  const days = Array.from({ length: dim }, (_, i) => String(i + 1).padStart(2, "0"));
-  const safeDay = Math.min(day || 1, dim);
 
-  function patch(next: { y?: number; m?: number; d?: number }) {
+  function patch(next: { y?: number; m?: number }) {
     const y = next.y ?? year;
     const m = next.m ?? month;
-    const last = new Date(y, m, 0).getDate();
-    const d = Math.min(next.d ?? safeDay, last);
-    onChange(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+    onChange(`${y}-${String(m).padStart(2, "0")}-01`);
   }
 
   return (
-    <div className="mt-1 grid grid-cols-3 gap-2">
-      <FieldSelect
-        value={String(safeDay).padStart(2, "0")}
-        onChange={(d) => patch({ d: Number(d) })}
-        options={days.map((d) => ({ value: d, label: d }))}
-      />
+    <div className="mt-1 grid grid-cols-2 gap-2">
       <FieldSelect value={String(month).padStart(2, "0")} onChange={(m) => patch({ m: Number(m) })} options={months} />
       <FieldSelect value={String(year)} onChange={(y) => patch({ y: Number(y) })} options={years.map((y) => ({ value: y, label: y }))} />
     </div>
@@ -163,7 +153,7 @@ export function CustomsCalculator() {
   const [price, setPrice] = useState("12000");
   const [freight, setFreight] = useState("2500");
   const [other, setOther] = useState("0");
-  const [issueDate, setIssueDate] = useState("2018-03-15");
+  const [issueDate, setIssueDate] = useState("2018-03-01");
   const [commerceType, setCommerceType] = useState<"nonFree" | "free">("nonFree");
   const [result, setResult] = useState<Duty | null>(null);
   const [error, setError] = useState("");
@@ -186,7 +176,7 @@ export function CustomsCalculator() {
         const priceQ = params.get("price");
         const freightQ = params.get("freight");
         const fuelCode = params.get("fuelCode");
-        if (year && /^(19|20)\d{2}$/.test(year)) setIssueDate(`${year}-06-15`);
+        if (year && /^(19|20)\d{2}$/.test(year)) setIssueDate(`${year}-06-01`);
         if (engineCc && Number(engineCc) > 0) setEngine(engineCc);
         if (priceQ && Number(priceQ) > 0) setPrice(priceQ);
         if (freightQ && Number(freightQ) > 0) setFreight(freightQ);
