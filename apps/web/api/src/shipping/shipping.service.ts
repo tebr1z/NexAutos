@@ -13,7 +13,7 @@ import {
   knownState,
   type AuctionCode,
 } from './zones';
-import { auctionFeeUsd } from './auction-fees';
+import { auctionFeeBreakdown } from './auction-fees';
 
 const KEY = 'shipping_rates';
 
@@ -62,7 +62,7 @@ export class ShippingService {
     const oceanRaw = table.cells[cellKey(state, auction, band.id)];
     const ocean = oceanRaw != null && Number(oceanRaw) > 0 ? Number(oceanRaw) : null;
     const stateName = US_STATES.find((row) => row.code === state)?.name;
-    const feeUsd = auctionFeeUsd(dto.priceUsd, auction);
+    const fee = auctionFeeBreakdown(dto.priceUsd, auction);
     const freightUsd = ocean != null ? ocean + table.tirUsd : null;
     return {
       lot,
@@ -71,8 +71,9 @@ export class ShippingService {
       auction,
       band,
       priceUsd: dto.priceUsd,
-      auctionFeeUsd: feeUsd,
-      invoiceUsd: dto.priceUsd + feeUsd,
+      auctionFeeUsd: fee.totalUsd,
+      auctionFee: fee,
+      invoiceUsd: dto.priceUsd + fee.totalUsd,
       year: lot?.year,
       engineCc: lot?.engineCc,
       fuel: lot?.fuel,
@@ -80,7 +81,7 @@ export class ShippingService {
       oceanUsd: ocean,
       tirUsd: table.tirUsd,
       freightUsd,
-      totalUsd: freightUsd != null ? freightUsd + feeUsd : null,
+      totalUsd: freightUsd != null ? freightUsd + fee.totalUsd : null,
       missing: ocean == null,
       cellKey: cellKey(state, auction, band.id),
     };

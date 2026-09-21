@@ -146,7 +146,14 @@ export default function ShippingRatesAdminPage() {
             <div>
               <p className="font-display text-3xl text-white">${quote.totalUsd.toLocaleString("en-US")}</p>
               <p className="mt-1 text-xs text-zinc-500">
-                Hərrac ${quote.priceUsd.toLocaleString("en-US")} + auction fee ${(quote.auctionFeeUsd ?? 0).toLocaleString("en-US")} + US yol pulu $
+                {quote.auction} auction fee ${(quote.auctionFeeUsd ?? 0).toLocaleString("en-US")}
+                {quote.auctionFee
+                  ? ` (buyer ${quote.auctionFee.buyerUsd} + live ${quote.auctionFee.virtualUsd} + gate ${quote.auctionFee.gateUsd}${quote.auctionFee.envUsd ? ` + env ${quote.auctionFee.envUsd}` : ""}${quote.auctionFee.titleUsd ? ` + title ${quote.auctionFee.titleUsd}` : ""})`
+                  : ""}
+                . Ştat buyer fee-ni dəyişmir.
+              </p>
+              <p className="mt-1 text-xs text-zinc-500">
+                Hərrac ${quote.priceUsd.toLocaleString("en-US")} + fee ${(quote.auctionFeeUsd ?? 0).toLocaleString("en-US")} + US yol pulu $
                 {quote.oceanUsd?.toLocaleString("en-US")} + TIR ${quote.tirUsd.toLocaleString("en-US")}
               </p>
             </div>

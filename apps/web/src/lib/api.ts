@@ -506,6 +506,14 @@ export const api = {
       band: { id: string; min: number; max: number };
       priceUsd: number;
       auctionFeeUsd?: number;
+      auctionFee?: {
+        buyerUsd: number;
+        virtualUsd: number;
+        gateUsd: number;
+        envUsd: number;
+        titleUsd: number;
+        totalUsd: number;
+      };
       invoiceUsd?: number;
       year?: number;
       engineCc?: number;

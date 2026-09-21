@@ -111,6 +111,9 @@ export function FreightCalculator() {
                   <p className="mt-3 text-xs text-muted">
                     {t.pages.freightBid}: ${quote.priceUsd.toLocaleString("en-US")} · {t.pages.freightAuctionFee}: $
                     {(quote.auctionFeeUsd ?? 0).toLocaleString("en-US")}
+                    {quote.auctionFee
+                      ? ` (${quote.auction} · buyer $${quote.auctionFee.buyerUsd} + live $${quote.auctionFee.virtualUsd} + gate $${quote.auctionFee.gateUsd}${quote.auctionFee.envUsd ? ` + env $${quote.auctionFee.envUsd}` : ""}${quote.auctionFee.titleUsd ? ` + title $${quote.auctionFee.titleUsd}` : ""})`
+                      : ""}
                   </p>
                   <p className="mt-1 text-xs text-muted">
                     {t.pages.freightOcean}: ${quote.oceanUsd?.toLocaleString("en-US")} · {t.pages.freightTir}: $

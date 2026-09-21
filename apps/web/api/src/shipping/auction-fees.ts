@@ -2,64 +2,56 @@ import type { AuctionCode } from "./zones";
 
 type Tier = { max: number; fee: number };
 
-function feeFromTiers(price: number, tiers: Tier[]) {
+export type AuctionFeeBreakdown = {
+  buyerUsd: number;
+  virtualUsd: number;
+  gateUsd: number;
+  envUsd: number;
+  titleUsd: number;
+  totalUsd: number;
+};
+
+function tierFee(price: number, tiers: Tier[]) {
   const value = Math.max(0, Number(price) || 0);
   const hit = tiers.find((row) => value <= row.max);
-  return hit?.fee ?? tiers[tiers.length - 1]?.fee ?? 0;
+  return hit?.fee ?? 0;
 }
 
-/** Copart US buyer fee (hammer). */
+/** Copart U.S. member fees — licensed/standard, secured funds, clean title. */
 const COPART_BUYER: Tier[] = [
-  { max: 49.99, fee: 1 },
-  { max: 99.99, fee: 1 },
-  { max: 199.99, fee: 25 },
-  { max: 299.99, fee: 50 },
-  { max: 349.99, fee: 80 },
-  { max: 399.99, fee: 90 },
-  { max: 449.99, fee: 110 },
-  { max: 499.99, fee: 120 },
-  { max: 549.99, fee: 130 },
-  { max: 599.99, fee: 140 },
-  { max: 699.99, fee: 165 },
-  { max: 799.99, fee: 195 },
-  { max: 899.99, fee: 215 },
-  { max: 999.99, fee: 230 },
-  { max: 1199.99, fee: 255 },
-  { max: 1299.99, fee: 275 },
-  { max: 1399.99, fee: 285 },
-  { max: 1499.99, fee: 295 },
-  { max: 1599.99, fee: 305 },
-  { max: 1699.99, fee: 325 },
-  { max: 1799.99, fee: 340 },
-  { max: 1999.99, fee: 355 },
-  { max: 2399.99, fee: 380 },
-  { max: 2499.99, fee: 400 },
-  { max: 2999.99, fee: 415 },
-  { max: 3499.99, fee: 455 },
-  { max: 3999.99, fee: 500 },
-  { max: 4499.99, fee: 550 },
-  { max: 4999.99, fee: 600 },
-  { max: 5499.99, fee: 625 },
-  { max: 5999.99, fee: 650 },
-  { max: 6499.99, fee: 675 },
-  { max: 6999.99, fee: 700 },
-  { max: 7499.99, fee: 725 },
-  { max: 7999.99, fee: 750 },
-  { max: 8499.99, fee: 775 },
-  { max: 8999.99, fee: 800 },
-  { max: 9999.99, fee: 825 },
+  { max: 49.99, fee: 25 },
+  { max: 99.99, fee: 45 },
+  { max: 199.99, fee: 80 },
+  { max: 399.99, fee: 120 },
+  { max: 499.99, fee: 160 },
+  { max: 599.99, fee: 185 },
+  { max: 699.99, fee: 210 },
+  { max: 799.99, fee: 230 },
+  { max: 899.99, fee: 250 },
+  { max: 999.99, fee: 275 },
+  { max: 1199.99, fee: 325 },
+  { max: 1299.99, fee: 350 },
+  { max: 1399.99, fee: 365 },
+  { max: 1499.99, fee: 380 },
+  { max: 1599.99, fee: 390 },
+  { max: 1699.99, fee: 410 },
+  { max: 1799.99, fee: 420 },
+  { max: 1999.99, fee: 440 },
+  { max: 2399.99, fee: 470 },
+  { max: 2499.99, fee: 480 },
+  { max: 2999.99, fee: 500 },
+  { max: 3499.99, fee: 600 },
+  { max: 3999.99, fee: 675 },
+  { max: 4499.99, fee: 710 },
+  { max: 5999.99, fee: 750 },
+  { max: 7499.99, fee: 800 },
+  { max: 7999.99, fee: 815 },
+  { max: 9999.99, fee: 840 },
   { max: 14999.99, fee: 850 },
-  { max: 19999.99, fee: 900 },
-  { max: 24999.99, fee: 975 },
-  { max: 29999.99, fee: 1050 },
-  { max: 34999.99, fee: 1150 },
-  { max: 39999.99, fee: 1250 },
-  { max: 44999.99, fee: 1350 },
-  { max: 49999.99, fee: 1450 },
-  { max: Number.POSITIVE_INFINITY, fee: 0 },
 ];
 
-const COPART_VIRTUAL: Tier[] = [
+/** Copart live (online) virtual bid fee. */
+const COPART_LIVE_VIRTUAL: Tier[] = [
   { max: 99.99, fee: 0 },
   { max: 499.99, fee: 49 },
   { max: 999.99, fee: 59 },
@@ -67,67 +59,112 @@ const COPART_VIRTUAL: Tier[] = [
   { max: 1999.99, fee: 89 },
   { max: 3999.99, fee: 99 },
   { max: 5999.99, fee: 109 },
-  { max: 7499.99, fee: 129 },
-  { max: Number.POSITIVE_INFINITY, fee: 195 },
-];
-
-/** IAAI buyer premium (hammer). */
-const IAAI_BUYER: Tier[] = [
-  { max: 99.99, fee: 25 },
-  { max: 199.99, fee: 50 },
-  { max: 299.99, fee: 70 },
-  { max: 399.99, fee: 90 },
-  { max: 499.99, fee: 110 },
-  { max: 599.99, fee: 130 },
-  { max: 699.99, fee: 145 },
-  { max: 799.99, fee: 165 },
-  { max: 899.99, fee: 185 },
-  { max: 999.99, fee: 205 },
-  { max: 1199.99, fee: 230 },
-  { max: 1499.99, fee: 265 },
-  { max: 1999.99, fee: 310 },
-  { max: 2499.99, fee: 355 },
-  { max: 2999.99, fee: 395 },
-  { max: 3499.99, fee: 435 },
-  { max: 3999.99, fee: 475 },
-  { max: 4499.99, fee: 515 },
-  { max: 4999.99, fee: 555 },
-  { max: 5999.99, fee: 600 },
-  { max: 6999.99, fee: 650 },
-  { max: 7999.99, fee: 700 },
-  { max: 8999.99, fee: 750 },
-  { max: 9999.99, fee: 800 },
-  { max: 14999.99, fee: 850 },
-  { max: 19999.99, fee: 925 },
-  { max: 24999.99, fee: 1000 },
-  { max: 29999.99, fee: 1075 },
-  { max: Number.POSITIVE_INFINITY, fee: 0 },
-];
-
-const IAAI_INTERNET: Tier[] = [
-  { max: 99.99, fee: 0 },
-  { max: 499.99, fee: 45 },
-  { max: 999.99, fee: 55 },
-  { max: 1999.99, fee: 75 },
-  { max: 3999.99, fee: 95 },
-  { max: 7499.99, fee: 119 },
+  { max: 7999.99, fee: 139 },
   { max: Number.POSITIVE_INFINITY, fee: 149 },
 ];
 
-const GATE = 95;
+/** IAA standard licensed vehicle buyer fees (effective 2024–2026 public tables). */
+const IAAI_BUYER: Tier[] = [
+  { max: 49.99, fee: 25 },
+  { max: 99.99, fee: 45 },
+  { max: 199.99, fee: 80 },
+  { max: 299.99, fee: 130 },
+  { max: 349.99, fee: 137 },
+  { max: 399.99, fee: 145 },
+  { max: 449.99, fee: 175 },
+  { max: 499.99, fee: 185 },
+  { max: 549.99, fee: 205 },
+  { max: 599.99, fee: 210 },
+  { max: 699.99, fee: 240 },
+  { max: 799.99, fee: 270 },
+  { max: 899.99, fee: 295 },
+  { max: 999.99, fee: 320 },
+  { max: 1199.99, fee: 375 },
+  { max: 1299.99, fee: 395 },
+  { max: 1399.99, fee: 410 },
+  { max: 1499.99, fee: 430 },
+  { max: 1599.99, fee: 445 },
+  { max: 1699.99, fee: 465 },
+  { max: 1799.99, fee: 485 },
+  { max: 1999.99, fee: 510 },
+  { max: 2399.99, fee: 535 },
+  { max: 2499.99, fee: 570 },
+  { max: 2999.99, fee: 610 },
+  { max: 3499.99, fee: 655 },
+  { max: 3999.99, fee: 705 },
+  { max: 4499.99, fee: 725 },
+  { max: 4999.99, fee: 750 },
+  { max: 5499.99, fee: 775 },
+  { max: 5999.99, fee: 800 },
+  { max: 6499.99, fee: 825 },
+  { max: 6999.99, fee: 845 },
+  { max: 7499.99, fee: 880 },
+  { max: 7999.99, fee: 900 },
+  { max: 8499.99, fee: 925 },
+  { max: 9999.99, fee: 945 },
+  { max: 14999.99, fee: 1000 },
+];
 
-function highBidFee(price: number, auction: AuctionCode) {
-  if (price <= 49999.99) return 0;
-  const extra = price * (auction === "COPART" ? 0.04 : 0.035);
-  return Math.round(extra);
+/** IAA live online bid fee. */
+const IAAI_LIVE: Tier[] = [
+  { max: 99.99, fee: 0 },
+  { max: 499.99, fee: 50 },
+  { max: 999.99, fee: 65 },
+  { max: 1499.99, fee: 85 },
+  { max: 1999.99, fee: 95 },
+  { max: 3999.99, fee: 110 },
+  { max: 5999.99, fee: 125 },
+  { max: 7999.99, fee: 145 },
+  { max: Number.POSITIVE_INFINITY, fee: 160 },
+];
+
+function copartBuyer(price: number) {
+  if (price >= 15000) return Math.round(price * 0.0725);
+  return tierFee(price, COPART_BUYER);
+}
+
+function iaaiBuyer(price: number) {
+  if (price >= 15000) return Math.round(price * 0.075);
+  return tierFee(price, IAAI_BUYER);
+}
+
+/**
+ * National Copart / IAAI auction fees (secured wire, live online bid).
+ * Yard/state does not change buyer, virtual, gate or env on the published US tables;
+ * only storage and some facility extras do, and those are excluded.
+ */
+export function auctionFeeBreakdown(priceUsd: number, auction: AuctionCode): AuctionFeeBreakdown {
+  const price = Math.max(0, Number(priceUsd) || 0);
+  if (auction === "COPART") {
+    const buyerUsd = copartBuyer(price);
+    const virtualUsd = tierFee(price, COPART_LIVE_VIRTUAL);
+    const gateUsd = 79;
+    const envUsd = 0;
+    const titleUsd = 0;
+    return {
+      buyerUsd,
+      virtualUsd,
+      gateUsd,
+      envUsd,
+      titleUsd,
+      totalUsd: buyerUsd + virtualUsd + gateUsd + envUsd + titleUsd,
+    };
+  }
+  const buyerUsd = iaaiBuyer(price);
+  const virtualUsd = tierFee(price, IAAI_LIVE);
+  const gateUsd = 105;
+  const envUsd = 15;
+  const titleUsd = 20;
+  return {
+    buyerUsd,
+    virtualUsd,
+    gateUsd,
+    envUsd,
+    titleUsd,
+    totalUsd: buyerUsd + virtualUsd + gateUsd + envUsd + titleUsd,
+  };
 }
 
 export function auctionFeeUsd(priceUsd: number, auction: AuctionCode) {
-  const price = Math.max(0, Number(priceUsd) || 0);
-  if (auction === "COPART") {
-    const buyer = price > 49999.99 ? highBidFee(price, auction) : feeFromTiers(price, COPART_BUYER);
-    return buyer + feeFromTiers(price, COPART_VIRTUAL) + GATE;
-  }
-  const buyer = price > 49999.99 ? highBidFee(price, auction) : feeFromTiers(price, IAAI_BUYER);
-  return buyer + feeFromTiers(price, IAAI_INTERNET) + GATE;
+  return auctionFeeBreakdown(priceUsd, auction).totalUsd;
 }
