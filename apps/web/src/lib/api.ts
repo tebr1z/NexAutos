@@ -505,12 +505,15 @@ export const api = {
       auction: string;
       band: { id: string; min: number; max: number };
       priceUsd: number;
+      auctionFeeUsd?: number;
+      invoiceUsd?: number;
       year?: number;
       engineCc?: number;
       fuel?: string;
       dgkEngineCode?: string;
       oceanUsd: number | null;
       tirUsd: number;
+      freightUsd?: number | null;
       totalUsd: number | null;
       missing: boolean;
       cellKey: string;

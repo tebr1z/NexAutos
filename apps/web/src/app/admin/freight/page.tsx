@@ -67,8 +67,8 @@ export default function ShippingRatesAdminPage() {
         tirUsd: Number(tirUsd) || 0,
         cells: { [quote.cellKey]: ocean },
       });
-      const total = ocean + (Number(tirUsd) || 0);
-      setQuote({ ...quote, oceanUsd: ocean, totalUsd: total, missing: false, tirUsd: Number(tirUsd) || 0 });
+      const total = ocean + (Number(tirUsd) || 0) + (quote.auctionFeeUsd ?? 0);
+      setQuote({ ...quote, oceanUsd: ocean, totalUsd: total, freightUsd: ocean + (Number(tirUsd) || 0), missing: false, tirUsd: Number(tirUsd) || 0 });
       setNotice(
         `${quote.auction} · ${quote.stateName || quote.state} · ${bandLabel(quote.band)} üçün $${ocean.toLocaleString("en-US")} yadda saxlanıldı. Eyni aralıq bir daha soruşulmayacaq.`,
       );
@@ -146,7 +146,8 @@ export default function ShippingRatesAdminPage() {
             <div>
               <p className="font-display text-3xl text-white">${quote.totalUsd.toLocaleString("en-US")}</p>
               <p className="mt-1 text-xs text-zinc-500">
-                US yol pulu ${quote.oceanUsd?.toLocaleString("en-US")} + TIR ${quote.tirUsd.toLocaleString("en-US")}
+                Hərrac ${quote.priceUsd.toLocaleString("en-US")} + auction fee ${(quote.auctionFeeUsd ?? 0).toLocaleString("en-US")} + US yol pulu $
+                {quote.oceanUsd?.toLocaleString("en-US")} + TIR ${quote.tirUsd.toLocaleString("en-US")}
               </p>
             </div>
           ) : (

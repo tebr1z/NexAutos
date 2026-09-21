@@ -19,8 +19,8 @@ function customsHref(quote: Quote) {
   if (engine) params.set("engine", String(engine));
   if (fuel) params.set("fuel", fuel);
   if (quote.dgkEngineCode) params.set("fuelCode", quote.dgkEngineCode);
-  params.set("price", String(quote.priceUsd));
-  if (quote.totalUsd) params.set("freight", String(quote.totalUsd));
+  params.set("price", String(quote.invoiceUsd ?? quote.priceUsd + (quote.auctionFeeUsd ?? 0)));
+  if (quote.freightUsd) params.set("freight", String(quote.freightUsd));
   if (quote.year && quote.engineCc) params.set("auto", "1");
   return `/customs?${params.toString()}`;
 }
@@ -109,7 +109,12 @@ export function FreightCalculator() {
                   <h2 className="mt-6 text-lg font-medium">{t.pages.freightTotal}</h2>
                   <p className="font-display mt-2 text-3xl text-royal">${quote.totalUsd?.toLocaleString("en-US")}</p>
                   <p className="mt-3 text-xs text-muted">
-                    {t.pages.freightOcean}: ${quote.oceanUsd?.toLocaleString("en-US")} · {t.pages.freightTir}: ${quote.tirUsd.toLocaleString("en-US")}
+                    {t.pages.freightBid}: ${quote.priceUsd.toLocaleString("en-US")} · {t.pages.freightAuctionFee}: $
+                    {(quote.auctionFeeUsd ?? 0).toLocaleString("en-US")}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    {t.pages.freightOcean}: ${quote.oceanUsd?.toLocaleString("en-US")} · {t.pages.freightTir}: $
+                    {quote.tirUsd.toLocaleString("en-US")}
                   </p>
                 </>
               )}
