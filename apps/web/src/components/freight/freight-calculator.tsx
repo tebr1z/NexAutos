@@ -29,6 +29,7 @@ export function FreightCalculator() {
   const { t } = useI18n();
   const [url, setUrl] = useState("");
   const [price, setPrice] = useState("5000");
+  const [auction, setAuction] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -38,7 +39,11 @@ export function FreightCalculator() {
     setBusy(true);
     setError("");
     try {
-      const next = await api.shippingQuote({ url: url.trim() || undefined, priceUsd: Number(price) });
+      const next = await api.shippingQuote({
+        url: url.trim() || undefined,
+        priceUsd: Number(price),
+        auction: auction || undefined,
+      });
       setQuote(next);
     } catch (err) {
       setQuote(null);
@@ -67,6 +72,14 @@ export function FreightCalculator() {
           <label className="block text-xs text-muted">
             {t.pages.freightBid}
             <input required type="number" min={1} value={price} onChange={(e) => setPrice(e.target.value)} className={`${inp} mt-1`} />
+          </label>
+          <label className="block text-xs text-muted">
+            Hərrac
+            <select value={auction} onChange={(e) => setAuction(e.target.value)} className={`${inp} mt-1`}>
+              <option value="">Avtomatik (linkdən)</option>
+              <option value="COPART">Copart</option>
+              <option value="IAAI">IAAI</option>
+            </select>
           </label>
           {error ? <p className="text-sm text-red-500">{error}</p> : null}
           <button disabled={busy} className="w-full rounded-xl bg-fg py-3 text-sm font-medium text-bg disabled:opacity-50">

@@ -1,4 +1,12 @@
-import { BadRequestException, BadGatewayException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
+import { knownState } from './zones';
+
+const BROWSER_HEADERS = {
+  Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+};
 
 export type BidCarsLot = {
   url: string;
@@ -105,6 +113,125 @@ export function parseBidCarsHtml(html: string, url: string): BidCarsLot {
   };
 }
 
+function mergeLot(base: BidCarsLot, extra: Partial<BidCarsLot> | null | undefined): BidCarsLot {
+  if (!extra) return base;
+  return {
+    ...base,
+    title: extra.title || base.title,
+    vin: extra.vin || base.vin,
+    lot: extra.lot || base.lot,
+    auction: extra.auction && extra.auction !== 'OTHER' ? extra.auction : base.auction,
+    location: extra.location || base.location,
+    shippingFrom: extra.shippingFrom || base.shippingFrom,
+    state: extra.state || base.state,
+    year: extra.year || base.year,
+    engineCc: extra.engineCc || base.engineCc,
+    engineLabel: extra.engineLabel || base.engineLabel,
+    fuel: extra.fuel || base.fuel,
+  };
+}
+
+function parseLotFromUrl(url: URL): BidCarsLot {
+  const path = url.pathname;
+  const match = path.match(/\/lot\/([^/]+)(?:\/([^/?#]*))?/i);
+  const lot = match?.[1] ? decodeURIComponent(match[1]) : undefined;
+  const slug = match?.[2] ? decodeURIComponent(match[2]) : '';
+  const tokens = slug.split(/[-_]+/).filter(Boolean);
+  const yearTok = tokens.find((tok) => /^(19|20)\d{2}$/.test(tok));
+  let state: string | undefined;
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const code = tokens[i].toUpperCase();
+    if (code.length === 2 && knownState(code) && i !== 0) {
+      state = code;
+      break;
+    }
+  }
+  const title = slug
+    ? slug.replace(/-/g, ' ').replace(/\s+/g, ' ').trim()
+    : undefined;
+  return {
+    url: url.toString(),
+    lot,
+    title,
+    state,
+    year: yearTok ? Number(yearTok) : parseYear(url.toString(), title),
+  };
+}
+
+async function fetchText(url: string, ms: number, extra?: { accept?: string; referer?: string }) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), ms);
+  try {
+    const res = await fetch(url, {
+      signal: ac.signal,
+      redirect: 'follow',
+      headers: {
+        ...BROWSER_HEADERS,
+        Accept: extra?.accept || BROWSER_HEADERS.Accept,
+        Referer: extra?.referer || 'https://bid.cars/',
+      },
+    });
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchCopartLot(lotRaw?: string): Promise<{ hit: Partial<BidCarsLot> } | { miss: true } | { skip: true }> {
+  const lot = String(lotRaw || '').replace(/\D/g, '');
+  if (!lot) return { skip: true };
+  const body = await fetchText(`https://www.copart.com/public/data/lotdetails/solr/${lot}`, 10000, {
+    accept: 'application/json',
+    referer: `https://www.copart.com/lot/${lot}`,
+  });
+  if (!body) return { skip: true };
+  try {
+    const json = JSON.parse(body) as {
+      returnCode?: number;
+      data?: {
+        lotDetails?: {
+          ln?: number;
+          mkn?: string;
+          lmg?: string;
+          lcy?: number;
+          ld?: string;
+          yn?: string;
+          fv?: string;
+          egn?: string;
+          ft?: string;
+          vin?: string;
+        };
+      };
+    };
+    const row = json.data?.lotDetails;
+    if (json.returnCode !== 1 || !row || (row.ln != null && String(row.ln) !== lot)) return { miss: true };
+    if (!row.mkn && !row.yn && !row.lcy) return { miss: true };
+    const yard = String(row.yn || '').trim();
+    const state = yard.match(/\b([A-Z]{2})\b/)?.[1] || yard.split('-')[0]?.trim();
+    const liters = String(row.egn || '').match(/(\d(?:\.\d)?)\s*L/i);
+    const engineCc = liters ? Math.round(Number(liters[1]) * 1000) : parseEngineCc(String(row.egn || ''));
+    return {
+      hit: {
+        lot,
+        auction: 'COPART',
+        title: row.ld?.trim() || [row.lcy, row.mkn, row.lmg].filter(Boolean).join(' '),
+        year: row.lcy || undefined,
+        location: yard || undefined,
+        state: knownState(state) || undefined,
+        vin: row.vin || row.fv || undefined,
+        engineCc,
+        engineLabel: engineCc ? `${engineCc} cm³` : undefined,
+        fuel: row.ft || undefined,
+      },
+    };
+  } catch {
+    return { skip: true };
+  }
+}
+
 export async function fetchBidCarsLot(raw: string): Promise<BidCarsLot> {
   let url: URL;
   try {
@@ -115,23 +242,15 @@ export async function fetchBidCarsLot(raw: string): Promise<BidCarsLot> {
   if (!/^(www\.)?bid\.cars$/i.test(url.hostname) || !url.pathname.includes('/lot/')) {
     throw new BadRequestException('Yalnız bid.cars lot linki qəbul olunur.');
   }
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), 12000);
-  try {
-    const res = await fetch(url.toString(), {
-      signal: ac.signal,
-      headers: {
-        Accept: 'text/html',
-        'User-Agent': 'AutoNexQuote/1.0 (nex.autos freight estimate)',
-      },
-    });
-    if (!res.ok) throw new BadGatewayException('Bid.cars lot səhifəsi açılmadı.');
-    const html = await res.text();
-    return parseBidCarsHtml(html, url.toString());
-  } catch (err) {
-    if (err instanceof BadRequestException || err instanceof BadGatewayException) throw err;
-    throw new BadGatewayException('Bid.cars-a çıxılmadı.');
-  } finally {
-    clearTimeout(timer);
+  url.hostname = 'bid.cars';
+  let lot = parseLotFromUrl(url);
+  const html = await fetchText(url.toString(), 12000);
+  if (html) lot = mergeLot(lot, parseBidCarsHtml(html, url.toString()));
+  const copart = await fetchCopartLot(lot.lot);
+  if ('hit' in copart) lot = mergeLot(lot, copart.hit);
+  else if ('miss' in copart && (!lot.auction || lot.auction === 'OTHER')) {
+    lot = { ...lot, auction: 'IAAI' };
   }
+  if (lot.engineCc && !lot.engineLabel) lot.engineLabel = `${lot.engineCc} cm³`;
+  return lot;
 }

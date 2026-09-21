@@ -16,6 +16,7 @@ function bandLabel(band: { min: number; max: number }) {
 export default function ShippingRatesAdminPage() {
   const [url, setUrl] = useState("");
   const [price, setPrice] = useState("4500");
+  const [auction, setAuction] = useState("");
   const [tirUsd, setTirUsd] = useState("200");
   const [quote, setQuote] = useState<Quote | null>(null);
   const [learn, setLearn] = useState("");
@@ -37,7 +38,7 @@ export default function ShippingRatesAdminPage() {
     setNotice("");
     setLearn("");
     try {
-      const next = await api.shippingQuote({ url: url.trim(), priceUsd: Number(price) });
+      const next = await api.shippingQuote({ url: url.trim(), priceUsd: Number(price), auction: auction || undefined });
       setQuote(next);
       if (next.missing) {
         setNotice(
@@ -106,6 +107,14 @@ export default function ShippingRatesAdminPage() {
         <label className="block text-xs text-zinc-500">
           Hərrac qiyməti (USD)
           <input required type="number" min={1} value={price} onChange={(e) => setPrice(e.target.value)} className={`${inp} mt-1`} />
+        </label>
+        <label className="block text-xs text-zinc-500">
+          Hərrac (əgər link oxunmasa)
+          <select value={auction} onChange={(e) => setAuction(e.target.value)} className={`${inp} mt-1 bg-[#111]`}>
+            <option value="">Avtomatik</option>
+            <option value="COPART">Copart</option>
+            <option value="IAAI">IAAI</option>
+          </select>
         </label>
         <button disabled={busy} className="rounded-xl bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-50">
           {busy ? "…" : "Ştatı oxu və aralığı tap"}
