@@ -43,6 +43,21 @@ function field(text: string, label: string) {
   return match?.[1]?.trim();
 }
 
+function vinFromText(raw?: string) {
+  const hit = String(raw || '')
+    .toUpperCase()
+    .match(/\b([A-HJ-NPR-Z0-9]{17})\b/);
+  return hit?.[1];
+}
+
+function lotCandidates(raw?: string) {
+  const value = String(raw || '').trim();
+  const dashed = value.match(/^(\d+)-(\d{5,})$/);
+  if (dashed) return [dashed[2]];
+  const digits = value.replace(/\D/g, '');
+  return digits.length >= 5 ? [digits] : [];
+}
+
 function parseYear(url: string, title?: string, text?: string) {
   const fromPath = url.match(/\/((?:19|20)\d{2})-/);
   if (fromPath) return Number(fromPath[1]);
@@ -138,21 +153,22 @@ function parseLotFromUrl(url: URL): BidCarsLot {
   const slug = match?.[2] ? decodeURIComponent(match[2]) : '';
   const tokens = slug.split(/[-_]+/).filter(Boolean);
   const yearTok = tokens.find((tok) => /^(19|20)\d{2}$/.test(tok));
+  const vin = vinFromText(slug) || vinFromText(url.toString());
   let state: string | undefined;
   for (let i = tokens.length - 1; i >= 0; i--) {
     const code = tokens[i].toUpperCase();
+    if (vin && code === vin.slice(0, 2)) continue;
     if (code.length === 2 && knownState(code) && i !== 0) {
       state = code;
       break;
     }
   }
-  const title = slug
-    ? slug.replace(/-/g, ' ').replace(/\s+/g, ' ').trim()
-    : undefined;
+  const title = slug ? slug.replace(/-/g, ' ').replace(/\s+/g, ' ').trim() : undefined;
   return {
     url: url.toString(),
     lot,
     title,
+    vin,
     state,
     year: yearTok ? Number(yearTok) : parseYear(url.toString(), title),
   };
@@ -181,55 +197,62 @@ async function fetchText(url: string, ms: number, extra?: { accept?: string; ref
 }
 
 async function fetchCopartLot(lotRaw?: string): Promise<{ hit: Partial<BidCarsLot> } | { miss: true } | { skip: true }> {
-  const lot = String(lotRaw || '').replace(/\D/g, '');
-  if (!lot) return { skip: true };
-  const body = await fetchText(`https://www.copart.com/public/data/lotdetails/solr/${lot}`, 10000, {
-    accept: 'application/json',
-    referer: `https://www.copart.com/lot/${lot}`,
-  });
-  if (!body) return { skip: true };
-  try {
-    const json = JSON.parse(body) as {
-      returnCode?: number;
-      data?: {
-        lotDetails?: {
-          ln?: number;
-          mkn?: string;
-          lmg?: string;
-          lcy?: number;
-          ld?: string;
-          yn?: string;
-          fv?: string;
-          egn?: string;
-          ft?: string;
-          vin?: string;
+  const ids = lotCandidates(lotRaw);
+  if (!ids.length) return { skip: true };
+  let skipped = false;
+  for (const lot of ids) {
+    const body = await fetchText(`https://www.copart.com/public/data/lotdetails/solr/${lot}`, 10000, {
+      accept: 'application/json',
+      referer: `https://www.copart.com/lot/${lot}`,
+    });
+    if (!body || body.trim().startsWith('<')) {
+      skipped = true;
+      continue;
+    }
+    try {
+      const json = JSON.parse(body) as {
+        returnCode?: number;
+        data?: {
+          lotDetails?: {
+            ln?: number;
+            mkn?: string;
+            lmg?: string;
+            lcy?: number;
+            ld?: string;
+            yn?: string;
+            fv?: string;
+            egn?: string;
+            ft?: string;
+            vin?: string;
+          };
         };
       };
-    };
-    const row = json.data?.lotDetails;
-    if (json.returnCode !== 1 || !row || (row.ln != null && String(row.ln) !== lot)) return { miss: true };
-    if (!row.mkn && !row.yn && !row.lcy) return { miss: true };
-    const yard = String(row.yn || '').trim();
-    const state = yard.match(/\b([A-Z]{2})\b/)?.[1] || yard.split('-')[0]?.trim();
-    const liters = String(row.egn || '').match(/(\d(?:\.\d)?)\s*L/i);
-    const engineCc = liters ? Math.round(Number(liters[1]) * 1000) : parseEngineCc(String(row.egn || ''));
-    return {
-      hit: {
-        lot,
-        auction: 'COPART',
-        title: row.ld?.trim() || [row.lcy, row.mkn, row.lmg].filter(Boolean).join(' '),
-        year: row.lcy || undefined,
-        location: yard || undefined,
-        state: knownState(state) || undefined,
-        vin: row.vin || row.fv || undefined,
-        engineCc,
-        engineLabel: engineCc ? `${engineCc} cm³` : undefined,
-        fuel: row.ft || undefined,
-      },
-    };
-  } catch {
-    return { skip: true };
+      const row = json.data?.lotDetails;
+      if (json.returnCode !== 1 || !row || (row.ln != null && String(row.ln) !== lot)) continue;
+      if (!row.mkn && !row.yn && !row.lcy) continue;
+      const yard = String(row.yn || '').trim();
+      const state = yard.match(/\b([A-Z]{2})\b/)?.[1] || yard.split('-')[0]?.trim();
+      const liters = String(row.egn || '').match(/(\d(?:\.\d)?)\s*L/i);
+      const engineCc = liters ? Math.round(Number(liters[1]) * 1000) : parseEngineCc(String(row.egn || ''));
+      return {
+        hit: {
+          lot,
+          auction: 'COPART',
+          title: row.ld?.trim() || [row.lcy, row.mkn, row.lmg].filter(Boolean).join(' '),
+          year: row.lcy || undefined,
+          location: yard || undefined,
+          state: knownState(state) || undefined,
+          vin: row.vin || (row.fv && !row.fv.includes('*') ? row.fv : undefined),
+          engineCc,
+          engineLabel: engineCc ? `${engineCc} cm³` : undefined,
+          fuel: row.ft || undefined,
+        },
+      };
+    } catch {
+      skipped = true;
+    }
   }
+  return skipped ? { skip: true } : { miss: true };
 }
 
 export async function fetchBidCarsLot(raw: string): Promise<BidCarsLot> {
