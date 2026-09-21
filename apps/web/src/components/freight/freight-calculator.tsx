@@ -264,6 +264,14 @@ export function FreightCalculator() {
                   ) : dutyNote ? (
                     <p className="mt-4 text-sm text-muted">{dutyNote}</p>
                   ) : null}
+                  <button
+                    type="button"
+                    disabled={busy || dutyBusy}
+                    onClick={() => void calcDuty()}
+                    className="mt-5 w-full rounded-xl bg-fg py-3 text-sm font-medium text-bg disabled:opacity-50"
+                  >
+                    {dutyBusy ? "…" : t.pages.freightDutyCalc}
+                  </button>
                 </>
               )}
               <a
