@@ -14,7 +14,7 @@ async function bootstrap() {
   app.use(urlencoded({ extended: true, limit: '20mb' }));
   app.setGlobalPrefix('api/v1');
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
-  const origins = (process.env.CORS_ORIGIN ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000')
+  const origins = (process.env.CORS_ORIGIN ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:5001')
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
@@ -41,7 +41,7 @@ async function bootstrap() {
     SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, config));
   }
 
-  const port = Number(process.env.API_PORT || process.env.PORT || 4000);
+  const port = Number(process.env.API_PORT || process.env.PORT || 5002);
   const host = process.env.API_HOST || "0.0.0.0";
   await app.listen(port, host);
 }

@@ -10,9 +10,9 @@ const apiDir = path.join(root, "api");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const nextBin = path.join(root, "node_modules", "next", "dist", "bin", "next");
 
-const publicPort = String(process.env.PORT || 3000);
+const publicPort = String(process.env.PORT || 5001);
 const apiPort = String(
-  process.env.API_PORT && process.env.API_PORT !== publicPort ? process.env.API_PORT : 4000,
+  process.env.API_PORT && process.env.API_PORT !== publicPort ? process.env.API_PORT : 5002,
 );
 const apiHost = process.env.API_HOST || "127.0.0.1";
 

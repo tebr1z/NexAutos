@@ -53,6 +53,11 @@ export function Footer() {
         <span>© {new Date().getFullYear()} Auto Nex. {t.footer.rights}</span>
         <span>{t.footer.cities}</span>
       </div>
+      <div className="border-t border-line py-3 text-center text-[11px] tracking-wide text-muted">
+        <a href="https://vexirahost.com" target="_blank" rel="noreferrer" className="hover:text-fg">
+          Powered by VexiraHost.com
+        </a>
+      </div>
     </footer>
   );
 }

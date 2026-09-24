@@ -6,7 +6,7 @@ export function nestApiBase() {
   }
   const pub = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (pub && /^https?:\/\//i.test(pub)) return pub.replace(/\/$/, "");
-  return "http://127.0.0.1:4000/api/v1";
+  return "http://127.0.0.1:5002/api/v1";
 }
 
 /** Browser talks to the Next.js origin so one public port is enough. */
