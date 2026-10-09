@@ -9,6 +9,12 @@ export class LoginDto {
   password: string;
 }
 
+export class RefreshDto {
+  @IsString()
+  @MinLength(32)
+  refreshToken: string;
+}
+
 export class RegisterDto {
   @IsString()
   name: string;

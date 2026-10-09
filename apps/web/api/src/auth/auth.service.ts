@@ -43,6 +43,20 @@ export class AuthService {
     return this.issue(user);
   }
 
+  async refresh(raw: string) {
+    const tokenHash = createHash('sha256').update(raw).digest('hex');
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+    if (!stored || stored.expiresAt.getTime() <= Date.now() || !stored.user.isActive) {
+      if (stored) await this.prisma.refreshToken.delete({ where: { id: stored.id } }).catch(() => undefined);
+      throw new UnauthorizedException('Sessiyanın vaxtı bitib. Yenidən daxil olun.');
+    }
+    await this.prisma.refreshToken.delete({ where: { id: stored.id } });
+    return this.issue(stored.user);
+  }
+
   private async issue(user: { id: string; email: string; name: string; role: string; locale: string }) {
     const accessToken = await this.jwt.signAsync({
       sub: user.id,
@@ -55,7 +69,7 @@ export class AuthService {
       data: {
         tokenHash,
         userId: user.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
     return {

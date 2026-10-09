@@ -11,6 +11,7 @@ const API_ROUTES = new Set([
   "/shipping/quote",
   "/shipping/rates",
   "/auth/login",
+  "/auth/refresh",
   "/customs/auto-options?lang=az",
   "/customs/auto-duty?lang=az",
 ]);
@@ -50,9 +51,27 @@ async function apiRequest(path, init = {}) {
   if (!response.ok) {
     const raw = body && body.message;
     const message = Array.isArray(raw) ? raw.join(" ") : raw;
-    throw new Error(message || `Auto Nex API ${response.status} xətası verdi.`);
+    const error = new Error(message || `Auto Nex API ${response.status} xətası verdi.`);
+    error.status = response.status;
+    throw error;
   }
   return body;
+}
+
+async function refreshSession() {
+  const auth = await chrome.storage.local.get({ refreshToken: "" });
+  if (!auth.refreshToken) throw new Error("Əvvəl admin hesabı ilə daxil olun.");
+  try {
+    const data = await apiRequest("/auth/refresh", {
+      method: "POST",
+      body: { refreshToken: auth.refreshToken },
+    });
+    await chrome.storage.local.set({ authToken: data.accessToken, refreshToken: data.refreshToken });
+    return data.accessToken;
+  } catch {
+    await chrome.storage.local.remove(["authToken", "refreshToken"]);
+    throw new Error("Sessiya bitib. Admin hesabı ilə yenidən daxil olun.");
+  }
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -105,8 +124,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   (async () => {
     if (message.type === "ANX_GET_SETTINGS") {
-      const auth = await chrome.storage.local.get({ authToken: "", authEmail: "" });
-      return { ok: true, data: { ...(await settings()), authenticated: Boolean(auth.authToken), authEmail: auth.authEmail } };
+      const auth = await chrome.storage.local.get({ authToken: "", refreshToken: "", authEmail: "" });
+      return { ok: true, data: { ...(await settings()), authenticated: Boolean(auth.authToken || auth.refreshToken), authEmail: auth.authEmail } };
     }
     if (message.type === "ANX_SAVE_SETTINGS") {
       const apiBase = normalizeApiBase(message.apiBase);
@@ -127,21 +146,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       });
       const staff = ["SUPER_ADMIN", "ADMIN", "MANAGER", "STAFF"];
       if (!data?.accessToken || !staff.includes(data.user?.role)) throw new Error("Yol tarifini yazmaq üçün admin və ya işçi hesabı lazımdır.");
-      await chrome.storage.local.set({ authToken: data.accessToken, authEmail: data.user.email });
+      await chrome.storage.local.set({ authToken: data.accessToken, refreshToken: data.refreshToken, authEmail: data.user.email });
       return { ok: true, data: { email: data.user.email, role: data.user.role } };
     }
     if (message.type === "ANX_SAVE_RATE") {
-      const auth = await chrome.storage.local.get({ authToken: "" });
-      if (!auth.authToken) throw new Error("Əvvəl admin e-poçtu və şifrəsi ilə daxil olun.");
+      const auth = await chrome.storage.local.get({ authToken: "", refreshToken: "" });
+      let accessToken = auth.authToken || (auth.refreshToken ? await refreshSession() : "");
+      if (!accessToken) throw new Error("Əvvəl admin e-poçtu və şifrəsi ilə daxil olun.");
       const cellKey = String(message.cellKey || "").trim();
       const rateUsd = Number(message.rateUsd);
       const tirUsd = Number(message.tirUsd);
       if (!cellKey || !Number.isFinite(rateUsd) || rateUsd <= 0) throw new Error("Yol pulunu düzgün yazın.");
-      const data = await apiRequest("/shipping/rates", {
-        method: "PUT",
-        token: auth.authToken,
-        body: { tirUsd: Number.isFinite(tirUsd) && tirUsd >= 0 ? tirUsd : undefined, cells: { [cellKey]: rateUsd } },
-      });
+      const payload = { tirUsd: Number.isFinite(tirUsd) && tirUsd >= 0 ? tirUsd : undefined, cells: { [cellKey]: rateUsd } };
+      let data;
+      try {
+        data = await apiRequest("/shipping/rates", { method: "PUT", token: accessToken, body: payload });
+      } catch (error) {
+        if (error?.status !== 401) throw error;
+        accessToken = await refreshSession();
+        data = await apiRequest("/shipping/rates", { method: "PUT", token: accessToken, body: payload });
+      }
       return { ok: true, data };
     }
     throw new Error("Naməlum Auto Nex əməliyyatı.");

@@ -12,6 +12,7 @@
     <style>
       :host { display:block; width:100%; margin:16px 0; color:#e5e7eb; font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
       :host([hidden]) { display:none !important; }
+      .body [hidden] { display:none !important; }
       * { box-sizing:border-box; }
       .card { overflow:hidden; border:1px solid #273449; border-radius:16px; background:#0b1220; box-shadow:0 16px 44px rgba(3,7,18,.28); }
       .head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:15px 16px; background:linear-gradient(135deg,#071426,#11223c); border-bottom:1px solid #273449; }
@@ -72,8 +73,8 @@
           <p id="rateHint">ABŞ–Poti yol pulunu bir dəfə yazın. Poti–Bakı xərci avtomatik əlavə ediləcək və tarif DB-də qalacaq.</p>
           <div class="grid">
             <label class="wide">ABŞ–Poti tarifi, USD<input id="rateUsd" type="number" min="1" step="10" placeholder="Məsələn: 270"></label>
-            <label>Admin e-poçtu<input id="adminEmail" type="email" autocomplete="username"></label>
-            <label>Admin şifrəsi<input id="adminPassword" type="password" autocomplete="current-password"></label>
+            <label id="adminEmailWrap">Admin e-poçtu<input id="adminEmail" type="email" autocomplete="username"></label>
+            <label id="adminPasswordWrap">Admin şifrəsi<input id="adminPassword" type="password" autocomplete="current-password"></label>
           </div>
           <button id="saveRate" type="button">Bazaya yaz və yenidən hesabla</button>
           <p class="status" id="rateStatus"></p>
@@ -83,7 +84,7 @@
     </section>`;
 
   const refs = Object.fromEntries(
-    ["priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "rateEditor", "rateHint", "rateUsd", "adminEmail", "adminPassword", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
+    ["priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "rateEditor", "rateHint", "rateUsd", "adminEmailWrap", "adminPasswordWrap", "adminEmail", "adminPassword", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
   );
   const manual = new Set();
   let lastUrl = location.href;
@@ -240,6 +241,16 @@
     return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
   }
 
+  function setAuthUi(authenticated, email = "") {
+    refs.adminEmailWrap.hidden = authenticated;
+    refs.adminPasswordWrap.hidden = authenticated;
+    if (email) refs.adminEmail.value = email;
+    refs.rateStatus.className = "status";
+    refs.rateStatus.textContent = authenticated
+      ? "Admin girişi yadda saxlanıb; email və şifrə yenidən istənməyəcək."
+      : "Tarifi DB-yə yazmaq üçün bir dəfə admin hesabı ilə daxil olun.";
+  }
+
   async function calculate(triggeredAutomatically = false) {
     if (calculating) {
       recalculateAfterCurrent = true;
@@ -377,10 +388,11 @@
     try {
       const email = refs.adminEmail.value.trim();
       const password = refs.adminPassword.value;
-      if (email || password) {
+      if (!refs.adminEmailWrap.hidden) {
         if (!email || !password) throw new Error("Admin e-poçtu və şifrəsini birlikdə yazın.");
-        await send({ type: "ANX_LOGIN", email, password });
+        const session = await send({ type: "ANX_LOGIN", email, password });
         refs.adminPassword.value = "";
+        setAuthUi(true, session.email);
       }
       await send({
         type: "ANX_SAVE_RATE",
@@ -391,8 +403,13 @@
       refs.rateStatus.textContent = "Tarif DB-də yadda saxlandı. Növbəti dəfə avtomatik gələcək.";
       await calculate(false);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/sessiya|daxil olun/i.test(message)) {
+        refs.adminEmailWrap.hidden = false;
+        refs.adminPasswordWrap.hidden = false;
+      }
       refs.rateStatus.className = "status error";
-      refs.rateStatus.textContent = error instanceof Error ? error.message : String(error);
+      refs.rateStatus.textContent = message;
     } finally {
       refs.saveRate.disabled = false;
     }
@@ -469,8 +486,7 @@
   readPage(true);
   send({ type: "ANX_GET_SETTINGS" })
     .then((value) => {
-      refs.adminEmail.value = value.authEmail || "";
-      if (value.authenticated) refs.rateStatus.textContent = "Admin girişi yadda saxlanıb; şifrəni yenidən yazmaq lazım deyil.";
+      setAuthUi(value.authenticated, value.authEmail || "");
     })
     .catch(() => undefined);
 
