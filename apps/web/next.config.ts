@@ -1,9 +1,25 @@
 import type { NextConfig } from "next";
+import { networkInterfaces } from "node:os";
+
+const configuredDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const localDevOrigins =
+  process.env.NODE_ENV === "production"
+    ? []
+    : Object.values(networkInterfaces()).flatMap((addresses) =>
+        (addresses ?? [])
+          .filter((address) => address.family === "IPv4" && !address.internal)
+          .map((address) => address.address),
+      );
+const allowedDevOrigins = [...new Set([...configuredDevOrigins, ...localDevOrigins])];
 
 const nextConfig: NextConfig = {
-  typescript: { ignoreBuildErrors: true },
+  allowedDevOrigins: allowedDevOrigins.length ? allowedDevOrigins : undefined,
   productionBrowserSourceMaps: false,
   experimental: { cpus: 1 },
+  turbopack: { root: process.cwd() },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },

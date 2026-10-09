@@ -7,6 +7,7 @@ const path = require("path");
 const root = path.join(__dirname, "..");
 const apiDir = path.join(root, "api");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const npmCli = process.env.npm_execpath;
 const env = {
   ...process.env,
   NODE_OPTIONS: process.env.NODE_OPTIONS || "--max-old-space-size=1536",
@@ -17,11 +18,12 @@ const env = {
 
 function run(cwd, args, cmd = npm) {
   console.log(`\n[build] ${path.relative(root, cwd) || "."} > ${cmd} ${args.join(" ")}\n`);
-  const result = spawnSync(cmd, args, {
+  const useNpmCli = cmd === npm && npmCli;
+  const result = spawnSync(useNpmCli ? process.execPath : cmd, useNpmCli ? [npmCli, ...args] : args, {
     cwd,
     env,
     stdio: "inherit",
-    shell: process.platform === "win32" && cmd === npm,
+    shell: !useNpmCli && process.platform === "win32" && cmd === npm,
   });
   if (result.status !== 0) process.exit(result.status || 1);
 }

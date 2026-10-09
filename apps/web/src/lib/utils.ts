@@ -14,7 +14,7 @@ function pad(n: number) {
 }
 
 /** Always `04.09.2026`, with time when it is not midnight: `04.09.2026 14:30`. */
-export function formatDate(value: string | Date, _locale?: string) {
+export function formatDate(value: string | Date) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
   const date = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;

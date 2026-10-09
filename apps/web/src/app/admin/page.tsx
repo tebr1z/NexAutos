@@ -681,8 +681,6 @@ export default function AdminHomePage() {
       vesselName: voyage.vesselName || live?.vesselName || loaded?.vesselName,
       vesselImo: createdImo || undefined,
       containerStatus: live?.containerStatus || loaded?.containerStatus,
-      lat: live?.lat ?? loaded?.lat,
-      lng: live?.lng ?? loaded?.lng,
       eta: voyage.eta || live?.eta || loaded?.eta,
       mapLat: parseCoord(voyage.mapLat),
       mapLng: parseCoord(voyage.mapLng),

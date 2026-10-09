@@ -8,6 +8,7 @@ const { resolveDatabaseUrl } = require("../api/scripts/resolve-database-url.cjs"
 const root = path.join(__dirname, "..");
 const apiDir = path.join(root, "api");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const npmCli = process.env.npm_execpath;
 const nextBin = path.join(root, "node_modules", "next", "dist", "bin", "next");
 
 const publicPort = String(process.env.PORT || 5001);
@@ -51,11 +52,12 @@ function shutdown(code) {
 }
 
 function spawnChild(cmd, args, cwd, extraEnv, useShell) {
-  const child = spawn(cmd, args, {
+  const useNpmCli = cmd === npm && npmCli;
+  const child = spawn(useNpmCli ? process.execPath : cmd, useNpmCli ? [npmCli, ...args] : args, {
     cwd,
     env: { ...process.env, ...extraEnv },
     stdio: "inherit",
-    shell: Boolean(useShell),
+    shell: !useNpmCli && Boolean(useShell),
   });
   children.push(child);
   child.on("exit", (code, signal) => {

@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Auto Nex – Premium car import and shipment tracking platform",
   "scripts": {
+    "dev": "node scripts/dev-all.cjs",
     "build": "node scripts/build-all.cjs",
     "start": "node scripts/start-all.cjs",
     "dev:web": "npm run dev --prefix apps/web",

@@ -152,6 +152,7 @@ export default function AdminInsurancePage() {
     setNotice("");
     try {
       const target = await ensureRecord();
+      if (!target.id) throw new Error("Sığorta yazılmadı.");
       const phone = normalizePhone(form.phone || target.customerPhone);
       if (!phone) throw new Error("Müştəri telefonu yoxdur — müqavilə göndərilmir.");
       const saved = await api.updateInsurance(target.id, {
@@ -202,6 +203,7 @@ export default function AdminInsurancePage() {
     setNotice("");
     try {
       const target = await ensureRecord();
+      if (!target.id) throw new Error("Sığorta yazılmadı.");
       const saved = await api.updateInsurance(target.id, {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
