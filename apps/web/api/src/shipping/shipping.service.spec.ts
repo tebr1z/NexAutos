@@ -1,5 +1,6 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { ShippingService } from './shipping.service';
+import { bandForPrice } from './zones';
 
 describe('ShippingService', () => {
   function service(cells: Record<string, number | null>) {
@@ -36,5 +37,18 @@ describe('ShippingService', () => {
     expect(result.freightUsd).toBe(470);
     expect(result.rateSource).toBe('state');
     expect(result.cellKey).toBe('GA:IAAI:savannah:b');
+  });
+
+  it('uses exactly three price bands and preserves the old upper-band rate', async () => {
+    expect(bandForPrice(0).id).toBe('a');
+    expect(bandForPrice(3000).id).toBe('a');
+    expect(bandForPrice(3001).id).toBe('b');
+    expect(bandForPrice(7000).id).toBe('b');
+    expect(bandForPrice(7001).id).toBe('c');
+    expect(bandForPrice(150000).id).toBe('c');
+
+    const result = await service({ 'GA:IAAI:d': 490 }).quote({ ...quote, priceUsd: 20000 });
+    expect(result.band.id).toBe('c');
+    expect(result.oceanUsd).toBe(490);
   });
 });

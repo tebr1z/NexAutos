@@ -31,9 +31,15 @@ export class ShippingService {
   async rates(): Promise<Stored> {
     const row = await this.prisma.setting.findUnique({ where: { key: KEY } });
     const value = (row?.value ?? {}) as Partial<Stored>;
+    const cells = { ...emptyRateCells(), ...(value.cells ?? {}) };
+    for (const [key, rate] of Object.entries(value.cells ?? {})) {
+      if (!key.endsWith(':d') || Number(rate) <= 0) continue;
+      const mergedKey = `${key.slice(0, -1)}c`;
+      if (Number(cells[mergedKey]) <= 0) cells[mergedKey] = Number(rate);
+    }
     return {
       tirUsd: Number(value.tirUsd) >= 0 ? Number(value.tirUsd) : 200,
-      cells: { ...emptyRateCells(), ...(value.cells ?? {}) },
+      cells,
     };
   }
 

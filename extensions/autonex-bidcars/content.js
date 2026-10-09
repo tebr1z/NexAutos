@@ -27,6 +27,11 @@
       input,select { width:100%; margin-top:5px; border:1px solid #334155; border-radius:9px; background:#111827; color:#f8fafc; padding:9px 10px; outline:none; font:600 13px/1.2 inherit; }
       input:focus,select:focus { border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.15); }
       .wide { grid-column:1/-1; }
+      details.compact { margin-top:10px; border:1px solid #273449; border-radius:10px; background:#0f172a; }
+      details.compact > summary { padding:10px 12px; color:#a9bdd6; font-size:11px; font-weight:800; cursor:pointer; list-style:none; }
+      details.compact > summary::after { content:"＋"; float:right; color:#60a5fa; }
+      details.compact[open] > summary::after { content:"－"; }
+      details.compact > .grid, details.compact > .detail-body { padding:0 12px 12px; }
       .actions { display:flex; gap:8px; margin-top:12px; }
       .primary { flex:1; border:0; border-radius:10px; background:#16a34a; color:white; padding:11px 12px; font-weight:800; cursor:pointer; }
       .primary:disabled { opacity:.55; cursor:wait; }
@@ -58,13 +63,18 @@
           <label class="wide">Hesablama qiyməti<select id="priceSource"><option value="bidNow">Bid Now / seçilən qiymət</option><option value="currentBid">Current Bid</option><option value="lotPrice">Lot Price</option><option value="manual">Əl ilə yaz</option></select></label>
           <label>Avtomobil qiyməti<input id="price" type="number" min="1" step="50"></label>
           <label>Hesablanan auction fee<input id="auctionFee" type="number" readonly></label>
+        </div>
+        <details class="compact">
+          <summary>Məlumatları yoxla və düzəlt</summary>
+          <div class="grid">
           <label>Hərrac<select id="auction"><option value="">Seçin</option><option value="IAAI">IAAI</option><option value="COPART">Copart</option></select></label>
           <label>Title<select id="titleKind"><option value="SALVAGE">Salvage</option><option value="CLEAN">Clean title</option></select></label>
           <label class="wide">Location / yard<input id="location" type="text" placeholder="Savannah (GA)"></label>
           <label>İl<input id="year" type="number" min="1950" max="2035"></label>
           <label>Mühərrik, cm³<input id="engine" type="number" min="0" step="100"></label>
           <label class="wide">Yanacaq<select id="fuel"><option value="Gasoline">Benzin</option><option value="Diesel">Dizel</option><option value="Hybrid">Hibrid</option><option value="Plug-in hybrid">Plug-in hibrid</option><option value="Electric">Elektrik</option><option value="LPG">Qaz / LPG</option></select></label>
-        </div>
+          </div>
+        </details>
         <div class="actions"><button class="primary" id="calculate" type="button">Auto Nex ilə hesabla</button></div>
         <p class="status" id="status"></p>
         <div class="result" id="result" hidden></div>
@@ -287,7 +297,7 @@
       });
       lastQuote = quote;
       refs.rateEditor.hidden = !quote.missing;
-      refs.rateHint.textContent = `${quote.auction} · ${quote.yard || yard} (${quote.state}) · ${quote.band?.min || 1}–${quote.band?.max || "+"} USD qiymət aralığı üçün ABŞ–Poti tarifini yazın. Poti–Bakı ${usd(quote.tirUsd)} avtomatik əlavə olunacaq.`;
+      refs.rateHint.textContent = `${quote.auction} · ${quote.yard || yard} (${quote.state}) · ${quote.band?.min ?? 0}–${quote.band?.max ?? "+"} USD qiymət aralığı üçün ABŞ–Poti tarifini yazın. Poti–Bakı ${usd(quote.tirUsd)} avtomatik əlavə olunacaq.`;
       const pickedFee = parser.selectAuctionFee({
         priceUsd,
         bidCarsFeeUsd: latestData?.auctionFeeUsd,
@@ -343,15 +353,17 @@
       const totalWithCustomsUsd = totalWithoutCustomsUsd == null || !duty ? null : totalWithoutCustomsUsd + customsUsd;
       const totalWithCustomsAzn = totalWithCustomsUsd == null || !duty ? null : totalWithCustomsUsd * Number(duty.usdCourse || 0);
       refs.result.innerHTML = `
-        <div class="row"><span>Avtomobil qiyməti</span><strong>${usd(priceUsd)}</strong></div>
-        <div class="row"><span>Auction fee (${auctionFeeSource})</span><strong>${usd(auctionFeeUsd)}</strong></div>
         <div class="row"><span>Avtomobil + auction fee</span><strong>${usd(invoiceUsd)}</strong></div>
-        <div class="row"><span>Auto Nex ABŞ daxili + okean</span><strong>${quote.oceanUsd == null ? "Tarif yoxdur" : usd(quote.oceanUsd)}</strong></div>
-        <div class="row"><span>Gürcüstan–Bakı</span><strong>${usd(quote.tirUsd)}</strong></div>
-        <div class="row"><span>Ümumi yol xərci</span><strong>${freightUsd == null ? "Tarif gözlənilir" : usd(freightUsd)}</strong></div>
-        ${totalWithoutCustomsUsd == null ? "" : `<div class="row"><span>Maşın + auction + yol</span><strong>${usd(totalWithoutCustomsUsd)}</strong></div>`}
+        <div class="row"><span>Bütün yol xərci</span><strong>${freightUsd == null ? "Tarif gözlənilir" : usd(freightUsd)}</strong></div>
         <div class="row"><span>DGK gömrük</span><strong>${duty ? `${usd(customsUsd)} · ${Number(duty.total?.value || 0).toLocaleString("az-AZ", { maximumFractionDigits: 2 })} AZN` : "—"}</strong></div>
         ${totalWithCustomsUsd == null ? "" : `<div class="total"><small>Yekun: maşın + auction + yol + gömrük</small><div>${usd(totalWithCustomsUsd)}</div><div style="font-size:15px;color:#bfdbfe">${Number(totalWithCustomsAzn || 0).toLocaleString("az-AZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} AZN</div></div>`}
+        <details class="compact"><summary>Hesab detalları</summary><div class="detail-body">
+          <div class="row"><span>Avtomobil</span><strong>${usd(priceUsd)}</strong></div>
+          <div class="row"><span>Auction fee (${auctionFeeSource})</span><strong>${usd(auctionFeeUsd)}</strong></div>
+          <div class="row"><span>ABŞ–Poti</span><strong>${quote.oceanUsd == null ? "Tarif yoxdur" : usd(quote.oceanUsd)}</strong></div>
+          <div class="row"><span>Poti–Bakı</span><strong>${usd(quote.tirUsd)}</strong></div>
+          ${totalWithoutCustomsUsd == null ? "" : `<div class="row"><span>Gömrükdən əvvəl</span><strong>${usd(totalWithoutCustomsUsd)}</strong></div>`}
+        </div></details>
         ${quote.rateSource === "state" ? `<p class="note">Bu yard üçün ayrıca tarif tapılmadı; ${escapeHtml(quote.state)} ştatının əvvəlki tarifi istifadə olundu.</p>` : ""}
         ${quote.auctionFee ? `<p class="note">${escapeHtml(quote.auction)} fee: buyer ${usd(quote.auctionFee.buyerUsd)} + live ${usd(quote.auctionFee.virtualUsd)} + gate ${usd(quote.auctionFee.gateUsd)}${quote.auctionFee.envUsd ? ` + env ${usd(quote.auctionFee.envUsd)}` : ""}${quote.auctionFee.titleUsd ? ` + title ${usd(quote.auctionFee.titleUsd)}` : ""}</p>` : ""}
         ${quote.missing ? `<p class="note">Bu yard və qiymət qrupu üçün yol pulu tarifi admin paneldə yoxdur.</p>` : ""}

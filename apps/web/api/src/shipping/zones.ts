@@ -1,8 +1,7 @@
 export const BANDS = [
-  { id: "a", min: 1, max: 3000 },
+  { id: "a", min: 0, max: 3000 },
   { id: "b", min: 3001, max: 7000 },
-  { id: "c", min: 7001, max: 15000 },
-  { id: "d", min: 15001, max: 1_000_000 },
+  { id: "c", min: 7001, max: 150000 },
 ] as const;
 
 export const AUCTIONS = ["COPART", "IAAI"] as const;
