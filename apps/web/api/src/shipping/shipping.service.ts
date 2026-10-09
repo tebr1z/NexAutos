@@ -33,6 +33,58 @@ function yardNameFromSlug(slug: string) {
     .join(' ');
 }
 
+const YARD_DIRECTIONS = new Set(['north', 'south', 'east', 'west', 'central']);
+
+function comparableYardSlug(slug: string) {
+  return slug
+    .split('-')
+    .map((part) => (part === 'ft' ? 'fort' : part))
+    .filter(Boolean)
+    .join('-');
+}
+
+function baseYardSlug(slug: string) {
+  return comparableYardSlug(slug)
+    .split('-')
+    .filter((part) => !YARD_DIRECTIONS.has(part))
+    .join('-');
+}
+
+function resolveYardRate(
+  table: Stored,
+  state: string,
+  auction: AuctionCode,
+  band: string,
+  requestedSlug: string,
+) {
+  const exactKey = `${state}:${auction}:${requestedSlug}:${band}`;
+  const exactRate = Number(table.cells[exactKey]);
+  if (exactRate > 0) return { rate: exactRate, key: exactKey, slug: requestedSlug, exact: true };
+
+  const prefix = `${state}:${auction}:`;
+  const suffix = `:${band}`;
+  const candidates = Object.entries(table.cells)
+    .map(([key, rawRate]) => {
+      if (!key.startsWith(prefix) || !key.endsWith(suffix)) return null;
+      const slug = key.slice(prefix.length, -suffix.length);
+      const rate = Number(rawRate);
+      return slug && rate > 0 ? { key, slug, rate } : null;
+    })
+    .filter((row): row is { key: string; slug: string; rate: number } => Boolean(row));
+
+  const comparable = comparableYardSlug(requestedSlug);
+  const same = candidates.find((row) => comparableYardSlug(row.slug) === comparable);
+  if (same) return { ...same, exact: false };
+
+  const base = baseYardSlug(requestedSlug);
+  const baseExact = candidates.find((row) => comparableYardSlug(row.slug) === base);
+  if (baseExact) return { ...baseExact, exact: false };
+
+  const baseMatches = candidates.filter((row) => baseYardSlug(row.slug) === base);
+  if (baseMatches.length === 1) return { ...baseMatches[0], exact: false };
+  return null;
+}
+
 @Injectable()
 export class ShippingService {
   constructor(private prisma: PrismaService) {}
@@ -134,10 +186,11 @@ export class ShippingService {
     if (!place?.slug) throw new BadRequestException('Yard tapılmadı. Lotda Sun Valley, Los Angeles kimi lokasiya olmalıdır.');
     const key = cellKey(state, auction, band.id, place.slug);
     const stateKey = cellKey(state, auction, band.id);
-    const yardRate = Number(table.cells[key]);
+    const yardMatch = resolveYardRate(table, state, auction, band.id, place.slug);
+    const yardRate = Number(yardMatch?.rate);
     const stateRate = Number(table.cells[stateKey]);
     const ocean = yardRate > 0 ? yardRate : stateRate > 0 ? stateRate : null;
-    const rateSource = yardRate > 0 ? 'yard' : stateRate > 0 ? 'state' : null;
+    const rateSource = yardRate > 0 ? (yardMatch?.exact ? 'yard' : 'yard-alias') : stateRate > 0 ? 'state' : null;
     const stateName = US_STATES.find((row) => row.code === state)?.name;
     const fee = auctionFeeBreakdown(dto.priceUsd, auction, dto.titleKind);
     const freightUsd = ocean != null ? ocean + table.tirUsd : null;
@@ -147,6 +200,8 @@ export class ShippingService {
       stateName,
       yard: place.yard,
       yardSlug: place.slug,
+      matchedYard: yardMatch ? table.yards[yardMatch.key.slice(0, yardMatch.key.lastIndexOf(':'))] || yardNameFromSlug(yardMatch.slug) : null,
+      matchedYardSlug: yardMatch?.slug ?? null,
       auction,
       band,
       priceUsd: dto.priceUsd,

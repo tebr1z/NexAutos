@@ -5,6 +5,97 @@ const DEFAULTS = {
   autoCalculate: false,
 };
 
+const BUNDLED_RATE_FILES = [
+  "data/caucasus-copart-rates-2026-10-09.json",
+  "data/caucasus-iaai-rates-2026-10-10.json",
+];
+const DIRECTION_WORDS = new Set(["north", "south", "east", "west", "central"]);
+let bundledRatesPromise;
+
+function rateSlug(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function comparableRateSlug(value) {
+  return rateSlug(value)
+    .split("-")
+    .map((part) => (part === "ft" ? "fort" : part))
+    .filter(Boolean)
+    .join("-");
+}
+
+function baseRateSlug(value) {
+  return comparableRateSlug(value)
+    .split("-")
+    .filter((part) => !DIRECTION_WORDS.has(part))
+    .join("-");
+}
+
+async function bundledRates() {
+  if (!bundledRatesPromise) {
+    bundledRatesPromise = Promise.all(
+      BUNDLED_RATE_FILES.map(async (file) => {
+        const response = await fetch(chrome.runtime.getURL(file));
+        if (!response.ok) throw new Error(`Bundled tarif oxunmadı: ${file}`);
+        return response.json();
+      }),
+    ).then((files) =>
+      files.flatMap((file) =>
+        (file.rates || []).map(([state, yard, baseUsd]) => ({
+          auction: String(file.auction || "").toUpperCase(),
+          state: String(state || "").toUpperCase(),
+          yard: String(yard || ""),
+          slug: rateSlug(yard),
+          baseUsd: Number(baseUsd),
+        })),
+      ),
+    );
+  }
+  return bundledRatesPromise;
+}
+
+async function applyBundledRate(quote, requestBody) {
+  if (!quote?.missing) return quote;
+  const auction = String(requestBody?.auction || quote.auction || "").toUpperCase();
+  const state = String(requestBody?.state || quote.state || "").toUpperCase();
+  const requestedYard = String(requestBody?.yard || quote.yard || "");
+  const requestedSlug = rateSlug(requestedYard);
+  if (!requestedSlug || !/^(COPART|IAAI)$/.test(auction) || !/^[A-Z]{2}$/.test(state)) return quote;
+
+  const candidates = (await bundledRates()).filter((row) => row.auction === auction && row.state === state);
+  const comparable = comparableRateSlug(requestedSlug);
+  const base = baseRateSlug(requestedSlug);
+  const match =
+    candidates.find((row) => row.slug === requestedSlug) ||
+    candidates.find((row) => comparableRateSlug(row.slug) === comparable) ||
+    candidates.find((row) => comparableRateSlug(row.slug) === base) ||
+    (() => {
+      const rows = candidates.filter((row) => baseRateSlug(row.slug) === base);
+      return rows.length === 1 ? rows[0] : null;
+    })();
+  if (!match || !Number.isFinite(match.baseUsd) || match.baseUsd <= 0) return quote;
+
+  const band = quote.band?.id || (Number(requestBody?.priceUsd) <= 3000 ? "a" : Number(requestBody?.priceUsd) <= 7000 ? "b" : "c");
+  const oceanUsd = Math.round(match.baseUsd + (band === "b" ? 50 : band === "c" ? 200 : 0));
+  const tirUsd = Number(quote.tirUsd) >= 0 ? Number(quote.tirUsd) : 200;
+  const freightUsd = oceanUsd + tirUsd;
+  return {
+    ...quote,
+    oceanUsd,
+    tirUsd,
+    freightUsd,
+    totalUsd: freightUsd + (Number(quote.auctionFeeUsd) || 0),
+    missing: false,
+    rateSource: "bundled",
+    matchedYard: match.yard,
+    matchedYardSlug: match.slug,
+  };
+}
+
 const API_ROUTES = new Set([
   "/health",
   "/health/db",
@@ -158,9 +249,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return { ok: true, data: next };
     }
     if (message.type === "ANX_API") {
+      const data = await apiRequest(message.path, { method: message.method, body: message.body });
       return {
         ok: true,
-        data: await apiRequest(message.path, { method: message.method, body: message.body }),
+        data: message.path === "/shipping/quote" ? await applyBundledRate(data, message.body) : data,
       };
     }
     if (message.type === "ANX_LOGIN") {

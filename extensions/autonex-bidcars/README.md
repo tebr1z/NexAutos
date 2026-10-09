@@ -8,6 +8,11 @@ Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən 
 - Copart və IAAI yard tarifləri ayrıca JSON fayllarında saxlanır və production seed vasitəsilə DB-yə düşür.
 - `/freight` səhifəsində hərrac və state seçərək bütün yard tariflərini üç qiymət aralığında görmək olur.
 
+## 1.9.1
+
+- BidCars yard adı DB-dəki ada tam uyğun gəlməyəndə istiqamət aliası tətbiq olunur (məsələn, `Orlando South` → `Orlando`).
+- API həmin yard üçün tarif qaytarmasa extension daxilindəki Copart/IAAI JSON faylları avtomatik fallback kimi işləyir.
+
 Oxunan sahələr:
 
 - `Current Bid`, `Bid Now` və `Lot Price` məbləğləri ayrıca

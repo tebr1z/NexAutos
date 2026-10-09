@@ -72,4 +72,30 @@ describe('ShippingService', () => {
     });
     expect(result.tirUsd).toBe(200);
   });
+
+  it('matches a BidCars directional yard to the seeded base yard', async () => {
+    const result = await service(
+      {
+        'FL:IAAI:orlando:a': 1583,
+        'FL:IAAI:orlando:b': 1633,
+        'FL:IAAI:orlando:c': 1783,
+        'FL:IAAI:orlando-north:c': 1802,
+      },
+      {
+        'FL:IAAI:orlando': 'Orlando',
+        'FL:IAAI:orlando-north': 'Orlando-North',
+      },
+    ).quote({
+      priceUsd: 8000,
+      auction: 'IAAI',
+      state: 'FL',
+      yard: 'Orlando South (FL)',
+      titleKind: 'SALVAGE',
+    });
+
+    expect(result.oceanUsd).toBe(1783);
+    expect(result.rateSource).toBe('yard-alias');
+    expect(result.matchedYard).toBe('Orlando');
+    expect(result.missing).toBe(false);
+  });
 });
