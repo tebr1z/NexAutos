@@ -30,17 +30,22 @@ async function apiRequest(path, init = {}) {
   if (!API_ROUTES.has(path)) throw new Error("Bu API əməliyyatına icazə yoxdur.");
   const current = await settings();
   const base = normalizeApiBase(current.apiBase);
-  const response = await fetch(`${base}${path}`, {
-    method: init.method || "GET",
-    headers: {
-      Accept: "application/json",
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
-      ...(init.token ? { Authorization: `Bearer ${init.token}` } : {}),
-    },
-    body: init.body ? JSON.stringify(init.body) : undefined,
-    cache: "no-store",
-    credentials: "omit",
-  });
+  let response;
+  try {
+    response = await fetch(`${base}${path}`, {
+      method: init.method || "GET",
+      headers: {
+        Accept: "application/json",
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+        ...(init.token ? { Authorization: `Bearer ${init.token}` } : {}),
+      },
+      body: init.body ? JSON.stringify(init.body) : undefined,
+      cache: "no-store",
+      credentials: "omit",
+    });
+  } catch {
+    throw new Error("nex.autos API-yə qoşulmaq alınmadı. Production backend-də Chrome extension icazəsi aktiv olmalıdır.");
+  }
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     const raw = body && body.message;

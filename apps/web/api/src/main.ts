@@ -19,8 +19,14 @@ async function bootstrap() {
     .map((item) => item.trim())
     .filter(Boolean);
   app.enableCors({
-    origin: origins,
+    origin(origin, callback) {
+      const trustedSite = !origin || origins.includes(origin);
+      const chromeExtension = /^chrome-extension:\/\/[a-p]{32}$/i.test(origin ?? '');
+      callback(trustedSite || chromeExtension ? null : new Error('CORS origin icazəli deyil.'), trustedSite || chromeExtension);
+    },
     credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Accept', 'Authorization', 'Content-Type'],
   });
   app.useGlobalFilters(new PrismaExceptionFilter());
   app.useGlobalPipes(

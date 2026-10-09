@@ -20,6 +20,8 @@ Hesab:
 
 Tarif tapılmasa panel ABŞ–Poti məbləğini istəyir. Admin hesabı ilə daxil olub **Bazaya yaz və yenidən hesabla** seçildikdə tarif konkret yard/şəhər, ştat, hərrac və qiymət aralığı üçün `shipping_rates` bazasında qalır. Növbəti eyni hesablamada yenidən soruşulmur. Şifrə saxlanmır; yalnız giriş tokeni extension-un lokal yaddaşında saxlanır.
 
+Production API `chrome-extension://` originlərini CORS-da qəbul etməlidir. Yazma sorğusu yalnız etibarlı admin/işçi JWT-si ilə işləyir.
+
 BidCars-in ayrıca xidmət haqqı nəticəyə daxil edilmir.
 
 ## Chrome-a quraşdırma
