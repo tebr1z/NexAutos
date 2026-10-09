@@ -89,6 +89,7 @@
   let lastUrl = location.href;
   let lastAutoSignature = "";
   let calculating = false;
+  let recalculateAfterCurrent = false;
   let timer = 0;
   let latestData = null;
   let lastQuote = null;
@@ -240,7 +241,10 @@
   }
 
   async function calculate(triggeredAutomatically = false) {
-    if (calculating) return;
+    if (calculating) {
+      recalculateAfterCurrent = true;
+      return;
+    }
     const priceUsd = Number(refs.price.value);
     const auction = refs.auction.value;
     const yard = refs.location.value.trim();
@@ -273,7 +277,15 @@
       lastQuote = quote;
       refs.rateEditor.hidden = !quote.missing;
       refs.rateHint.textContent = `${quote.auction} · ${quote.yard || yard} (${quote.state}) · ${quote.band?.min || 1}–${quote.band?.max || "+"} USD qiymət aralığı üçün ABŞ–Poti tarifini yazın. Poti–Bakı ${usd(quote.tirUsd)} avtomatik əlavə olunacaq.`;
-      const auctionFeeUsd = Number(quote.auctionFeeUsd || 0);
+      const pickedFee = parser.selectAuctionFee({
+        priceUsd,
+        bidCarsFeeUsd: latestData?.auctionFeeUsd,
+        bidNowUsd: latestData?.bidNowUsd,
+        lotPriceUsd: latestData?.lotPriceUsd,
+        fallbackFeeUsd: quote.auctionFeeUsd,
+      });
+      const auctionFeeUsd = pickedFee.amount;
+      const auctionFeeSource = pickedFee.source;
       refs.auctionFee.value = String(auctionFeeUsd);
       const invoiceUsd = priceUsd + auctionFeeUsd;
       const freightUsd = quote.freightUsd == null ? null : Number(quote.freightUsd);
@@ -318,16 +330,17 @@
       }
 
       const totalWithCustomsUsd = totalWithoutCustomsUsd == null || !duty ? null : totalWithoutCustomsUsd + customsUsd;
+      const totalWithCustomsAzn = totalWithCustomsUsd == null || !duty ? null : totalWithCustomsUsd * Number(duty.usdCourse || 0);
       refs.result.innerHTML = `
         <div class="row"><span>Avtomobil qiyməti</span><strong>${usd(priceUsd)}</strong></div>
-        <div class="row"><span>Auction fee (seçilən qiymətə görə)</span><strong>${usd(auctionFeeUsd)}</strong></div>
+        <div class="row"><span>Auction fee (${auctionFeeSource})</span><strong>${usd(auctionFeeUsd)}</strong></div>
         <div class="row"><span>Avtomobil + auction fee</span><strong>${usd(invoiceUsd)}</strong></div>
         <div class="row"><span>Auto Nex ABŞ daxili + okean</span><strong>${quote.oceanUsd == null ? "Tarif yoxdur" : usd(quote.oceanUsd)}</strong></div>
         <div class="row"><span>Gürcüstan–Bakı</span><strong>${usd(quote.tirUsd)}</strong></div>
         <div class="row"><span>Ümumi yol xərci</span><strong>${freightUsd == null ? "Tarif gözlənilir" : usd(freightUsd)}</strong></div>
-        ${totalWithoutCustomsUsd == null ? "" : `<div class="row"><span>Gömrüksüz ümumi</span><strong>${usd(totalWithoutCustomsUsd)}</strong></div>`}
+        ${totalWithoutCustomsUsd == null ? "" : `<div class="row"><span>Maşın + auction + yol</span><strong>${usd(totalWithoutCustomsUsd)}</strong></div>`}
         <div class="row"><span>DGK gömrük</span><strong>${duty ? `${usd(customsUsd)} · ${Number(duty.total?.value || 0).toLocaleString("az-AZ", { maximumFractionDigits: 2 })} AZN` : "—"}</strong></div>
-        ${totalWithCustomsUsd == null ? "" : `<div class="total"><small>Gömrüklə ümumi məbləğ</small><div>${usd(totalWithCustomsUsd)}</div></div>`}
+        ${totalWithCustomsUsd == null ? "" : `<div class="total"><small>Yekun: maşın + auction + yol + gömrük</small><div>${usd(totalWithCustomsUsd)}</div><div style="font-size:15px;color:#bfdbfe">${Number(totalWithCustomsAzn || 0).toLocaleString("az-AZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} AZN</div></div>`}
         ${quote.rateSource === "state" ? `<p class="note">Bu yard üçün ayrıca tarif tapılmadı; ${escapeHtml(quote.state)} ştatının əvvəlki tarifi istifadə olundu.</p>` : ""}
         ${quote.auctionFee ? `<p class="note">${escapeHtml(quote.auction)} fee: buyer ${usd(quote.auctionFee.buyerUsd)} + live ${usd(quote.auctionFee.virtualUsd)} + gate ${usd(quote.auctionFee.gateUsd)}${quote.auctionFee.envUsd ? ` + env ${usd(quote.auctionFee.envUsd)}` : ""}${quote.auctionFee.titleUsd ? ` + title ${usd(quote.auctionFee.titleUsd)}` : ""}</p>` : ""}
         ${quote.missing ? `<p class="note">Bu yard və qiymət qrupu üçün yol pulu tarifi admin paneldə yoxdur.</p>` : ""}
@@ -344,6 +357,10 @@
       calculating = false;
       refs.calculate.disabled = false;
       refs.calculate.textContent = "Auto Nex ilə hesabla";
+      if (recalculateAfterCurrent) {
+        recalculateAfterCurrent = false;
+        window.setTimeout(() => void calculate(true), 0);
+      }
     }
   }
 
@@ -414,7 +431,7 @@
         refs.result.hidden = true;
       }
       const data = readPage(false);
-      const signature = [refs.priceSource.value, refs.price.value, data.bidNowUsd, data.currentBidUsd, data.auction, data.location].join("|");
+      const signature = [refs.priceSource.value, refs.price.value, data.bidNowUsd, data.currentBidUsd, data.lotPriceUsd, data.auctionFeeUsd, data.auction, data.location].join("|");
       if (!host.hidden && signature !== lastAutoSignature) {
         lastAutoSignature = signature;
         void calculate(true);
@@ -429,6 +446,7 @@
     refs.priceSource.value = "manual";
     manual.add("price");
   });
+  refs.price.addEventListener("change", () => void calculate(false));
   refs.priceSource.addEventListener("change", () => {
     manual.delete("price");
     if (latestData) updatePriceChoices(latestData, false);

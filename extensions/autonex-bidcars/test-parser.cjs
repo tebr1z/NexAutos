@@ -31,4 +31,27 @@ assert.equal(lot.fuelCode, "1");
 assert.equal(parser.fuelCode("Diesel"), "2");
 assert.equal(parser.fuelCode("Electric"), "12");
 
+const liveBid = parser.parseSnapshot({
+  title: "2022 HYUNDAI SONATA IAAI",
+  text: `
+    Time left Live auction in progress $2,700 Bid Now
+    Final Price Estimator Lot Price $2,700 Auction Fees $720 Trucking to port $270
+    Location: Savannah (GA) Engine 2.0L Fuel Type Gasoline Drive Type Front wheel drive
+  `,
+  exactTokens: ["IAAI"],
+  bidCandidates: [{ value: "$2,700", score: 20, kind: "bidNow" }],
+});
+
+assert.equal(liveBid.bidNowUsd, 2700);
+assert.equal(liveBid.lotPriceUsd, 2700);
+assert.equal(liveBid.auctionFeeUsd, 720);
+assert.deepEqual(
+  parser.selectAuctionFee({ priceUsd: 2700, bidCarsFeeUsd: 720, bidNowUsd: 2700, lotPriceUsd: 2700, fallbackFeeUsd: 860 }),
+  { amount: 720, source: "BidCars" },
+);
+assert.deepEqual(
+  parser.selectAuctionFee({ priceUsd: 2200, bidCarsFeeUsd: 720, bidNowUsd: 2700, lotPriceUsd: 2700, fallbackFeeUsd: 785 }),
+  { amount: 785, source: "Auto Nex fallback" },
+);
+
 console.log("BidCars parser tests passed.");

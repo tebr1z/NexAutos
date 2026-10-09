@@ -60,6 +60,17 @@
     return "1";
   }
 
+  function selectAuctionFee({ priceUsd, bidCarsFeeUsd, bidNowUsd, lotPriceUsd, fallbackFeeUsd }) {
+    const price = Number(priceUsd) || 0;
+    const pageFee = Number(bidCarsFeeUsd) || 0;
+    const matchesPagePrice = [bidNowUsd, lotPriceUsd]
+      .map(Number)
+      .some((value) => value > 0 && Math.abs(value - price) < 0.01);
+    return pageFee > 0 && matchesPagePrice
+      ? { amount: pageFee, source: "BidCars" }
+      : { amount: Number(fallbackFeeUsd) || 0, source: "Auto Nex fallback" };
+  }
+
   function parseSnapshot(snapshot) {
     const text = clean(snapshot.text);
     const title = clean(snapshot.title);
@@ -107,7 +118,7 @@
     };
   }
 
-  const api = { clean, parseMoney, parseEngineCc, fuelCode, parseSnapshot };
+  const api = { clean, parseMoney, parseEngineCc, fuelCode, selectAuctionFee, parseSnapshot };
   global.AutoNexBidCarsParser = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Auto Nex – BidCars Kalkulyatoru",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "BidCars lot səhifəsində seçilən qiymətə görə hərrac haqqını, Auto Nex yol pulunu, DGK gömrüyünü və ümumi məbləği hesablayır.",
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [

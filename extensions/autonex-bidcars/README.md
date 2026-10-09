@@ -18,6 +18,8 @@ Hesab:
 4. İl, mühərrik və yanacaqla açıq DGK API üzərindən gömrük.
 5. Həm gömrüksüz, həm də gömrüklə ümumi məbləğ.
 
+Seçilən qiymət BidCars `Bid Now` / `Lot Price` ilə eynidirsə, səhifədə canlı yenilənən `Auction Fees` istifadə olunur. Bu məbləğ tapılmasa Auto Nex hərrac cədvəli fallback kimi işləyir. Yekun formula `avtomobil + auction fee + ABŞ–Poti + Poti–Bakı + DGK gömrük` şəklindədir və həm USD, həm AZN göstərilir.
+
 Tarif tapılmasa panel ABŞ–Poti məbləğini istəyir. Admin hesabı ilə daxil olub **Bazaya yaz və yenidən hesabla** seçildikdə tarif konkret yard/şəhər, ştat, hərrac və qiymət aralığı üçün `shipping_rates` bazasında qalır. Növbəti eyni hesablamada yenidən soruşulmur. Şifrə saxlanmır; yalnız giriş tokeni extension-un lokal yaddaşında saxlanır.
 
 Production API `chrome-extension://` originlərini CORS-da qəbul etməlidir. Yazma sorğusu yalnız etibarlı admin/işçi JWT-si ilə işləyir.
