@@ -486,7 +486,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  shippingQuote: (payload: { url?: string; priceUsd: number; state?: string; auction?: string; titleKind?: string }) =>
+  shippingQuote: (payload: { url?: string; priceUsd: number; state?: string; auction?: string; titleKind?: string; yard?: string }) =>
     request<{
       lot?: {
         title?: string;
@@ -538,6 +538,26 @@ export const api = {
       auctions: string[];
       states: { code: string; name: string }[];
     }>("/shipping/meta"),
+  shippingCatalog: (filters?: { auction?: string; state?: string }) => {
+    const query = new URLSearchParams();
+    if (filters?.auction) query.set("auction", filters.auction);
+    if (filters?.state) query.set("state", filters.state);
+    const suffix = query.toString();
+    return request<{
+      tirUsd: number;
+      bands: { id: "a" | "b" | "c"; min: number; max: number }[];
+      auctions: string[];
+      seedVersion?: string;
+      rows: {
+        auction: "COPART" | "IAAI";
+        state: string;
+        stateName?: string;
+        yard: string;
+        yardSlug: string;
+        rates: Record<"a" | "b" | "c", number | null>;
+      }[];
+    }>(`/shipping/catalog${suffix ? `?${suffix}` : ""}`);
+  },
   shippingRates: () =>
     request<{ tirUsd: number; cells: Record<string, number | null> }>("/shipping/rates"),
   saveShippingRates: (payload: { tirUsd: number; cells: Record<string, number | null> }) =>

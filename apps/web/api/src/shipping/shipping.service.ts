@@ -18,7 +18,20 @@ import { auctionFeeBreakdown } from './auction-fees';
 
 const KEY = 'shipping_rates';
 
-type Stored = { tirUsd: number; cells: Record<string, number | null> };
+type Stored = {
+  tirUsd: number;
+  cells: Record<string, number | null>;
+  yards: Record<string, string>;
+  seedVersion?: string;
+};
+
+function yardNameFromSlug(slug: string) {
+  return slug
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
 
 @Injectable()
 export class ShippingService {
@@ -40,6 +53,55 @@ export class ShippingService {
     return {
       tirUsd: Number(value.tirUsd) >= 0 ? Number(value.tirUsd) : 200,
       cells,
+      yards: value.yards ?? {},
+      seedVersion: value.seedVersion,
+    };
+  }
+
+  async catalog(auctionFilter?: string, stateFilter?: string) {
+    const table = await this.rates();
+    const auction = auctionFilter?.trim().toUpperCase();
+    const state = stateFilter?.trim().toUpperCase();
+    const rows = new Map<
+      string,
+      {
+        auction: AuctionCode;
+        state: string;
+        stateName?: string;
+        yard: string;
+        yardSlug: string;
+        rates: Record<string, number | null>;
+      }
+    >();
+
+    for (const [key, rawRate] of Object.entries(table.cells)) {
+      const match = key.match(/^([A-Z]{2}):(COPART|IAAI):([a-z0-9-]+):([abc])$/);
+      const rate = Number(rawRate);
+      if (!match || !Number.isFinite(rate) || rate <= 0) continue;
+      const [, rowState, rowAuction, slug, band] = match;
+      if (auction && rowAuction !== auction) continue;
+      if (state && rowState !== state) continue;
+      const prefix = `${rowState}:${rowAuction}:${slug}`;
+      const current = rows.get(prefix) ?? {
+        auction: rowAuction as AuctionCode,
+        state: rowState,
+        stateName: US_STATES.find((item) => item.code === rowState)?.name,
+        yard: table.yards[prefix] || yardNameFromSlug(slug),
+        yardSlug: slug,
+        rates: { a: null, b: null, c: null },
+      };
+      current.rates[band] = rate;
+      rows.set(prefix, current);
+    }
+
+    return {
+      tirUsd: table.tirUsd,
+      bands: BANDS,
+      auctions: AUCTIONS,
+      seedVersion: table.seedVersion,
+      rows: [...rows.values()].sort(
+        (left, right) => left.state.localeCompare(right.state) || left.yard.localeCompare(right.yard),
+      ),
     };
   }
 
@@ -48,6 +110,8 @@ export class ShippingService {
     const next: Stored = {
       tirUsd: dto.tirUsd ?? current.tirUsd,
       cells: { ...current.cells, ...dto.cells },
+      yards: current.yards,
+      seedVersion: current.seedVersion,
     };
     await this.prisma.setting.upsert({
       where: { key: KEY },

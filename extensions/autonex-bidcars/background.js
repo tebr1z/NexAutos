@@ -91,6 +91,15 @@ function isBidCarsUrl(value) {
   }
 }
 
+function isCaucasusUrl(value) {
+  try {
+    const url = new URL(value || "");
+    return url.protocol === "https:" && url.hostname === "login.caucasusauto.com";
+  } catch {
+    return false;
+  }
+}
+
 function notifyTab(tabId) {
   return new Promise((resolve, reject) => {
     chrome.tabs.sendMessage(tabId, { type: "ANX_OPEN_CALCULATOR" }, (response) => {
@@ -101,6 +110,21 @@ function notifyTab(tabId) {
 }
 
 chrome.action.onClicked.addListener(async (tab) => {
+  if (tab.id && isCaucasusUrl(tab.url)) {
+    try {
+      await new Promise((resolve, reject) => {
+        chrome.tabs.sendMessage(tab.id, { type: "ANX_OPEN_CAUCASUS_SCANNER" }, (response) => {
+          if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+          resolve(response);
+        });
+      });
+    } catch {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["caucasus.js"] });
+      chrome.tabs.sendMessage(tab.id, { type: "ANX_OPEN_CAUCASUS_SCANNER" });
+    }
+    return;
+  }
+
   if (!tab.id || !isBidCarsUrl(tab.url)) {
     await chrome.action.setBadgeBackgroundColor({ color: "#dc2626" });
     await chrome.action.setBadgeText({ text: "BID" });
@@ -167,6 +191,30 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         data = await apiRequest("/shipping/rates", { method: "PUT", token: accessToken, body: payload });
       }
       return { ok: true, data };
+    }
+    if (message.type === "ANX_SAVE_RATES") {
+      const auth = await chrome.storage.local.get({ authToken: "", refreshToken: "" });
+      let accessToken = auth.authToken || (auth.refreshToken ? await refreshSession() : "");
+      if (!accessToken) throw new Error("Əvvəl BidCars panelində admin hesabı ilə daxil olun.");
+      const sourceCells = message.cells && typeof message.cells === "object" ? message.cells : {};
+      const cells = {};
+      for (const [key, value] of Object.entries(sourceCells)) {
+        const rate = Number(value);
+        if (/^[A-Z]{2}:(COPART|IAAI):[a-z0-9-]+:[abc]$/.test(key) && Number.isFinite(rate) && rate > 0) {
+          cells[key] = Math.round(rate);
+        }
+      }
+      if (!Object.keys(cells).length) throw new Error("DB-yə yazılacaq düzgün tarif tapılmadı.");
+      const payload = { tirUsd: 200, cells };
+      let data;
+      try {
+        data = await apiRequest("/shipping/rates", { method: "PUT", token: accessToken, body: payload });
+      } catch (error) {
+        if (error?.status !== 401) throw error;
+        accessToken = await refreshSession();
+        data = await apiRequest("/shipping/rates", { method: "PUT", token: accessToken, body: payload });
+      }
+      return { ok: true, data: { saved: Object.keys(cells).length, rates: data } };
     }
     throw new Error("Naməlum Auto Nex əməliyyatı.");
   })()

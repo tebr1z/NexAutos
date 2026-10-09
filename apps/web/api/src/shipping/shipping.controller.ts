@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
@@ -21,6 +21,12 @@ export class ShippingController {
   @Post('quote')
   quote(@Body() dto: ShippingQuoteDto) {
     return this.shipping.quote(dto);
+  }
+
+  @SkipThrottle()
+  @Get('catalog')
+  catalog(@Query('auction') auction?: string, @Query('state') state?: string) {
+    return this.shipping.catalog(auction, state);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -3,10 +3,10 @@ import { ShippingService } from './shipping.service';
 import { bandForPrice } from './zones';
 
 describe('ShippingService', () => {
-  function service(cells: Record<string, number | null>) {
+  function service(cells: Record<string, number | null>, yards: Record<string, string> = {}) {
     const prisma = {
       setting: {
-        findUnique: jest.fn().mockResolvedValue({ value: { tirUsd: 200, cells } }),
+        findUnique: jest.fn().mockResolvedValue({ value: { tirUsd: 200, cells, yards, seedVersion: 'test' } }),
       },
     } as unknown as PrismaService;
     return new ShippingService(prisma);
@@ -50,5 +50,26 @@ describe('ShippingService', () => {
     const result = await service({ 'GA:IAAI:d': 490 }).quote({ ...quote, priceUsd: 20000 });
     expect(result.band.id).toBe('c');
     expect(result.oceanUsd).toBe(490);
+  });
+
+  it('returns a public yard catalog filtered by auction and state', async () => {
+    const result = await service(
+      {
+        'GA:IAAI:savannah:a': 1240,
+        'GA:IAAI:savannah:b': 1290,
+        'GA:IAAI:savannah:c': 1440,
+        'GA:COPART:savannah:a': 1339,
+      },
+      { 'GA:IAAI:savannah': 'Savannah' },
+    ).catalog('IAAI', 'GA');
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({
+      auction: 'IAAI',
+      state: 'GA',
+      yard: 'Savannah',
+      rates: { a: 1240, b: 1290, c: 1440 },
+    });
+    expect(result.tirUsd).toBe(200);
   });
 });

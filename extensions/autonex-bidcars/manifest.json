@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Auto Nex – BidCars Kalkulyatoru",
-  "version": "1.7.0",
-  "description": "BidCars lot səhifəsində seçilən qiymətə görə hərrac haqqını, Auto Nex yol pulunu, DGK gömrüyünü və ümumi məbləği hesablayır.",
+  "version": "1.9.0",
+  "description": "BidCars ümumi qiymətini hesablayır və Caucasus Auto-dan Copart/IAAI yol tariflərini toplayır.",
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
     "https://nex.autos/*",
+    "https://login.caucasusauto.com/*",
     "http://localhost:5001/*",
     "http://127.0.0.1:5002/*"
   ],
@@ -19,6 +20,11 @@
     {
       "matches": ["https://bid.cars/*", "https://www.bid.cars/*"],
       "js": ["parser.js", "content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://login.caucasusauto.com/admin.php*"],
+      "js": ["caucasus.js"],
       "run_at": "document_idle"
     }
   ]

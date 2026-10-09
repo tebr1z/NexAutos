@@ -1,0 +1,1184 @@
+{
+  "source": "https://login.caucasusauto.com/admin.php?cat=invoice&action=add",
+  "auction": "COPART",
+  "capturedAt": "2026-10-09",
+  "currency": "USD",
+  "priceBands": {
+    "a": "0-3000",
+    "b": "3001-7000",
+    "c": "7001-150000"
+  },
+  "bandRule": {
+    "b": "a+50",
+    "c": "a+200"
+  },
+  "potiToBakuUsd": 200,
+  "locationCount": 233,
+  "rates": [
+    [
+      "AK",
+      "Anchorage",
+      5070
+    ],
+    [
+      "AL",
+      "Alabama Dothan",
+      1740
+    ],
+    [
+      "AL",
+      "Birmingham",
+      1685
+    ],
+    [
+      "AL",
+      "Cusseta",
+      1645
+    ],
+    [
+      "AL",
+      "Dothan",
+      1575
+    ],
+    [
+      "AL",
+      "Mobile",
+      1674
+    ],
+    [
+      "AL",
+      "Mobile South",
+      1590
+    ],
+    [
+      "AL",
+      "Montgomery",
+      1720
+    ],
+    [
+      "AL",
+      "Tanner",
+      1661
+    ],
+    [
+      "AR",
+      "Fayetteville",
+      1833
+    ],
+    [
+      "AR",
+      "Little Rock",
+      1940
+    ],
+    [
+      "AZ",
+      "Phoenix",
+      2240
+    ],
+    [
+      "AZ",
+      "Phoenix North",
+      2290
+    ],
+    [
+      "AZ",
+      "Tucson",
+      2140
+    ],
+    [
+      "CA",
+      "Adelanto",
+      1870
+    ],
+    [
+      "CA",
+      "Antelope",
+      2291
+    ],
+    [
+      "CA",
+      "Bakersfield",
+      2112
+    ],
+    [
+      "CA",
+      "CrashedToys Sacramento",
+      2145
+    ],
+    [
+      "CA",
+      "d Bid Repo",
+      2235
+    ],
+    [
+      "CA",
+      "Fresno",
+      2080
+    ],
+    [
+      "CA",
+      "Hayward",
+      2290
+    ],
+    [
+      "CA",
+      "Long Beach",
+      2070
+    ],
+    [
+      "CA",
+      "Los Angeles",
+      2110
+    ],
+    [
+      "CA",
+      "Martinez",
+      2400
+    ],
+    [
+      "CA",
+      "Mentone",
+      1958
+    ],
+    [
+      "CA",
+      "Napa",
+      2274
+    ],
+    [
+      "CA",
+      "Palmdale",
+      2190
+    ],
+    [
+      "CA",
+      "Rancho Cucamonga",
+      2170
+    ],
+    [
+      "CA",
+      "REDDING",
+      2360
+    ],
+    [
+      "CA",
+      "Sacramento",
+      2270
+    ],
+    [
+      "CA",
+      "San Bernardino",
+      2058
+    ],
+    [
+      "CA",
+      "San Diego",
+      2210
+    ],
+    [
+      "CA",
+      "San Jose",
+      2300
+    ],
+    [
+      "CA",
+      "So Sacramento",
+      2154
+    ],
+    [
+      "CA",
+      "Sun Valley",
+      2140
+    ],
+    [
+      "CA",
+      "Vallejo",
+      2224
+    ],
+    [
+      "CA",
+      "Van Nuys",
+      2170
+    ],
+    [
+      "CO",
+      "Colorado Springs",
+      1889
+    ],
+    [
+      "CO",
+      "Denver",
+      2070
+    ],
+    [
+      "CO",
+      "Denver Central",
+      2053
+    ],
+    [
+      "CO",
+      "Denver South",
+      2097
+    ],
+    [
+      "CT",
+      "Hartford",
+      1540
+    ],
+    [
+      "CT",
+      "Hartford Springfield",
+      1550
+    ],
+    [
+      "DC",
+      "Washington DC",
+      1670
+    ],
+    [
+      "DE",
+      "Seaford",
+      1394
+    ],
+    [
+      "FL",
+      "Clewiston",
+      1690
+    ],
+    [
+      "FL",
+      "Ft. Pierce",
+      1545
+    ],
+    [
+      "FL",
+      "Jacksonville East",
+      1390
+    ],
+    [
+      "FL",
+      "Jacksonville North",
+      1440
+    ],
+    [
+      "FL",
+      "Jacksonville West",
+      1390
+    ],
+    [
+      "FL",
+      "Miami Central",
+      1540
+    ],
+    [
+      "FL",
+      "Miami North",
+      1390
+    ],
+    [
+      "FL",
+      "Miami South",
+      1540
+    ],
+    [
+      "FL",
+      "Ocala",
+      1440
+    ],
+    [
+      "FL",
+      "Orlando North",
+      1512
+    ],
+    [
+      "FL",
+      "Orlando South",
+      1590
+    ],
+    [
+      "FL",
+      "Punta Gorda",
+      1720
+    ],
+    [
+      "FL",
+      "Punta Gorda South",
+      1770
+    ],
+    [
+      "FL",
+      "Tallahassee",
+      1670
+    ],
+    [
+      "FL",
+      "Tampa North",
+      1640
+    ],
+    [
+      "FL",
+      "Tampa South",
+      1640
+    ],
+    [
+      "FL",
+      "West Palm Beach",
+      1650
+    ],
+    [
+      "GA",
+      "Atlanta East",
+      1643
+    ],
+    [
+      "GA",
+      "Atlanta North",
+      1530
+    ],
+    [
+      "GA",
+      "Atlanta South",
+      1590
+    ],
+    [
+      "GA",
+      "Atlanta West",
+      1590
+    ],
+    [
+      "GA",
+      "Augusta",
+      1895
+    ],
+    [
+      "GA",
+      "Cartersville",
+      1573
+    ],
+    [
+      "GA",
+      "CrashedToys Atlanta",
+      1685
+    ],
+    [
+      "GA",
+      "FAIRBURN",
+      1769
+    ],
+    [
+      "GA",
+      "Macon",
+      1604
+    ],
+    [
+      "GA",
+      "Savannah",
+      1339
+    ],
+    [
+      "GA",
+      "Tifton",
+      1620
+    ],
+    [
+      "HI",
+      "Honolulu",
+      3566
+    ],
+    [
+      "IA",
+      "CEDAR RAPIDS",
+      1870
+    ],
+    [
+      "IA",
+      "Davenport",
+      1775
+    ],
+    [
+      "IA",
+      "Des Moines",
+      1820
+    ],
+    [
+      "ID",
+      "Boise",
+      2370
+    ],
+    [
+      "IL",
+      "Chicago North",
+      1840
+    ],
+    [
+      "IL",
+      "Chicago South",
+      1722
+    ],
+    [
+      "IL",
+      "Peoria",
+      1816
+    ],
+    [
+      "IL",
+      "Southern Illinois",
+      1816
+    ],
+    [
+      "IL",
+      "St.Louis",
+      1641
+    ],
+    [
+      "IL",
+      "Wheeling",
+      1767
+    ],
+    [
+      "IN",
+      "Cicero",
+      1770
+    ],
+    [
+      "IN",
+      "DYER",
+      2093
+    ],
+    [
+      "IN",
+      "Fort Wayne",
+      1692
+    ],
+    [
+      "IN",
+      "Hammond",
+      1808
+    ],
+    [
+      "IN",
+      "hartford city",
+      1902
+    ],
+    [
+      "IN",
+      "Indianapolis",
+      1782
+    ],
+    [
+      "KS",
+      "Kansas City",
+      1940
+    ],
+    [
+      "KS",
+      "Kansas City East",
+      2090
+    ],
+    [
+      "KS",
+      "Kansas City West",
+      2115
+    ],
+    [
+      "KS",
+      "Wichita",
+      1873
+    ],
+    [
+      "KY",
+      "Earlington",
+      2090
+    ],
+    [
+      "KY",
+      "Lexington East",
+      1890
+    ],
+    [
+      "KY",
+      "Lexington West",
+      1790
+    ],
+    [
+      "KY",
+      "Louisville",
+      1790
+    ],
+    [
+      "KY",
+      "Walton",
+      1840
+    ],
+    [
+      "LA",
+      "Baton Rouge",
+      1840
+    ],
+    [
+      "LA",
+      "New Orleans",
+      1690
+    ],
+    [
+      "LA",
+      "Shreveport",
+      1440
+    ],
+    [
+      "LA",
+      "Vin-ton",
+      1745
+    ],
+    [
+      "LA",
+      "Vinthon",
+      1740
+    ],
+    [
+      "MA",
+      "Freetown",
+      1815
+    ],
+    [
+      "MA",
+      "National Offsite Auction",
+      1540
+    ],
+    [
+      "MA",
+      "North Boston",
+      1670
+    ],
+    [
+      "MA",
+      "South Boston",
+      1630
+    ],
+    [
+      "MA",
+      "West Warren",
+      1640
+    ],
+    [
+      "MD",
+      "Baltimore",
+      1590
+    ],
+    [
+      "MD",
+      "Baltimore East",
+      1640
+    ],
+    [
+      "MD",
+      "Laurel",
+      1620
+    ],
+    [
+      "ME",
+      "Lyman",
+      1588
+    ],
+    [
+      "ME",
+      "WINDHAM",
+      1838
+    ],
+    [
+      "MI",
+      "Detroit",
+      1690
+    ],
+    [
+      "MI",
+      "Flint",
+      1740
+    ],
+    [
+      "MI",
+      "Ionia",
+      1838
+    ],
+    [
+      "MI",
+      "Kincheloe",
+      2137
+    ],
+    [
+      "MI",
+      "Lansing",
+      1791
+    ],
+    [
+      "MI",
+      "WAYLAND",
+      1738
+    ],
+    [
+      "MN",
+      "Crashedtoys Minneapolis",
+      1764
+    ],
+    [
+      "MN",
+      "Minneapolis",
+      1965
+    ],
+    [
+      "MN",
+      "Minneapolis North",
+      1940
+    ],
+    [
+      "MN",
+      "St. Cloud",
+      1924
+    ],
+    [
+      "MO",
+      "Columbia",
+      1785
+    ],
+    [
+      "MO",
+      "Sikeston",
+      1720
+    ],
+    [
+      "MO",
+      "Springfield",
+      1950
+    ],
+    [
+      "MO",
+      "St. Louis",
+      1882
+    ],
+    [
+      "MS",
+      "Grenada",
+      1640
+    ],
+    [
+      "MS",
+      "Jackson",
+      1590
+    ],
+    [
+      "MT",
+      "Billings",
+      2490
+    ],
+    [
+      "MT",
+      "Helena",
+      2390
+    ],
+    [
+      "NC",
+      "China Grove",
+      1590
+    ],
+    [
+      "NC",
+      "Concord",
+      1620
+    ],
+    [
+      "NC",
+      "Gastonia",
+      1820
+    ],
+    [
+      "NC",
+      "Lagrange",
+      1620
+    ],
+    [
+      "NC",
+      "LUMBERTON",
+      1595
+    ],
+    [
+      "NC",
+      "Mebane",
+      1605
+    ],
+    [
+      "NC",
+      "Mocksville",
+      1590
+    ],
+    [
+      "NC",
+      "Raleigh",
+      1670
+    ],
+    [
+      "NC",
+      "Raleigh North",
+      1920
+    ],
+    [
+      "ND",
+      "Bismarck",
+      2201
+    ],
+    [
+      "NE",
+      "Lincoln",
+      1905
+    ],
+    [
+      "NH",
+      "Candia",
+      1730
+    ],
+    [
+      "NJ",
+      "Glassboro East",
+      1525
+    ],
+    [
+      "NJ",
+      "GLASSBORO WEST",
+      1190
+    ],
+    [
+      "NJ",
+      "Somerville",
+      1390
+    ],
+    [
+      "NJ",
+      "Trenton",
+      1540
+    ],
+    [
+      "NM",
+      "Albuquerque",
+      1780
+    ],
+    [
+      "NV",
+      "Las Vegas",
+      2120
+    ],
+    [
+      "NV",
+      "Las Vegas West",
+      2170
+    ],
+    [
+      "NV",
+      "Reno",
+      2150
+    ],
+    [
+      "NY",
+      "Albany",
+      1580
+    ],
+    [
+      "NY",
+      "Buffalo",
+      1655
+    ],
+    [
+      "NY",
+      "Long Island",
+      1570
+    ],
+    [
+      "NY",
+      "Newburgh",
+      1600
+    ],
+    [
+      "NY",
+      "Rochester",
+      1654
+    ],
+    [
+      "NY",
+      "Syracuse",
+      1580
+    ],
+    [
+      "OH",
+      "Akron",
+      1890
+    ],
+    [
+      "OH",
+      "Cleveland East",
+      1787
+    ],
+    [
+      "OH",
+      "Cleveland West",
+      1840
+    ],
+    [
+      "OH",
+      "Columbus",
+      1770
+    ],
+    [
+      "OH",
+      "Dayton",
+      1702
+    ],
+    [
+      "OK",
+      "Oklahoma City",
+      1780
+    ],
+    [
+      "OK",
+      "Tulsa",
+      1827
+    ],
+    [
+      "OR",
+      "Eugene",
+      2395
+    ],
+    [
+      "OR",
+      "Portland North",
+      2530
+    ],
+    [
+      "OR",
+      "Portland South",
+      2520
+    ],
+    [
+      "PA",
+      "Altoona",
+      1483
+    ],
+    [
+      "PA",
+      "Chambersburg",
+      1540
+    ],
+    [
+      "PA",
+      "Harrisburg",
+      1447
+    ],
+    [
+      "PA",
+      "Philadelphia",
+      1520
+    ],
+    [
+      "PA",
+      "Philadelphia East",
+      1455
+    ],
+    [
+      "PA",
+      "PITTSBURGH WEST",
+      1615
+    ],
+    [
+      "PA",
+      "Pittsburgh East",
+      1290
+    ],
+    [
+      "PA",
+      "Pittsburgh North",
+      1680
+    ],
+    [
+      "PA",
+      "Pittsburgh South",
+      1590
+    ],
+    [
+      "PA",
+      "Scranton",
+      1590
+    ],
+    [
+      "PA",
+      "York Haven",
+      1640
+    ],
+    [
+      "RI",
+      "Exeter",
+      1634
+    ],
+    [
+      "SC",
+      "Columbia",
+      1785
+    ],
+    [
+      "SC",
+      "Greer",
+      1740
+    ],
+    [
+      "SC",
+      "North Charleston",
+      1640
+    ],
+    [
+      "SC",
+      "Spartanburg",
+      1745
+    ],
+    [
+      "SD",
+      "Rapid City",
+      2040
+    ],
+    [
+      "TN",
+      "Knoxville",
+      1840
+    ],
+    [
+      "TN",
+      "Memphis",
+      1840
+    ],
+    [
+      "TN",
+      "Nashville",
+      1790
+    ],
+    [
+      "TX",
+      "Abilene",
+      1590
+    ],
+    [
+      "TX",
+      "Amarillo",
+      1740
+    ],
+    [
+      "TX",
+      "Andrews",
+      1620
+    ],
+    [
+      "TX",
+      "Austin",
+      1726
+    ],
+    [
+      "TX",
+      "Central Region",
+      1640
+    ],
+    [
+      "TX",
+      "Corpus Christi",
+      1504
+    ],
+    [
+      "TX",
+      "CrashedToys Dallas",
+      1576
+    ],
+    [
+      "TX",
+      "Dallas",
+      1645
+    ],
+    [
+      "TX",
+      "Dallas South",
+      1645
+    ],
+    [
+      "TX",
+      "DRIVE Dallas",
+      1570
+    ],
+    [
+      "TX",
+      "Eastern Region",
+      1640
+    ],
+    [
+      "TX",
+      "El Paso",
+      1658
+    ],
+    [
+      "TX",
+      "Ft. Worth",
+      1735
+    ],
+    [
+      "TX",
+      "Houston",
+      1540
+    ],
+    [
+      "TX",
+      "Houston East",
+      1600
+    ],
+    [
+      "TX",
+      "Longview",
+      1640
+    ],
+    [
+      "TX",
+      "Lufkin",
+      1390
+    ],
+    [
+      "TX",
+      "McAllen",
+      1690
+    ],
+    [
+      "TX",
+      "Mountain Region",
+      1640
+    ],
+    [
+      "TX",
+      "North Austin",
+      1776
+    ],
+    [
+      "TX",
+      "Pacific Region",
+      1590
+    ],
+    [
+      "TX",
+      "San Antonio",
+      1590
+    ],
+    [
+      "TX",
+      "Waco",
+      1740
+    ],
+    [
+      "UT",
+      "Ogden",
+      2270
+    ],
+    [
+      "UT",
+      "Salt Lake City",
+      2420
+    ],
+    [
+      "UT",
+      "Salt Lake City North",
+      2230
+    ],
+    [
+      "VA",
+      "Danville",
+      1702
+    ],
+    [
+      "VA",
+      "FREDERICKSBURG",
+      1720
+    ],
+    [
+      "VA",
+      "Hampton",
+      1640
+    ],
+    [
+      "VA",
+      "RICHMOND EAST",
+      1590
+    ],
+    [
+      "VA",
+      "Richmond",
+      1545
+    ],
+    [
+      "VT",
+      "RUTLAND",
+      1790
+    ],
+    [
+      "WA",
+      "Graham",
+      2490
+    ],
+    [
+      "WA",
+      "North Seattle",
+      2640
+    ],
+    [
+      "WA",
+      "Pasco",
+      2433
+    ],
+    [
+      "WA",
+      "Spanaway",
+      2540
+    ],
+    [
+      "WA",
+      "Spokane",
+      2566
+    ],
+    [
+      "WI",
+      "Appleton",
+      1740
+    ],
+    [
+      "WI",
+      "Madison",
+      1863
+    ],
+    [
+      "WI",
+      "Madison South",
+      1663
+    ],
+    [
+      "WI",
+      "Milwaukee",
+      1750
+    ],
+    [
+      "WI",
+      "Milwaukee North",
+      1880
+    ],
+    [
+      "WI",
+      "Milwaukee South",
+      1850
+    ],
+    [
+      "WV",
+      "Charleston",
+      1640
+    ],
+    [
+      "WY",
+      "Casper",
+      2190
+    ]
+  ]
+}

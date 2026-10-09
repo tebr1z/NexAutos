@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
 import { dutyUsd, fetchCustomsDuty, type CustomsDuty } from "@/lib/customs-duty";
 import { useI18n } from "@/providers/i18n-provider";
@@ -9,6 +9,7 @@ const inp =
   "w-full rounded-xl border border-line bg-bg px-4 py-3 text-sm text-fg placeholder:text-muted";
 
 type Quote = Awaited<ReturnType<typeof api.shippingQuote>>;
+type ShippingCatalog = Awaited<ReturnType<typeof api.shippingCatalog>>;
 
 function moneyAzn(n: number) {
   return `${n.toLocaleString("az-AZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} AZN`;
@@ -32,6 +33,34 @@ export function FreightCalculator() {
   const [duty, setDuty] = useState<(CustomsDuty & { engineName?: string }) | null>(null);
   const [dutyNote, setDutyNote] = useState("");
   const [dutyBusy, setDutyBusy] = useState(false);
+  const [catalog, setCatalog] = useState<ShippingCatalog | null>(null);
+  const [catalogError, setCatalogError] = useState("");
+  const [browseAuction, setBrowseAuction] = useState<"COPART" | "IAAI">("COPART");
+  const [browseState, setBrowseState] = useState("GA");
+
+  useEffect(() => {
+    api
+      .shippingCatalog()
+      .then(setCatalog)
+      .catch((err) => setCatalogError(err instanceof Error ? err.message : "Tarif siyahısı yüklənmədi."));
+  }, []);
+
+  const catalogStates = useMemo(() => {
+    if (!catalog) return [];
+    const names = new Map<string, string>();
+    for (const row of catalog.rows) {
+      if (row.auction === browseAuction) names.set(row.state, row.stateName || row.state);
+    }
+    return [...names.entries()].sort((left, right) => left[0].localeCompare(right[0]));
+  }, [browseAuction, catalog]);
+
+  const catalogRows = useMemo(
+    () =>
+      (catalog?.rows ?? []).filter(
+        (row) => row.auction === browseAuction && (!browseState || row.state === browseState),
+      ),
+    [browseAuction, browseState, catalog],
+  );
 
   async function loadQuote() {
     const next = await api.shippingQuote({
@@ -108,6 +137,75 @@ export function FreightCalculator() {
     <div className="mx-auto max-w-7xl px-5 pt-32 pb-24 md:px-8">
       <h1 className="font-display text-5xl">{t.pages.freightTitle}</h1>
       <p className="mt-4 max-w-2xl text-muted">{t.pages.freightSubtitle}</p>
+
+      <section className="mt-10 rounded-3xl border border-line bg-card p-6">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted">ABŞ–Poti tarif siyahısı</p>
+            <h2 className="mt-2 font-display text-2xl">State və yard seçərək yol puluna baxın</h2>
+            <p className="mt-2 text-sm text-muted">
+              Poti–Bakı üçün əlavə {moneyUsd(catalog?.tirUsd ?? 200)} yekun hesablamada avtomatik artırılır.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 md:min-w-[420px]">
+            <label className="block text-xs text-muted">
+              Hərrac
+              <select
+                value={browseAuction}
+                onChange={(e) => {
+                  setBrowseAuction(e.target.value as "COPART" | "IAAI");
+                  setBrowseState("GA");
+                }}
+                className={`${inp} mt-1`}
+              >
+                <option value="COPART">Copart</option>
+                <option value="IAAI">IAAI</option>
+              </select>
+            </label>
+            <label className="block text-xs text-muted">
+              State
+              <select value={browseState} onChange={(e) => setBrowseState(e.target.value)} className={`${inp} mt-1`}>
+                <option value="">Bütün state-lər</option>
+                {catalogStates.map(([code, name]) => (
+                  <option key={code} value={code}>
+                    {code} — {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+
+        {catalogError ? <p className="mt-5 text-sm text-red-500">{catalogError}</p> : null}
+        {!catalog && !catalogError ? <p className="mt-5 text-sm text-muted">Tariflər yüklənir…</p> : null}
+        {catalog ? (
+          <div className="mt-6 overflow-x-auto">
+            <table className="w-full min-w-[680px] text-left text-sm">
+              <thead className="border-b border-line text-xs uppercase tracking-wider text-muted">
+                <tr>
+                  <th className="px-3 py-3">State</th>
+                  <th className="px-3 py-3">Yard / şəhər</th>
+                  <th className="px-3 py-3">$0–3,000</th>
+                  <th className="px-3 py-3">$3,001–7,000</th>
+                  <th className="px-3 py-3">$7,001–150,000</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catalogRows.map((row) => (
+                  <tr key={`${row.auction}:${row.state}:${row.yardSlug}`} className="border-b border-line/70">
+                    <td className="px-3 py-3 font-medium">{row.state}</td>
+                    <td className="px-3 py-3">{row.yard}</td>
+                    <td className="px-3 py-3">{row.rates.a ? moneyUsd(row.rates.a) : "—"}</td>
+                    <td className="px-3 py-3">{row.rates.b ? moneyUsd(row.rates.b) : "—"}</td>
+                    <td className="px-3 py-3">{row.rates.c ? moneyUsd(row.rates.c) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!catalogRows.length ? <p className="py-6 text-sm text-muted">Bu seçim üçün tarif tapılmadı.</p> : null}
+          </div>
+        ) : null}
+      </section>
 
       <div className="mt-12 grid gap-8 lg:grid-cols-2">
         <form className="space-y-4 rounded-3xl border border-line bg-card p-6" onSubmit={submit}>

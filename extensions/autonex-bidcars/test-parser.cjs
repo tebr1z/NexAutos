@@ -45,6 +45,14 @@ const liveBid = parser.parseSnapshot({
 assert.equal(liveBid.bidNowUsd, 2700);
 assert.equal(liveBid.lotPriceUsd, 2700);
 assert.equal(liveBid.auctionFeeUsd, 720);
+
+const copartFromBody = parser.parseSnapshot({
+  title: "2020 Toyota Camry",
+  text: "Location: Dallas (TX) Auction Copart Engine 2.5L Fuel Type Gasoline",
+  exactTokens: [],
+  bidCandidates: [{ value: "$3,100", score: 20, kind: "bidNow" }],
+});
+assert.equal(copartFromBody.auction, "COPART");
 assert.deepEqual(
   parser.selectAuctionFee({ priceUsd: 2700, bidCarsFeeUsd: 720, bidNowUsd: 2700, lotPriceUsd: 2700, fallbackFeeUsd: 860 }),
   { amount: 720, source: "BidCars" },

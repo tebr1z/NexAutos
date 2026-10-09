@@ -2,6 +2,12 @@
 
 Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən birbaşa oxuyur və səhifəyə Auto Nex hesab paneli əlavə edir.
 
+## 1.9.0
+
+- BidCars səhifəsində Copart / IAA / IAAI hərracını başlıqdan, badge-dən və lot mətnindən tanıyır.
+- Copart və IAAI yard tarifləri ayrıca JSON fayllarında saxlanır və production seed vasitəsilə DB-yə düşür.
+- `/freight` səhifəsində hərrac və state seçərək bütün yard tariflərini üç qiymət aralığında görmək olur.
+
 Oxunan sahələr:
 
 - `Current Bid`, `Bid Now` və `Lot Price` məbləğləri ayrıca
@@ -27,6 +33,19 @@ Tarif tapılmasa panel ABŞ–Poti məbləğini istəyir. Admin hesabı ilə dax
 Production API `chrome-extension://` originlərini CORS-da qəbul etməlidir. Yazma sorğusu yalnız etibarlı admin/işçi JWT-si ilə işləyir.
 
 BidCars-in ayrıca xidmət haqqı nəticəyə daxil edilmir.
+
+## Caucasus Auto tarif toplayıcısı
+
+Extension `login.caucasusauto.com/admin.php?cat=invoice&action=add` səhifəsində də işləyir. Extension ikonuna vurduqda açılan panel Copart və IAAI üçün ştat/şəhər tariflərini gecikmə ilə oxuyur və hər nəticədən sonra lokal yaddaşa checkpoint yazır.
+
+Tarif qaydası:
+
+- `0–3000`: Caucasus Auto kalkulyatorundan `$1500` nümunəsi ilə oxunan əsas yol xərci
+- `3001–7000`: əsas tarif + `$50`
+- `7001–150000`: orta qrup + `$150`, yəni əsas tarif + `$200`
+- Poti–Bakı: ayrıca `$200`
+
+Paneldən nəticələri JSON kimi yükləmək və yadda saxlanmış admin sessiyası ilə Auto Nex DB-yə toplu yazmaq olar. Skan invoice yaratmır və formu göndərmir; yalnız `калькуляция` nəticəsini oxuyur.
 
 ## Chrome-a quraşdırma
 
