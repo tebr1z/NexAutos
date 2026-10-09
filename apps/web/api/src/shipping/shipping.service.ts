@@ -63,8 +63,11 @@ export class ShippingService {
     if (auction === 'OTHER') throw new BadRequestException('Hərrac Copart və ya IAAI olmalıdır.');
     if (!place?.slug) throw new BadRequestException('Yard tapılmadı. Lotda Sun Valley, Los Angeles kimi lokasiya olmalıdır.');
     const key = cellKey(state, auction, band.id, place.slug);
-    const oceanRaw = table.cells[key];
-    const ocean = oceanRaw != null && Number(oceanRaw) > 0 ? Number(oceanRaw) : null;
+    const stateKey = cellKey(state, auction, band.id);
+    const yardRate = Number(table.cells[key]);
+    const stateRate = Number(table.cells[stateKey]);
+    const ocean = yardRate > 0 ? yardRate : stateRate > 0 ? stateRate : null;
+    const rateSource = yardRate > 0 ? 'yard' : stateRate > 0 ? 'state' : null;
     const stateName = US_STATES.find((row) => row.code === state)?.name;
     const fee = auctionFeeBreakdown(dto.priceUsd, auction, dto.titleKind);
     const freightUsd = ocean != null ? ocean + table.tirUsd : null;
@@ -89,6 +92,7 @@ export class ShippingService {
       freightUsd,
       totalUsd: freightUsd != null ? freightUsd + fee.totalUsd : null,
       missing: ocean == null,
+      rateSource,
       cellKey: key,
     };
   }

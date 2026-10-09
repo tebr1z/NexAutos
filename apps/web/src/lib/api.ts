@@ -529,6 +529,7 @@ export const api = {
       freightUsd?: number | null;
       totalUsd: number | null;
       missing: boolean;
+      rateSource?: "yard" | "state" | null;
       cellKey: string;
     }>("/shipping/quote", { method: "POST", body: JSON.stringify(payload) }),
   shippingMeta: () =>

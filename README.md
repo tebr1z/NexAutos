@@ -20,8 +20,12 @@ cd ../../..
 npm run dev
 ```
 
-Web: http://localhost:3000  
-API: http://localhost:4000/api/v1/health
+Web: http://localhost:5001
+API: http://localhost:5002/api/v1/health
+
+## BidCars Chrome əlavəsi
+
+BidCars lot səhifəsində qiymət, auction fee, yol pulu və gömrüyü birbaşa hesablamaq üçün `extensions/autonex-bidcars` qovluğunu Chrome-da `chrome://extensions` → **Developer mode** → **Load unpacked** ilə quraşdırın. Ətraflı təlimat həmin qovluqdakı `README.md` faylındadır.
 
 Admin üçün `ADMIN_EMAIL` və `ADMIN_PASSWORD` seed-də yazılmalıdır. Demo giriş yoxdur.
 
