@@ -39,6 +39,11 @@
       .total small { color:#93c5fd; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
       .total div { margin-top:3px; color:#fff; font-size:24px; font-weight:900; }
       .note { margin-top:9px; color:#7890ad; font-size:10px; line-height:1.45; }
+      .rate-editor { margin-top:12px; padding:12px; border:1px solid #854d0e; border-radius:11px; background:rgba(120,53,15,.22); }
+      .rate-editor h4 { margin:0 0 4px; color:#fde68a; font-size:13px; }
+      .rate-editor p { margin:0 0 9px; color:#d6b98b; font-size:10px; line-height:1.45; }
+      .rate-editor button { width:100%; margin-top:10px; border:0; border-radius:9px; background:#d97706; color:white; padding:10px; font-weight:800; cursor:pointer; }
+      .rate-editor button:disabled { opacity:.55; cursor:wait; }
       .fallback { position:fixed; z-index:2147483646; right:20px; bottom:20px; width:min(370px,calc(100vw - 32px)); max-height:calc(100vh - 40px); overflow:auto; margin:0; }
       @media (max-width:700px) { .fallback { right:10px; bottom:10px; width:calc(100vw - 20px); max-height:75vh; } }
     </style>
@@ -62,12 +67,23 @@
         <div class="actions"><button class="primary" id="calculate" type="button">Auto Nex ilə hesabla</button></div>
         <p class="status" id="status"></p>
         <div class="result" id="result" hidden></div>
+        <section class="rate-editor" id="rateEditor" hidden>
+          <h4>Bu marşrutun tarifi bazada yoxdur</h4>
+          <p id="rateHint">ABŞ–Poti yol pulunu bir dəfə yazın. Poti–Bakı xərci avtomatik əlavə ediləcək və tarif DB-də qalacaq.</p>
+          <div class="grid">
+            <label class="wide">ABŞ–Poti tarifi, USD<input id="rateUsd" type="number" min="1" step="10" placeholder="Məsələn: 270"></label>
+            <label>Admin e-poçtu<input id="adminEmail" type="email" autocomplete="username"></label>
+            <label>Admin şifrəsi<input id="adminPassword" type="password" autocomplete="current-password"></label>
+          </div>
+          <button id="saveRate" type="button">Bazaya yaz və yenidən hesabla</button>
+          <p class="status" id="rateStatus"></p>
+        </section>
         <p class="note">Current Bid və ya Bid Now qiymətini seçin. Auction fee qiymətə görə, yol pulu Auto Nex bazasından, gömrük isə DGK API-dən hesablanır.</p>
       </div>
     </section>`;
 
   const refs = Object.fromEntries(
-    ["priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result"].map((id) => [id, shadow.getElementById(id)]),
+    ["priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "rateEditor", "rateHint", "rateUsd", "adminEmail", "adminPassword", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
   );
   const manual = new Set();
   let lastUrl = location.href;
@@ -75,6 +91,7 @@
   let calculating = false;
   let timer = 0;
   let latestData = null;
+  let lastQuote = null;
 
   function send(message) {
     return new Promise((resolve, reject) => {
@@ -253,6 +270,9 @@
         method: "POST",
         body: { priceUsd, auction, yard, state, titleKind: refs.titleKind.value },
       });
+      lastQuote = quote;
+      refs.rateEditor.hidden = !quote.missing;
+      refs.rateHint.textContent = `${quote.auction} · ${quote.yard || yard} (${quote.state}) · ${quote.band?.min || 1}–${quote.band?.max || "+"} USD qiymət aralığı üçün ABŞ–Poti tarifini yazın. Poti–Bakı ${usd(quote.tirUsd)} avtomatik əlavə olunacaq.`;
       const auctionFeeUsd = Number(quote.auctionFeeUsd || 0);
       refs.auctionFee.value = String(auctionFeeUsd);
       const invoiceUsd = priceUsd + auctionFeeUsd;
@@ -304,6 +324,7 @@
         <div class="row"><span>Avtomobil + auction fee</span><strong>${usd(invoiceUsd)}</strong></div>
         <div class="row"><span>Auto Nex ABŞ daxili + okean</span><strong>${quote.oceanUsd == null ? "Tarif yoxdur" : usd(quote.oceanUsd)}</strong></div>
         <div class="row"><span>Gürcüstan–Bakı</span><strong>${usd(quote.tirUsd)}</strong></div>
+        <div class="row"><span>Ümumi yol xərci</span><strong>${freightUsd == null ? "Tarif gözlənilir" : usd(freightUsd)}</strong></div>
         ${totalWithoutCustomsUsd == null ? "" : `<div class="row"><span>Gömrüksüz ümumi</span><strong>${usd(totalWithoutCustomsUsd)}</strong></div>`}
         <div class="row"><span>DGK gömrük</span><strong>${duty ? `${usd(customsUsd)} · ${Number(duty.total?.value || 0).toLocaleString("az-AZ", { maximumFractionDigits: 2 })} AZN` : "—"}</strong></div>
         ${totalWithCustomsUsd == null ? "" : `<div class="total"><small>Gömrüklə ümumi məbləğ</small><div>${usd(totalWithCustomsUsd)}</div></div>`}
@@ -323,6 +344,40 @@
       calculating = false;
       refs.calculate.disabled = false;
       refs.calculate.textContent = "Auto Nex ilə hesabla";
+    }
+  }
+
+  async function saveMissingRate() {
+    const rateUsd = Number(refs.rateUsd.value);
+    if (!lastQuote?.cellKey || !Number.isFinite(rateUsd) || rateUsd <= 0) {
+      refs.rateStatus.className = "status error";
+      refs.rateStatus.textContent = "ABŞ–Poti yol pulunu düzgün yazın.";
+      return;
+    }
+    refs.saveRate.disabled = true;
+    refs.rateStatus.className = "status";
+    refs.rateStatus.textContent = "Tarif bazaya yazılır…";
+    try {
+      const email = refs.adminEmail.value.trim();
+      const password = refs.adminPassword.value;
+      if (email || password) {
+        if (!email || !password) throw new Error("Admin e-poçtu və şifrəsini birlikdə yazın.");
+        await send({ type: "ANX_LOGIN", email, password });
+        refs.adminPassword.value = "";
+      }
+      await send({
+        type: "ANX_SAVE_RATE",
+        cellKey: lastQuote.cellKey,
+        rateUsd,
+        tirUsd: Number(lastQuote.tirUsd || 0),
+      });
+      refs.rateStatus.textContent = "Tarif DB-də yadda saxlandı. Növbəti dəfə avtomatik gələcək.";
+      await calculate(false);
+    } catch (error) {
+      refs.rateStatus.className = "status error";
+      refs.rateStatus.textContent = error instanceof Error ? error.message : String(error);
+    } finally {
+      refs.saveRate.disabled = false;
     }
   }
 
@@ -387,12 +442,19 @@
     host.hidden = true;
   });
   refs.calculate.addEventListener("click", () => void calculate(false));
+  refs.saveRate.addEventListener("click", () => void saveMissingRate());
   document.addEventListener("input", (event) => {
     if (!host.contains(event.target)) scheduleAuto();
   }, true);
 
   placePanel();
   readPage(true);
+  send({ type: "ANX_GET_SETTINGS" })
+    .then((value) => {
+      refs.adminEmail.value = value.authEmail || "";
+      if (value.authenticated) refs.rateStatus.textContent = "Admin girişi yadda saxlanıb; şifrəni yenidən yazmaq lazım deyil.";
+    })
+    .catch(() => undefined);
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type !== "ANX_OPEN_CALCULATOR") return false;
