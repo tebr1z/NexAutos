@@ -22,7 +22,7 @@ import { MarketSalesModule } from './market-sales/market-sales.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] }),
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../../.env', '../../.env'] }),
     ThrottlerModule.forRoot({ throttlers: [{ ttl: 60000, limit: 80 }] }),
     PrismaModule,
     AuthModule,

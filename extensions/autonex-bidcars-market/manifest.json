@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Auto Nex – BidCars Market Analizi",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "BidCars final satışlarını 30 gün saxlayır, oxşar avtomobilləri müqayisə edir və Bakı təhvil qiymətini hesablayır.",
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [

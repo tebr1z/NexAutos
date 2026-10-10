@@ -17,7 +17,8 @@
       .card { overflow:hidden; border:1px solid #273449; border-radius:18px; background:#0b1220; box-shadow:0 22px 60px rgba(3,7,18,.42); }
       .head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 13px; background:linear-gradient(135deg,#071426,#11223c); border-bottom:1px solid #273449; }
       .brand { display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-.02em; }
-      .mark { display:grid; place-items:center; width:29px; height:29px; border-radius:9px; color:white; background:#2563eb; }
+      .mark { display:grid; place-items:center; width:31px; height:31px; border-radius:9px; color:white; background:#0d1e36; border:1px solid #315991; }
+      .mark svg { width:25px; height:25px; }
       .sub { color:#8da2bd; font-size:11px; margin-top:2px; font-weight:500; }
       button { font:inherit; }
       .ghost { border:1px solid #334155; border-radius:9px; background:#172033; color:#dbeafe; padding:7px 9px; cursor:pointer; }
@@ -76,7 +77,7 @@
     </style>
     <section class="card">
       <header class="head">
-        <div class="brand"><span class="mark">AN</span><div>Auto Nex<div class="sub">BidCars ümumi qiymət hesabı</div></div></div>
+        <div class="brand"><span class="mark"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M10 40c2-7 7-11 14-12l6-10h15l8 10c5 1 8 5 9 12h-7c-1-4-4-6-8-6s-7 2-8 6H27c-1-4-4-6-8-6s-7 2-8 6z" fill="#2f7cff"/><circle cx="19" cy="41" r="6" fill="none" stroke="white" stroke-width="3"/><circle cx="47" cy="41" r="6" fill="none" stroke="white" stroke-width="3"/><path d="M31 15h20M41 8v14" stroke="#65f0c1" stroke-width="4" stroke-linecap="round"/></svg></span><div>Auto Nex<div class="sub">BidCars ümumi qiymət hesabı</div></div></div>
         <div><button class="ghost" id="refresh" type="button" title="Səhifədən yenidən oxu">↻ Oxu</button> <button class="ghost" id="close" type="button" title="Bağla">✕</button></div>
       </header>
       <div class="body">
