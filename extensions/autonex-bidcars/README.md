@@ -52,6 +52,11 @@ Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən 
 - İlk açılışda qiymət seçimi, auction fee və düzəliş sahələri gizli saxlanır; yalnız kompakt nəticə görünür.
 - Tək `Ətraflı` düyməsi qiymət/auction fee sahələrini, avtomobil məlumatlarını və tam hesab bölgüsünü birlikdə açır; `Yığcam göstər` onları yenidən bağlayır.
 
+## 1.9.9
+
+- Auction, yol və gömrük kartları ilkin görünüşdən `Ətraflı` hissəyə keçirilib; onların yerində seçilmiş hesablama qiyməti göstərilir.
+- Panel 360px enə endirilib, daxili boşluqlar və böyük AZN yekun bloku kiçildilib.
+
 Oxunan sahələr:
 
 - `Current Bid`, `Bid Now` və `Lot Price` məbləğləri ayrıca

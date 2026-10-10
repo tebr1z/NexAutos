@@ -15,13 +15,13 @@
       .body [hidden] { display:none !important; }
       * { box-sizing:border-box; }
       .card { overflow:hidden; border:1px solid #273449; border-radius:18px; background:#0b1220; box-shadow:0 22px 60px rgba(3,7,18,.42); }
-      .head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:15px 16px; background:linear-gradient(135deg,#071426,#11223c); border-bottom:1px solid #273449; }
+      .head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 13px; background:linear-gradient(135deg,#071426,#11223c); border-bottom:1px solid #273449; }
       .brand { display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-.02em; }
       .mark { display:grid; place-items:center; width:29px; height:29px; border-radius:9px; color:white; background:#2563eb; }
       .sub { color:#8da2bd; font-size:11px; margin-top:2px; font-weight:500; }
       button { font:inherit; }
       .ghost { border:1px solid #334155; border-radius:9px; background:#172033; color:#dbeafe; padding:7px 9px; cursor:pointer; }
-      .body { padding:16px 18px 18px; }
+      .body { padding:12px 13px 13px; }
       .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
       label { display:block; color:#8da2bd; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
       input,select { width:100%; margin-top:5px; border:1px solid #334155; border-radius:9px; background:#111827; color:#f8fafc; padding:9px 10px; outline:none; font:600 13px/1.2 inherit; }
@@ -38,19 +38,25 @@
       .status { min-height:18px; margin:10px 0 0; color:#93a4bb; font-size:11px; line-height:1.45; }
       .status.error { color:#fca5a5; }
       .result { margin-top:13px; border-top:1px solid #273449; padding-top:8px; }
+      .price-line { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 10px; border:1px solid #273449; border-radius:9px; background:#0f172a; }
+      .price-line span { color:#8da2bd; font-size:9px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
+      .price-line strong { color:#fff; font-size:15px; }
       .fee-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:4px; }
       .fee-box { min-width:0; padding:9px 7px; border:1px solid #273449; border-radius:10px; background:#0f172a; text-align:center; }
       .fee-box span { display:block; overflow:hidden; color:#8da2bd; font-size:9px; font-weight:800; letter-spacing:.04em; text-overflow:ellipsis; text-transform:uppercase; white-space:nowrap; }
       .fee-box strong { display:block; margin-top:4px; color:#f8fafc; font-size:13px; }
+      .result-details .fee-strip { gap:5px; margin-bottom:7px; }
+      .result-details .fee-box { padding:6px 4px; }
+      .result-details .fee-box strong { font-size:12px; }
       .row { display:flex; justify-content:space-between; gap:14px; padding:7px 0; border-bottom:1px solid rgba(51,65,85,.6); font-size:12px; }
       .row span:first-child { color:#94a3b8; }
       .row strong { color:#f8fafc; text-align:right; }
       .total { margin-top:11px; padding:12px; border-radius:11px; background:rgba(37,99,235,.16); border:1px solid rgba(59,130,246,.32); }
       .total small { color:#93c5fd; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
       .total div { margin-top:3px; color:#fff; font-size:24px; font-weight:900; }
-      .azn-total { margin-top:9px; padding:13px; border:1px solid rgba(59,130,246,.38); border-radius:12px; background:linear-gradient(135deg,rgba(37,99,235,.25),rgba(29,78,216,.1)); text-align:center; }
+      .azn-total { margin-top:7px; padding:10px; border:1px solid rgba(59,130,246,.38); border-radius:10px; background:linear-gradient(135deg,rgba(37,99,235,.25),rgba(29,78,216,.1)); text-align:center; }
       .azn-total small { color:#93c5fd; font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
-      .azn-total strong { display:block; margin-top:3px; color:#fff; font-size:28px; line-height:1.05; }
+      .azn-total strong { display:block; margin-top:2px; color:#fff; font-size:23px; line-height:1.05; }
       .dyp-button { width:100%; margin-top:8px; border:1px solid #475569; border-radius:9px; background:#172033; color:#dbeafe; padding:9px 10px; cursor:pointer; font-size:11px; font-weight:800; }
       .dyp-button.active { border-color:#16a34a; background:rgba(22,163,74,.17); color:#bbf7d0; }
       .dyp-button:disabled { opacity:.45; cursor:not-allowed; }
@@ -64,7 +70,7 @@
       .rate-editor p { margin:0 0 9px; color:#d6b98b; font-size:10px; line-height:1.45; }
       .rate-editor button { width:100%; margin-top:10px; border:0; border-radius:9px; background:#d97706; color:white; padding:10px; font-weight:800; cursor:pointer; }
       .rate-editor button:disabled { opacity:.55; cursor:wait; }
-      .dock { position:fixed; z-index:2147483646; right:18px; top:18px; width:min(390px,calc(100vw - 36px)); max-height:calc(100vh - 36px); overflow:auto; margin:0; scrollbar-width:thin; scrollbar-color:#334155 transparent; }
+      .dock { position:fixed; z-index:2147483646; right:14px; top:14px; width:min(360px,calc(100vw - 28px)); max-height:calc(100vh - 28px); overflow:auto; margin:0; scrollbar-width:thin; scrollbar-color:#334155 transparent; }
       @media (max-width:700px) { .dock { right:10px; top:10px; width:calc(100vw - 20px); max-height:calc(100vh - 20px); } }
     </style>
     <section class="card">
@@ -328,14 +334,15 @@
     const dypAzn = includeDyp ? 800 : 0;
     const finalAzn = data.totalWithCustomsAzn == null ? null : data.totalWithCustomsAzn + dypAzn;
     refs.result.innerHTML = `
-      <div class="fee-strip">
-        <div class="fee-box"><span>Auction</span><strong>${usd(data.auctionFeeUsd)}</strong></div>
-        <div class="fee-box"><span>Yol</span><strong>${data.freightUsd == null ? "—" : usd(data.freightUsd)}</strong></div>
-        <div class="fee-box"><span>Gömrük</span><strong>${data.duty ? usd(data.customsUsd) : "—"}</strong></div>
-      </div>
+      <div class="price-line"><span>Hesablama qiyməti</span><strong>${usd(data.priceUsd)}</strong></div>
       <div class="azn-total"><small>Yekun məbləğ${includeDyp ? " · DYP daxil" : ""}</small><strong>${finalAzn == null ? "—" : azn(finalAzn)}</strong></div>
       <button class="dyp-button${includeDyp ? " active" : ""}" id="toggleDyp" type="button" ${finalAzn == null ? "disabled" : ""}>${includeDyp ? "✓ DYP xərci əlavə edildi — 800 AZN" : "+ DYP xərclərini əlavə et — 800 AZN"}</button>
       <section class="result-details" ${showDetails ? "" : "hidden"}><div class="detail-body">
+        <div class="fee-strip">
+          <div class="fee-box"><span>Auction</span><strong>${usd(data.auctionFeeUsd)}</strong></div>
+          <div class="fee-box"><span>Yol</span><strong>${data.freightUsd == null ? "—" : usd(data.freightUsd)}</strong></div>
+          <div class="fee-box"><span>Gömrük</span><strong>${data.duty ? usd(data.customsUsd) : "—"}</strong></div>
+        </div>
         <div class="row"><span>Avtomobil</span><strong>${usd(data.priceUsd)}</strong></div>
         <div class="row"><span>Auction fee (${escapeHtml(data.auctionFeeSource)})</span><strong>${usd(data.auctionFeeUsd)}</strong></div>
         <div class="row"><span>Avtomobil + auction</span><strong>${usd(data.invoiceUsd)}</strong></div>
