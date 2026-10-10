@@ -26,7 +26,7 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Accept', 'Authorization', 'Content-Type'],
+    allowedHeaders: ['Accept', 'Authorization', 'Content-Type', 'X-AutoNex-Collector'],
   });
   app.useGlobalFilters(new PrismaExceptionFilter());
   app.useGlobalPipes(

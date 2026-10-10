@@ -18,6 +18,7 @@ import { CustomsModule } from './customs/customs.module';
 import { ShippingModule } from './shipping/shipping.module';
 import { SettingsModule } from './settings/settings.module';
 import { HealthController } from './health/health.controller';
+import { MarketSalesModule } from './market-sales/market-sales.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { HealthController } from './health/health.controller';
     CustomsModule,
     ShippingModule,
     SettingsModule,
+    MarketSalesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

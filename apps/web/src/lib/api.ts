@@ -198,6 +198,37 @@ async function requestWithLocal<T>(path: string, init?: RequestInit): Promise<T>
   }
 }
 
+export type MarketSale = {
+  id: string;
+  sourceKey: string;
+  sourceUrl: string;
+  lotNumber?: string | null;
+  vin?: string | null;
+  auction?: string | null;
+  make?: string | null;
+  model?: string | null;
+  trim?: string | null;
+  year?: number | null;
+  engineCc?: number | null;
+  engineLabel?: string | null;
+  fuel?: string | null;
+  color?: string | null;
+  location?: string | null;
+  state?: string | null;
+  mileageMi?: number | null;
+  mileageKm?: number | null;
+  finalBidUsd: number;
+  saleDate?: string | null;
+  observedAt: string;
+};
+
+export type MarketSalesResponse = {
+  rows: MarketSale[];
+  total: number;
+  days: number;
+  facets: Pick<MarketSale, "make" | "model" | "trim" | "fuel" | "auction" | "year" | "engineCc">[];
+};
+
 export const api = {
   track: (code: string) =>
     request<TrackingShipment>(`/tracking/${encodeURIComponent(code)}`, {
@@ -468,6 +499,13 @@ export const api = {
     ),
   publicContractPdfUrl: (token: string) => `/api/contracts/public/${encodeURIComponent(token)}/pdf`,
   catalog: () => request<CatalogCar[]>("/catalog"),
+  marketSales: (filters?: Record<string, string | number | undefined>) => {
+    const query = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== "") query.set(key, String(value));
+    });
+    return request<MarketSalesResponse>(`/market-sales/manage${query.size ? `?${query.toString()}` : ""}`);
+  },
   customsOptions: (lang: string) =>
     request<{
       AutoEngineTypes: { code: string; name: string; abbreviation2: string }[];

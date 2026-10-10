@@ -234,6 +234,37 @@ model CatalogCar {
   @@index([published, sortOrder])
 }
 
+model MarketSale {
+  id           String   @id @default(cuid())
+  sourceKey    String   @unique
+  sourceUrl    String
+  lotNumber    String?
+  vin          String?
+  auction      String?
+  make         String?
+  model        String?
+  trim         String?
+  year         Int?
+  engineCc     Int?
+  engineLabel  String?
+  fuel         String?
+  color        String?
+  location     String?
+  state        String?
+  mileageMi    Int?
+  mileageKm    Int?
+  finalBidUsd  Int
+  saleDate     DateTime?
+  observedAt   DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([make, model, trim])
+  @@index([year, engineCc, fuel])
+  @@index([auction, saleDate])
+  @@index([observedAt])
+}
+
 model TrackingEvent {
   id          String          @id @default(cuid())
   orderId     String

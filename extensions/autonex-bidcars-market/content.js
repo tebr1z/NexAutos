@@ -14,6 +14,8 @@
   let scanTimer;
   let bakuToken = 0;
   let customsOptions;
+  let dbStatus = "DB sinxronizasiya yoxlanılır…";
+  let dbStatusError = false;
 
   const money = (value) => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
   const azn = (value) => `${Number(value || 0).toLocaleString("az-AZ", { maximumFractionDigits: 0 })} AZN`;
@@ -70,6 +72,33 @@
     await chrome.storage.local.set({ [STORAGE_KEY]: records });
   }
 
+  async function syncToDb(found) {
+    if (!found.length) return;
+    const settings = await chrome.storage.sync.get({ collectorKey: "" });
+    if (!settings.collectorKey) {
+      dbStatus = "DB bağlı deyil — collector açarını bir dəfə yazın.";
+      dbStatusError = false;
+      return;
+    }
+    try {
+      const payload = found.slice(0, 50).map((row) => ({
+        key: row.key, url: row.url, lot: row.lot || undefined, vin: row.vin || undefined,
+        auction: row.auction || undefined, make: row.make || undefined, model: row.model || undefined,
+        trim: row.trim || undefined, year: row.year || undefined, engineCc: row.engineCc || undefined,
+        engineLabel: row.engineLabel || undefined, fuel: row.fuel || undefined, color: row.color || undefined,
+        location: row.location || undefined, state: row.state || undefined, mileageMi: row.mileageMi || undefined,
+        mileageKm: row.mileageKm || undefined, finalBidUsd: row.finalBidUsd,
+        saleDate: row.saleDate || undefined, observedAt: row.observedAt
+      }));
+      const result = await send({ type: "ANM_API", path: "/market-sales/ingest", method: "POST", body: { records: payload } });
+      dbStatus = `PostgreSQL yeniləndi: ${result.accepted || 0} final satış.`;
+      dbStatusError = false;
+    } catch (error) {
+      dbStatus = `DB sinxronizasiya xətası: ${error.message}`;
+      dbStatusError = true;
+    }
+  }
+
   function buildPanel() {
     if (panel) return;
     panel = document.createElement("div");
@@ -108,10 +137,17 @@
     view.innerHTML = `<div class="hero"><small>${esc(cohort.label)} · ${stat?.count || 0} satış${stat && stat.count < 3 ? " · zəif nümunə" : ""}</small><strong>${stat ? `${money(stat.q1)} – ${money(stat.q3)}` : "Məlumat azdır"}</strong><div>${esc(target.year)} ${esc(target.make)} ${esc(target.model)} · ${esc(target.trim)} · ${esc(target.fuel)}</div><div class="grid"><div class="metric"><span>Median final</span><b>${stat ? money(stat.median) : "—"}</b></div><div class="metric"><span>Orta final</span><b>${stat ? money(stat.average) : "—"}</b></div></div></div>
       <div class="filters"><label class="wide">Analiz edilən maşın<select id="target">${records.map((row) => `<option value="${esc(row.key)}" ${row.key === target.key ? "selected" : ""}>${esc(`${row.year} ${row.make} ${row.model} ${row.trim} · ${money(row.finalBidUsd)}`)}</option>`).join("")}</select></label><label>Hərrac<select id="auction">${options(records.map((r) => r.auction), previous.auction)}</select></label><label>Yanacaq<select id="fuel">${options(records.map((r) => r.fuel), previous.fuel)}</select></label><label class="wide">Rəng<select id="color">${options(records.map((r) => r.color), previous.color)}</select></label></div>
       <div class="actions"><button class="primary" id="baku">Bakı təhvil hesabla</button><button class="secondary" id="rescan">↻ Oxu</button><button class="danger" id="reset">30 günü sıfırla</button></div><div id="bakuResult"></div>
-      <div class="list"><div class="row"><span>Komplektasiya</span><b>${esc(target.trim)}</b></div><div class="row"><span>İl / yürüş</span><b>${esc(target.year || "—")} · ${target.mileageKm ? `${Math.round(target.mileageKm / 1000)} min km` : "—"}</b></div><div class="row"><span>Mühərrik / yanacaq</span><b>${target.engineCc ? `${target.engineCc} cm³` : "—"} · ${esc(target.fuel)}</b></div><div class="row"><span>Rəng / hərrac</span><b>${esc(target.color)} · ${esc(target.auction)}</b></div><div class="row"><span>Bazada cəmi</span><b>${records.length} final satış</b></div></div><p class="note">Aralıq 25–75 faiz diapazonudur; qeyri-adi ucuz/bahalı nəticələr ortalamanı pozmasın deyə median əsas götürülür.</p>`;
+      <div class="list"><div class="row"><span>Komplektasiya</span><b>${esc(target.trim)}</b></div><div class="row"><span>İl / yürüş</span><b>${esc(target.year || "—")} · ${target.mileageKm ? `${Math.round(target.mileageKm / 1000)} min km` : "—"}</b></div><div class="row"><span>Mühərrik / yanacaq</span><b>${target.engineCc ? `${target.engineCc} cm³` : "—"} · ${esc(target.fuel)}</b></div><div class="row"><span>Rəng / hərrac</span><b>${esc(target.color)} · ${esc(target.auction)}</b></div><div class="row"><span>Lokal bazada</span><b>${records.length} final satış</b></div></div><p id="dbStatus" class="note ${dbStatusError ? "error" : ""}">${esc(dbStatus)}</p><details><summary class="note" style="cursor:pointer">DB bağlantısı</summary><div class="actions"><input id="collectorKey" type="password" placeholder="MARKET_COLLECTOR_KEY"><button id="saveKey" class="secondary">Açarı saxla</button></div></details><p class="note">Aralıq 25–75 faiz diapazonudur; qeyri-adi ucuz/bahalı nəticələr ortalamanı pozmasın deyə median əsas götürülür.</p>`;
     ["target", "auction", "fuel", "color"].forEach((id) => shadow.getElementById(id).onchange = render);
     shadow.getElementById("rescan").onclick = () => scheduleScan(0);
     shadow.getElementById("baku").onclick = () => void calculateBaku(currentTarget(), stat);
+    shadow.getElementById("saveKey").onclick = async () => {
+      const key = shadow.getElementById("collectorKey").value.trim();
+      if (!key) return;
+      await chrome.storage.sync.set({ collectorKey: key });
+      dbStatus = "Açar saxlanıldı, PostgreSQL-ə göndərilir…"; dbStatusError = false; render();
+      await syncToDb(targets.length ? targets : records.slice(0, 50)); render();
+    };
     shadow.getElementById("reset").onclick = async () => {
       if (!confirm("Auto Nex Market-in topladığı son 30 günlük final satış məlumatları silinsin?")) return;
       await chrome.storage.local.remove(STORAGE_KEY); records = []; targets = []; render();
@@ -163,6 +199,7 @@
     const found = collectPageRecords();
     targets = found.filter(activeCutoff);
     await saveFound(found);
+    await syncToDb(targets);
     render();
   }
 

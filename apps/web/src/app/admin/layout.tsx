@@ -6,12 +6,13 @@ import { useEffect } from "react";
 import { Logo } from "@/components/brand/logo";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
-import { Archive, CarFront, FileSignature, Images, LogOut, MessageSquareText, Settings, Shield, Ship } from "lucide-react";
+import { Archive, CarFront, Database, FileSignature, Images, LogOut, MessageSquareText, Settings, Shield, Ship } from "lucide-react";
 
 const LINKS = [
   { href: "/admin", label: "Maşınlar", icon: CarFront },
   { href: "/admin/catalog", label: "Kataloq", icon: Images },
   { href: "/admin/freight", label: "Yol pulu", icon: Ship },
+  { href: "/admin/market", label: "Bazar analizi", icon: Database },
   { href: "/admin/contracts", label: "Müqavilələr", icon: FileSignature },
   { href: "/admin/insurance", label: "Sığorta", icon: Shield },
   { href: "/admin#arxiv", label: "Arxiv", icon: Archive },
