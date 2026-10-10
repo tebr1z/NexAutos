@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { Logo } from "@/components/brand/logo";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
+import { adminHomeForRole, canAccessAdminPath, ROLE_DETAILS, type InternalRole } from "@/lib/admin-access";
 import { Archive, CarFront, Database, FileSignature, Images, LogOut, MessageSquareText, Settings, Shield, Ship, Users } from "lucide-react";
 
 const LINKS = [
@@ -18,6 +19,7 @@ const LINKS = [
   { href: "/admin#arxiv", label: "Arxiv", icon: Archive },
   { href: "/admin/inquiries", label: "Müraciətlər", icon: MessageSquareText },
   { href: "/admin/settings", label: "Ayarlar", icon: Settings },
+  { href: "/admin/users", label: "İstifadəçilər", icon: Users },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -25,21 +27,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const freightOnly = user?.role === "FREIGHT_USER";
-  const links = freightOnly
-    ? LINKS.filter((link) => link.href === "/admin/freight")
-    : user?.role === "SUPER_ADMIN" || user?.role === "ADMIN"
-      ? [...LINKS, { href: "/admin/users", label: "İstifadəçilər", icon: Users }]
-      : LINKS;
+  const hasPageAccess = canAccessAdminPath(user?.role, pathname);
+  const links = LINKS.filter((link) => canAccessAdminPath(user?.role, link.href.split("#")[0]));
 
   useEffect(() => {
     if (!loading && (!user || user.role === "CUSTOMER")) {
       router.replace("/login");
-    } else if (!loading && user?.role === "FREIGHT_USER" && pathname !== "/admin/freight") {
-      router.replace("/admin/freight");
+    } else if (!loading && user && !hasPageAccess) {
+      router.replace(adminHomeForRole(user.role));
     }
-  }, [user, loading, router, pathname]);
+  }, [user, loading, router, pathname, hasPageAccess]);
 
-  if (loading || !user || user.role === "CUSTOMER" || (freightOnly && pathname !== "/admin/freight")) {
+  if (loading || !user || user.role === "CUSTOMER" || !hasPageAccess) {
     return <div className="flex min-h-screen items-center justify-center text-muted">Admin…</div>;
   }
 
@@ -73,7 +72,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="min-w-0 flex-1">
         <header className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4 text-sm lg:px-8">
           <div><p className="text-xs text-zinc-500">Auto Nex idarəetmə paneli</p><p className="mt-0.5 text-zinc-300">{freightOnly ? "Yol pulu hesablaması" : "Maşın alına bilər, müqavilə sonra təyin olunur"}</p></div>
-          <div className="flex items-center gap-3"><p className="hidden sm:block">{user.name}</p><button type="button" onClick={logout} className="rounded-full border border-white/10 p-2 text-zinc-400 lg:hidden" aria-label="Çıxış"><LogOut size={16} /></button></div>
+          <div className="flex items-center gap-3"><div className="hidden text-right sm:block"><p>{user.name}</p><p className="text-[11px] text-zinc-500">{ROLE_DETAILS[user.role as InternalRole].label}</p></div><button type="button" onClick={logout} className="rounded-full border border-white/10 p-2 text-zinc-400 lg:hidden" aria-label="Çıxış"><LogOut size={16} /></button></div>
         </header>
         <nav className="flex gap-2 overflow-x-auto border-b border-white/10 px-4 py-3 lg:hidden">
           {links.map((l) => <Link key={l.href} href={l.href} className={cn("inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs text-zinc-400", pathname === l.href && "bg-white/10 text-white")}><l.icon size={15} />{l.label}</Link>)}

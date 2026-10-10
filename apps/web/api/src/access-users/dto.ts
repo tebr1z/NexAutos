@@ -1,5 +1,9 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import type { Role } from '@prisma/client';
+
+export const ASSIGNABLE_ACCESS_ROLES = ['ADMIN', 'MANAGER', 'STAFF', 'FREIGHT_USER'] as const;
+export type AssignableAccessRole = (typeof ASSIGNABLE_ACCESS_ROLES)[number];
 
 function toBool(value: unknown) {
   if (value === true || value === 'true') return true;
@@ -7,7 +11,7 @@ function toBool(value: unknown) {
   return value;
 }
 
-export class CreateFreightUserDto {
+export class CreateAccessUserDto {
   @IsString()
   @MinLength(2)
   name: string;
@@ -18,9 +22,12 @@ export class CreateFreightUserDto {
   @IsString()
   @MinLength(8)
   password: string;
+
+  @IsIn(ASSIGNABLE_ACCESS_ROLES)
+  role: AssignableAccessRole;
 }
 
-export class UpdateFreightUserDto {
+export class UpdateAccessUserDto {
   @IsOptional()
   @IsString()
   @MinLength(2)
@@ -35,4 +42,8 @@ export class UpdateFreightUserDto {
   @Transform(({ value }) => toBool(value))
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsIn(ASSIGNABLE_ACCESS_ROLES)
+  role?: Role;
 }

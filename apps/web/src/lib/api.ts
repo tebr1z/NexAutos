@@ -259,11 +259,11 @@ export type MarketSalesResponse = {
   facets: Pick<MarketSale, "make" | "model" | "trim" | "fuel" | "auction" | "year" | "engineCc">[];
 };
 
-export type FreightAccessUser = {
+export type AccessUser = {
   id: string;
   name: string;
   email: string;
-  role: "FREIGHT_USER";
+  role: "SUPER_ADMIN" | "ADMIN" | "MANAGER" | "STAFF" | "FREIGHT_USER";
   isActive: boolean;
   lastLoginAt?: string | null;
   createdAt: string;
@@ -286,11 +286,11 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   me: () => request<AuthUser>("/auth/me"),
-  freightUsers: () => request<FreightAccessUser[]>("/access-users/freight"),
-  createFreightUser: (payload: { name: string; email: string; password: string }) =>
-    request<FreightAccessUser>("/access-users/freight", { method: "POST", body: JSON.stringify(payload) }),
-  updateFreightUser: (id: string, payload: { name?: string; password?: string; isActive?: boolean }) =>
-    request<FreightAccessUser>(`/access-users/freight/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  accessUsers: () => request<AccessUser[]>("/access-users"),
+  createAccessUser: (payload: { name: string; email: string; password: string; role: AccessUser["role"] }) =>
+    request<AccessUser>("/access-users", { method: "POST", body: JSON.stringify(payload) }),
+  updateAccessUser: (id: string, payload: { name?: string; password?: string; isActive?: boolean; role?: AccessUser["role"] }) =>
+    request<AccessUser>(`/access-users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) }),
   stats: () =>
     request<{
       totalOrders: number;

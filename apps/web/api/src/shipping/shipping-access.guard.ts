@@ -3,8 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { AuthGuard } from '@nestjs/passport';
 import { timingSafeEqual } from 'node:crypto';
 import { firstValueFrom, isObservable } from 'rxjs';
+import { INTERNAL_ROLES } from '../common/access-roles';
 
-const STAFF = new Set(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'FREIGHT_USER']);
+const STAFF = new Set<string>(INTERNAL_ROLES);
 
 function sameSecret(candidate?: string, expected?: string) {
   const left = Buffer.from(candidate?.trim() || '');

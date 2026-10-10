@@ -1,12 +1,10 @@
 import { Body, Controller, Get, Headers, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Role } from '@prisma/client';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { Roles } from '../common/decorators/roles.decorator';
+import { MANAGEMENT_ROLES } from '../common/access-roles';
 import { MarketSaleBatchDto, MarketSaleQueryDto } from './dto';
 import { MarketSalesService } from './market-sales.service';
-
-const STAFF: Role[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'];
 
 @Controller('market-sales')
 export class MarketSalesController {
@@ -19,7 +17,7 @@ export class MarketSalesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...MANAGEMENT_ROLES)
   @Get('manage')
   list(@Query() query: MarketSaleQueryDto) {
     return this.market.list(query);

@@ -10,14 +10,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Role } from '@prisma/client';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { OPERATIONS_ROLES } from '../common/access-roles';
 import { ContractsService } from './contracts.service';
 import { CreateContractDto, RequestOtpDto, SessionDto, SignContractDto, VerifyOtpDto, AssignContractDto } from './dto';
-
-const STAFF: Role[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'];
 
 @Controller('contracts/public')
 export class PublicContractsController {
@@ -63,7 +61,7 @@ export class PublicContractsController {
 
 @Controller('contracts')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(...STAFF)
+@Roles(...OPERATIONS_ROLES)
 export class ContractsController {
   constructor(private contracts: ContractsService) {}
 

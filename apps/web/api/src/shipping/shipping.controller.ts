@@ -1,13 +1,11 @@
 import { Body, Controller, Get, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import { Role } from '@prisma/client';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { Roles } from '../common/decorators/roles.decorator';
+import { MANAGEMENT_ROLES } from '../common/access-roles';
 import { ShippingQuoteDto, ShippingRatesDto } from './dto';
 import { ShippingService } from './shipping.service';
 import { ShippingAccessGuard } from './shipping-access.guard';
-
-const STAFF: Role[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'];
 
 @Controller('shipping')
 export class ShippingController {
@@ -33,14 +31,14 @@ export class ShippingController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...MANAGEMENT_ROLES)
   @Get('rates')
   rates() {
     return this.shipping.rates();
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...MANAGEMENT_ROLES)
   @Put('rates')
   save(@Body() dto: ShippingRatesDto) {
     return this.shipping.saveRates(dto);

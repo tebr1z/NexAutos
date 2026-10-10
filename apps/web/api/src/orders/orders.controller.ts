@@ -1,13 +1,11 @@
 import { Body, Controller, Get, Header, Param, Patch, Post, Put, StreamableFile, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import { Role } from '@prisma/client';
 import { OrdersService } from './orders.service';
 import { CreateInsuranceDto, CreateOrderDto, CustomerSmsDto, OrderPhotoDto, PrunePhotosDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-
-const STAFF: Role[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'];
+import { OPERATIONS_ROLES } from '../common/access-roles';
 
 @Controller()
 export class OrdersController {
@@ -19,7 +17,7 @@ export class OrdersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...OPERATIONS_ROLES)
   @Post('insurance')
   createInsurance(@Body() dto: CreateInsuranceDto, @CurrentUser() user: { id: string }) {
     return this.orders.createInsuranceCase(dto, user.id);
@@ -36,7 +34,7 @@ export class OrdersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...OPERATIONS_ROLES)
   @Get('orders')
   list() {
     return this.orders.findAll();
@@ -49,14 +47,14 @@ export class OrdersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...OPERATIONS_ROLES)
   @Post('orders')
   create(@Body() dto: CreateOrderDto, @CurrentUser() user: { id: string }) {
     return this.orders.create(dto, user.id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...OPERATIONS_ROLES)
   @Post('orders/:id/container')
   attachContainer(
     @Param('id') id: string,
@@ -67,7 +65,7 @@ export class OrdersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...OPERATIONS_ROLES)
   @Post('orders/:id/sms')
   sms(
     @Param('id') id: string,
@@ -78,7 +76,7 @@ export class OrdersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...OPERATIONS_ROLES)
   @Patch('orders/:id/insurance')
   insurance(
     @Param('id') id: string,
@@ -89,14 +87,14 @@ export class OrdersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...OPERATIONS_ROLES)
   @Post('orders/:id/insurance/payout')
   insurancePayout(@Param('id') id: string, @CurrentUser() user: { id: string }) {
     return this.orders.confirmInsurancePayout(id, user.id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...OPERATIONS_ROLES)
   @Patch('orders/:id/voyage')
   voyage(
     @Param('id') id: string,
@@ -107,7 +105,7 @@ export class OrdersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...OPERATIONS_ROLES)
   @Patch('orders/:id/status')
   status(
     @Param('id') id: string,
@@ -126,14 +124,14 @@ export class OrdersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...OPERATIONS_ROLES)
   @Post('orders/:id/photos')
   addPhoto(@Param('id') id: string, @Body() dto: OrderPhotoDto) {
     return this.orders.addPhoto(id, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...STAFF)
+  @Roles(...OPERATIONS_ROLES)
   @Put('orders/:id/photos')
   prunePhotos(@Param('id') id: string, @Body() dto: PrunePhotosDto) {
     return this.orders.prunePhotos(id, dto.keepIds ?? [], dto.keepUrls ?? []);
