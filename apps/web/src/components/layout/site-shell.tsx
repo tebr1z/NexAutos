@@ -7,7 +7,6 @@ import { Preloader } from "@/components/layout/preloader";
 import { Cursor } from "@/components/layout/cursor";
 import { WhatsAppButton } from "@/components/layout/whatsapp-button";
 import { Assistant } from "@/components/layout/assistant";
-import { SmoothScroll } from "@/providers/smooth-scroll";
 import "@/lib/gsap";
 
 export function SiteShell({ children }: { children: React.ReactNode }) {
@@ -20,7 +19,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SmoothScroll>
+    <>
       {pathname === "/" && <Preloader />}
       <Cursor />
       <Header />
@@ -28,6 +27,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <Footer />
       {!isContract && <WhatsAppButton />}
       {!isContract && <Assistant />}
-    </SmoothScroll>
+    </>
   );
 }
