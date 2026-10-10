@@ -26,7 +26,7 @@ export default function LoginPage() {
           setError("");
           try {
             const user = await login(email, password);
-            router.push(user.role === "CUSTOMER" ? "/account" : "/admin");
+            router.push(user.role === "CUSTOMER" ? "/account" : user.role === "FREIGHT_USER" ? "/admin/freight" : "/admin");
           } catch (err) {
             setError(err instanceof Error ? err.message : t.auth.loginFail);
           }

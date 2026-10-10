@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
 import { dutyUsd, fetchCustomsDuty, type CustomsDuty } from "@/lib/customs-duty";
+import { useAuth } from "@/providers/auth-provider";
 
 const inp =
   "w-full rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm text-white placeholder:text-zinc-500";
@@ -19,6 +20,8 @@ function moneyAzn(n: number) {
 }
 
 export default function ShippingRatesAdminPage() {
+  const { user } = useAuth();
+  const canEditRates = user?.role !== "FREIGHT_USER";
   const [url, setUrl] = useState("");
   const [price, setPrice] = useState("4500");
   const [auction, setAuction] = useState("");
@@ -33,11 +36,12 @@ export default function ShippingRatesAdminPage() {
   const [duty, setDuty] = useState<(CustomsDuty & { engineName?: string }) | null>(null);
 
   useEffect(() => {
+    if (!canEditRates) return;
     api
       .shippingRates()
       .then((row) => setTirUsd(String(row.tirUsd ?? 200)))
       .catch(() => undefined);
-  }, []);
+  }, [canEditRates]);
 
   async function loadQuote() {
     const next = await api.shippingQuote({
@@ -46,6 +50,7 @@ export default function ShippingRatesAdminPage() {
       auction: auction || undefined,
       titleKind,
     });
+    setTirUsd(String(next.tirUsd ?? 200));
     setQuote(next);
     return next;
   }
@@ -191,7 +196,7 @@ export default function ShippingRatesAdminPage() {
         </div>
       </form>
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
+      {canEditRates ? <div className="mt-6 flex flex-wrap items-end gap-3">
         <label className="block text-xs text-zinc-500">
           Gürcüstan → Bakı (TIR), USD
           <input value={tirUsd} onChange={(e) => setTirUsd(e.target.value.replace(/[^\d.]/g, ""))} className={`${inp} mt-1 w-40`} />
@@ -199,7 +204,7 @@ export default function ShippingRatesAdminPage() {
         <button type="button" onClick={() => void saveTir()} className="rounded-xl border border-white/15 px-4 py-3 text-xs text-zinc-300">
           TIR-ı yadda saxla
         </button>
-      </div>
+      </div> : null}
 
       {quote ? (
         <div className="mt-8 space-y-4 rounded-2xl border border-white/10 p-5">
@@ -249,7 +254,7 @@ export default function ShippingRatesAdminPage() {
                 </div>
               ) : null}
             </div>
-          ) : (
+          ) : canEditRates ? (
             <form className="space-y-3" onSubmit={remember}>
               <label className="block text-xs text-zinc-500">
                 {quote.auction} · {quote.yard || quote.lot?.location}, {quote.state} · {bandLabel(quote.band)} üçün ABŞ yol pulu (USD)
@@ -266,6 +271,8 @@ export default function ShippingRatesAdminPage() {
                 Bu yard-ı yadda saxla
               </button>
             </form>
+          ) : (
+            <p className="text-sm text-amber-300">Bu yard üçün tarif yoxdur. Adminə məlumat verin.</p>
           )}
         </div>
       ) : null}

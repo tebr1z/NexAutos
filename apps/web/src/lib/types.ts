@@ -114,6 +114,6 @@ export type AuthUser = {
   id: string;
   email: string;
   name: string;
-  role: "SUPER_ADMIN" | "ADMIN" | "MANAGER" | "STAFF" | "CUSTOMER";
+  role: "SUPER_ADMIN" | "ADMIN" | "MANAGER" | "STAFF" | "FREIGHT_USER" | "CUSTOMER";
   locale: string;
 };

@@ -19,6 +19,7 @@ import { ShippingModule } from './shipping/shipping.module';
 import { SettingsModule } from './settings/settings.module';
 import { HealthController } from './health/health.controller';
 import { MarketSalesModule } from './market-sales/market-sales.module';
+import { AccessUsersModule } from './access-users/access-users.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { MarketSalesModule } from './market-sales/market-sales.module';
     ShippingModule,
     SettingsModule,
     MarketSalesModule,
+    AccessUsersModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

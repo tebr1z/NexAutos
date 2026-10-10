@@ -4,7 +4,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { timingSafeEqual } from 'node:crypto';
 import { firstValueFrom, isObservable } from 'rxjs';
 
-const STAFF = new Set(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF']);
+const STAFF = new Set(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'FREIGHT_USER']);
 
 function sameSecret(candidate?: string, expected?: string) {
   const left = Buffer.from(candidate?.trim() || '');

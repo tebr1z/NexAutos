@@ -20,8 +20,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem("anx_token");
-    if (!token || token.startsWith("demo-")) {
+    const refreshToken = localStorage.getItem("anx_refresh_token");
+    if ((!token && !refreshToken) || token?.startsWith("demo-")) {
       localStorage.removeItem("anx_token");
+      localStorage.removeItem("anx_refresh_token");
       localStorage.removeItem("anx_demo_user");
       setLoading(false);
       return;
@@ -31,6 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then(setUser)
       .catch(() => {
         localStorage.removeItem("anx_token");
+        localStorage.removeItem("anx_refresh_token");
         localStorage.removeItem("anx_demo_user");
       })
       .finally(() => setLoading(false));
@@ -39,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     const res = await api.login(email, password);
     localStorage.setItem("anx_token", res.accessToken);
+    localStorage.setItem("anx_refresh_token", res.refreshToken);
     localStorage.removeItem("anx_demo_user");
     setUser(res.user);
     return res.user;
@@ -47,12 +51,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (payload: { name: string; email: string; password: string; phone?: string }) => {
     const res = await api.register(payload);
     localStorage.setItem("anx_token", res.accessToken);
+    localStorage.setItem("anx_refresh_token", res.refreshToken);
     setUser(res.user);
     return res.user;
   };
 
   const logout = () => {
     localStorage.removeItem("anx_token");
+    localStorage.removeItem("anx_refresh_token");
     localStorage.removeItem("anx_demo_user");
     setUser(null);
   };

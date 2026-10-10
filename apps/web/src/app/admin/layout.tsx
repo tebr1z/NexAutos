@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { Logo } from "@/components/brand/logo";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
-import { Archive, CarFront, Database, FileSignature, Images, LogOut, MessageSquareText, Settings, Shield, Ship } from "lucide-react";
+import { Archive, CarFront, Database, FileSignature, Images, LogOut, MessageSquareText, Settings, Shield, Ship, Users } from "lucide-react";
 
 const LINKS = [
   { href: "/admin", label: "Maşınlar", icon: CarFront },
@@ -24,14 +24,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, loading, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const freightOnly = user?.role === "FREIGHT_USER";
+  const links = freightOnly
+    ? LINKS.filter((link) => link.href === "/admin/freight")
+    : user?.role === "SUPER_ADMIN" || user?.role === "ADMIN"
+      ? [...LINKS, { href: "/admin/users", label: "İstifadəçilər", icon: Users }]
+      : LINKS;
 
   useEffect(() => {
     if (!loading && (!user || user.role === "CUSTOMER")) {
       router.replace("/login");
+    } else if (!loading && user?.role === "FREIGHT_USER" && pathname !== "/admin/freight") {
+      router.replace("/admin/freight");
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, pathname]);
 
-  if (loading || !user || user.role === "CUSTOMER") {
+  if (loading || !user || user.role === "CUSTOMER" || (freightOnly && pathname !== "/admin/freight")) {
     return <div className="flex min-h-screen items-center justify-center text-muted">Admin…</div>;
   }
 
@@ -42,7 +50,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Logo />
         </Link>
         <nav className="mt-10 space-y-1 text-sm">
-          {LINKS.map((l) => (
+          {links.map((l) => (
             <Link
               key={l.href}
               href={l.href}
@@ -64,11 +72,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
       <div className="min-w-0 flex-1">
         <header className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4 text-sm lg:px-8">
-          <div><p className="text-xs text-zinc-500">Auto Nex idarəetmə paneli</p><p className="mt-0.5 text-zinc-300">Maşın alına bilər, müqavilə sonra təyin olunur</p></div>
+          <div><p className="text-xs text-zinc-500">Auto Nex idarəetmə paneli</p><p className="mt-0.5 text-zinc-300">{freightOnly ? "Yol pulu hesablaması" : "Maşın alına bilər, müqavilə sonra təyin olunur"}</p></div>
           <div className="flex items-center gap-3"><p className="hidden sm:block">{user.name}</p><button type="button" onClick={logout} className="rounded-full border border-white/10 p-2 text-zinc-400 lg:hidden" aria-label="Çıxış"><LogOut size={16} /></button></div>
         </header>
         <nav className="flex gap-2 overflow-x-auto border-b border-white/10 px-4 py-3 lg:hidden">
-          {LINKS.map((l) => <Link key={l.href} href={l.href} className={cn("inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs text-zinc-400", pathname === l.href && "bg-white/10 text-white")}><l.icon size={15} />{l.label}</Link>)}
+          {links.map((l) => <Link key={l.href} href={l.href} className={cn("inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs text-zinc-400", pathname === l.href && "bg-white/10 text-white")}><l.icon size={15} />{l.label}</Link>)}
         </nav>
         <div className="p-5 sm:p-6 lg:p-10">{children}</div>
       </div>

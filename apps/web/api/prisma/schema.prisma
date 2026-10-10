@@ -13,6 +13,7 @@ enum Role {
   ADMIN
   MANAGER
   STAFF
+  FREIGHT_USER
   CUSTOMER
 }
 

@@ -106,6 +106,31 @@ export type PublicContract = {
 };
 
 const API = typeof window === "undefined" ? nestApiBase() : browserApiBase();
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshBrowserToken() {
+  if (typeof window === "undefined") return null;
+  if (refreshPromise) return refreshPromise;
+  const refreshToken = localStorage.getItem("anx_refresh_token");
+  if (!refreshToken) return null;
+  refreshPromise = fetch(`${API}/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken }),
+    cache: "no-store",
+  }).then(async (response) => {
+    if (!response.ok) throw new Error("Sessiya yenilənmədi.");
+    const data = await response.json() as { accessToken: string; refreshToken: string };
+    localStorage.setItem("anx_token", data.accessToken);
+    localStorage.setItem("anx_refresh_token", data.refreshToken);
+    return data.accessToken;
+  }).catch(() => {
+    localStorage.removeItem("anx_token");
+    localStorage.removeItem("anx_refresh_token");
+    return null;
+  }).finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
 
 export type VesselHit = {
   name: string;
@@ -157,15 +182,20 @@ export type OceanLookup = {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("anx_token") : null;
-  const res = await fetch(`${API}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-    cache: "no-store",
-  });
+  const run = (accessToken: string | null) => fetch(`${API}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...(init?.headers ?? {}),
+      },
+      cache: "no-store",
+    });
+  let res = await run(token);
+  if (res.status === 401 && typeof window !== "undefined" && !["/auth/login", "/auth/register", "/auth/refresh"].includes(path)) {
+    const renewed = await refreshBrowserToken();
+    if (renewed) res = await run(renewed);
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const raw = (body as { message?: string | string[] }).message;
@@ -229,6 +259,16 @@ export type MarketSalesResponse = {
   facets: Pick<MarketSale, "make" | "model" | "trim" | "fuel" | "auction" | "year" | "engineCc">[];
 };
 
+export type FreightAccessUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: "FREIGHT_USER";
+  isActive: boolean;
+  lastLoginAt?: string | null;
+  createdAt: string;
+};
+
 export const api = {
   track: (code: string) =>
     request<TrackingShipment>(`/tracking/${encodeURIComponent(code)}`, {
@@ -236,16 +276,21 @@ export const api = {
     }),
   vin: (vin: string) => request<VinRecord>(`/vins/${encodeURIComponent(vin)}`),
   login: (email: string, password: string) =>
-    request<{ accessToken: string; user: AuthUser }>("/auth/login", {
+    request<{ accessToken: string; refreshToken: string; user: AuthUser }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
   register: (payload: { name: string; email: string; password: string; phone?: string }) =>
-    request<{ accessToken: string; user: AuthUser }>("/auth/register", {
+    request<{ accessToken: string; refreshToken: string; user: AuthUser }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
   me: () => request<AuthUser>("/auth/me"),
+  freightUsers: () => request<FreightAccessUser[]>("/access-users/freight"),
+  createFreightUser: (payload: { name: string; email: string; password: string }) =>
+    request<FreightAccessUser>("/access-users/freight", { method: "POST", body: JSON.stringify(payload) }),
+  updateFreightUser: (id: string, payload: { name?: string; password?: string; isActive?: boolean }) =>
+    request<FreightAccessUser>(`/access-users/freight/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) }),
   stats: () =>
     request<{
       totalOrders: number;

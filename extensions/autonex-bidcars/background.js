@@ -294,7 +294,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         method: "POST",
         body: { email: String(message.email || "").trim(), password: String(message.password || "") },
       });
-      const staff = ["SUPER_ADMIN", "ADMIN", "MANAGER", "STAFF"];
+      const staff = ["SUPER_ADMIN", "ADMIN", "MANAGER", "STAFF", "FREIGHT_USER"];
       if (!data?.accessToken || !staff.includes(data.user?.role)) throw new Error("Yol tarifini yazmaq üçün admin və ya işçi hesabı lazımdır.");
       await chrome.storage.local.set({ authToken: data.accessToken, refreshToken: data.refreshToken, authEmail: data.user.email });
       return { ok: true, data: { email: data.user.email, role: data.user.role } };
