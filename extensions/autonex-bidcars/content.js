@@ -38,12 +38,23 @@
       .status { min-height:18px; margin:10px 0 0; color:#93a4bb; font-size:11px; line-height:1.45; }
       .status.error { color:#fca5a5; }
       .result { margin-top:13px; border-top:1px solid #273449; padding-top:8px; }
+      .fee-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:4px; }
+      .fee-box { min-width:0; padding:9px 7px; border:1px solid #273449; border-radius:10px; background:#0f172a; text-align:center; }
+      .fee-box span { display:block; overflow:hidden; color:#8da2bd; font-size:9px; font-weight:800; letter-spacing:.04em; text-overflow:ellipsis; text-transform:uppercase; white-space:nowrap; }
+      .fee-box strong { display:block; margin-top:4px; color:#f8fafc; font-size:13px; }
       .row { display:flex; justify-content:space-between; gap:14px; padding:7px 0; border-bottom:1px solid rgba(51,65,85,.6); font-size:12px; }
       .row span:first-child { color:#94a3b8; }
       .row strong { color:#f8fafc; text-align:right; }
       .total { margin-top:11px; padding:12px; border-radius:11px; background:rgba(37,99,235,.16); border:1px solid rgba(59,130,246,.32); }
       .total small { color:#93c5fd; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
       .total div { margin-top:3px; color:#fff; font-size:24px; font-weight:900; }
+      .azn-total { margin-top:9px; padding:13px; border:1px solid rgba(59,130,246,.38); border-radius:12px; background:linear-gradient(135deg,rgba(37,99,235,.25),rgba(29,78,216,.1)); text-align:center; }
+      .azn-total small { color:#93c5fd; font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+      .azn-total strong { display:block; margin-top:3px; color:#fff; font-size:28px; line-height:1.05; }
+      .dyp-button { width:100%; margin-top:8px; border:1px solid #475569; border-radius:9px; background:#172033; color:#dbeafe; padding:9px 10px; cursor:pointer; font-size:11px; font-weight:800; }
+      .dyp-button.active { border-color:#16a34a; background:rgba(22,163,74,.17); color:#bbf7d0; }
+      .dyp-button:disabled { opacity:.45; cursor:not-allowed; }
+      .result-details { margin-top:8px !important; }
       .note { margin-top:9px; color:#7890ad; font-size:10px; line-height:1.45; }
       .rate-editor { margin-top:14px; padding:14px; border:1px solid #854d0e; border-radius:13px; background:rgba(120,53,15,.22); }
       .rate-editor h4 { margin:0 0 4px; color:#fde68a; font-size:13px; }
@@ -102,6 +113,8 @@
   let timer = 0;
   let latestData = null;
   let lastQuote = null;
+  let lastCalculation = null;
+  let includeDyp = false;
 
   function send(message) {
     return new Promise((resolve, reject) => {
@@ -301,6 +314,47 @@
     return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
   }
 
+  function azn(value) {
+    return `${Number(value || 0).toLocaleString("az-AZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} AZN`;
+  }
+
+  function renderCalculation() {
+    const data = lastCalculation;
+    if (!data) return;
+    const dypAzn = includeDyp ? 800 : 0;
+    const finalAzn = data.totalWithCustomsAzn == null ? null : data.totalWithCustomsAzn + dypAzn;
+    refs.result.innerHTML = `
+      <div class="fee-strip">
+        <div class="fee-box"><span>Auction</span><strong>${usd(data.auctionFeeUsd)}</strong></div>
+        <div class="fee-box"><span>Yol</span><strong>${data.freightUsd == null ? "—" : usd(data.freightUsd)}</strong></div>
+        <div class="fee-box"><span>Gömrük</span><strong>${data.duty ? usd(data.customsUsd) : "—"}</strong></div>
+      </div>
+      <div class="azn-total"><small>Yekun məbləğ${includeDyp ? " · DYP daxil" : ""}</small><strong>${finalAzn == null ? "—" : azn(finalAzn)}</strong></div>
+      <button class="dyp-button${includeDyp ? " active" : ""}" id="toggleDyp" type="button" ${finalAzn == null ? "disabled" : ""}>${includeDyp ? "✓ DYP xərci əlavə edildi — 800 AZN" : "+ DYP xərclərini əlavə et — 800 AZN"}</button>
+      <details class="compact result-details"><summary>Ətraflı hesab</summary><div class="detail-body">
+        <div class="row"><span>Avtomobil</span><strong>${usd(data.priceUsd)}</strong></div>
+        <div class="row"><span>Auction fee (${escapeHtml(data.auctionFeeSource)})</span><strong>${usd(data.auctionFeeUsd)}</strong></div>
+        <div class="row"><span>Avtomobil + auction</span><strong>${usd(data.invoiceUsd)}</strong></div>
+        <div class="row"><span>ABŞ–Poti</span><strong>${data.quote.oceanUsd == null ? "Tarif yoxdur" : usd(data.quote.oceanUsd)}</strong></div>
+        <div class="row"><span>Poti–Bakı</span><strong>${usd(data.quote.tirUsd)}</strong></div>
+        <div class="row"><span>Bütün yol xərci</span><strong>${data.freightUsd == null ? "—" : usd(data.freightUsd)}</strong></div>
+        ${data.totalWithoutCustomsUsd == null ? "" : `<div class="row"><span>Gömrükdən əvvəl</span><strong>${usd(data.totalWithoutCustomsUsd)}</strong></div>`}
+        <div class="row"><span>DGK gömrük</span><strong>${data.duty ? `${usd(data.customsUsd)} · ${azn(data.duty.total?.value)}` : "—"}</strong></div>
+        ${includeDyp ? `<div class="row"><span>DYP xərcləri</span><strong>800.00 AZN</strong></div>` : ""}
+        ${data.totalWithCustomsUsd == null ? "" : `<div class="row"><span>Yekun USD</span><strong>${usd(data.totalWithCustomsUsd)}</strong></div>`}
+        ${finalAzn == null ? "" : `<div class="row"><span>Yekun AZN</span><strong>${azn(finalAzn)}</strong></div>`}
+        ${data.quote.rateSource === "state" ? `<p class="note">Bu yard üçün ayrıca tarif tapılmadı; ${escapeHtml(data.quote.state)} ştatının əvvəlki tarifi istifadə olundu.</p>` : ""}
+        ${data.quote.auctionFee ? `<p class="note">${escapeHtml(data.quote.auction)} fee: buyer ${usd(data.quote.auctionFee.buyerUsd)} + live ${usd(data.quote.auctionFee.virtualUsd)} + gate ${usd(data.quote.auctionFee.gateUsd)}${data.quote.auctionFee.envUsd ? ` + env ${usd(data.quote.auctionFee.envUsd)}` : ""}${data.quote.auctionFee.titleUsd ? ` + title ${usd(data.quote.auctionFee.titleUsd)}` : ""}</p>` : ""}
+        ${data.quote.missing ? `<p class="note">Bu yard və qiymət qrupu üçün yol pulu tarifi admin paneldə yoxdur.</p>` : ""}
+        ${data.customsNote ? `<p class="note">${escapeHtml(data.customsNote)}</p>` : ""}
+      </div></details>`;
+    refs.result.hidden = false;
+    shadow.getElementById("toggleDyp")?.addEventListener("click", () => {
+      includeDyp = !includeDyp;
+      renderCalculation();
+    });
+  }
+
   async function calculate(triggeredAutomatically = false) {
     if (calculating) {
       recalculateAfterCurrent = true;
@@ -411,23 +465,8 @@
 
       const totalWithCustomsUsd = totalWithoutCustomsUsd == null || !duty ? null : totalWithoutCustomsUsd + customsUsd;
       const totalWithCustomsAzn = totalWithCustomsUsd == null || !duty ? null : totalWithCustomsUsd * Number(duty.usdCourse || 0);
-      refs.result.innerHTML = `
-        <div class="row"><span>Avtomobil + auction fee</span><strong>${usd(invoiceUsd)}</strong></div>
-        <div class="row"><span>Bütün yol xərci</span><strong>${freightUsd == null ? "Tarif gözlənilir" : usd(freightUsd)}</strong></div>
-        <div class="row"><span>DGK gömrük</span><strong>${duty ? `${usd(customsUsd)} · ${Number(duty.total?.value || 0).toLocaleString("az-AZ", { maximumFractionDigits: 2 })} AZN` : "—"}</strong></div>
-        ${totalWithCustomsUsd == null ? "" : `<div class="total"><small>Yekun: maşın + auction + yol + gömrük</small><div>${usd(totalWithCustomsUsd)}</div><div style="font-size:15px;color:#bfdbfe">${Number(totalWithCustomsAzn || 0).toLocaleString("az-AZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} AZN</div></div>`}
-        <details class="compact"><summary>Hesab detalları</summary><div class="detail-body">
-          <div class="row"><span>Avtomobil</span><strong>${usd(priceUsd)}</strong></div>
-          <div class="row"><span>Auction fee (${auctionFeeSource})</span><strong>${usd(auctionFeeUsd)}</strong></div>
-          <div class="row"><span>ABŞ–Poti</span><strong>${quote.oceanUsd == null ? "Tarif yoxdur" : usd(quote.oceanUsd)}</strong></div>
-          <div class="row"><span>Poti–Bakı</span><strong>${usd(quote.tirUsd)}</strong></div>
-          ${totalWithoutCustomsUsd == null ? "" : `<div class="row"><span>Gömrükdən əvvəl</span><strong>${usd(totalWithoutCustomsUsd)}</strong></div>`}
-        </div></details>
-        ${quote.rateSource === "state" ? `<p class="note">Bu yard üçün ayrıca tarif tapılmadı; ${escapeHtml(quote.state)} ştatının əvvəlki tarifi istifadə olundu.</p>` : ""}
-        ${quote.auctionFee ? `<p class="note">${escapeHtml(quote.auction)} fee: buyer ${usd(quote.auctionFee.buyerUsd)} + live ${usd(quote.auctionFee.virtualUsd)} + gate ${usd(quote.auctionFee.gateUsd)}${quote.auctionFee.envUsd ? ` + env ${usd(quote.auctionFee.envUsd)}` : ""}${quote.auctionFee.titleUsd ? ` + title ${usd(quote.auctionFee.titleUsd)}` : ""}</p>` : ""}
-        ${quote.missing ? `<p class="note">Bu yard və qiymət qrupu üçün yol pulu tarifi admin paneldə yoxdur.</p>` : ""}
-        ${customsNote ? `<p class="note">${escapeHtml(customsNote)}</p>` : ""}`;
-      refs.result.hidden = false;
+      lastCalculation = { priceUsd, auctionFeeUsd, auctionFeeSource, invoiceUsd, freightUsd, totalWithoutCustomsUsd, duty, customsUsd, customsNote, totalWithCustomsUsd, totalWithCustomsAzn, quote };
+      renderCalculation();
       refs.status.textContent = `${quote.auction} · ${quote.yard || yard} · ${quote.state} · ${year || "il yoxdur"} · ${engineCc || "EV"} cm³ · ${fuel}`;
     } catch (error) {
       refs.status.className = "status error";
@@ -489,6 +528,8 @@
         manual.clear();
         lastAutoSignature = "";
         refs.result.hidden = true;
+        lastCalculation = null;
+        includeDyp = false;
       }
       const data = readPage(false);
       const signature = [refs.priceSource.value, refs.price.value, data.bidNowUsd, data.currentBidUsd, data.lotPriceUsd, data.auctionFeeUsd, data.auction, data.location].join("|");
@@ -533,7 +574,6 @@
     host.hidden = false;
     placePanel();
     readPage(true);
-    host.scrollIntoView({ behavior: "smooth", block: "center" });
     void calculate(false);
     sendResponse({ ok: true });
     return false;

@@ -40,6 +40,13 @@ Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən 
 - `Fuel Type` dəyəri birbaşa BidCars texniki məlumat cədvəlindən götürülür və DGK kateqoriyasına çevrilir.
 - Benzin, dizel, LPG, hibrid, dizel hibrid, plug-in hibrid, plug-in dizel hibrid, mild hibrid və elektrik ayrı saxlanır; gömrük sorğusuna uyğun DGK mühərrik kodu göndərilir.
 
+## 1.9.7
+
+- Extension açılarkən və hesablayarkən BidCars səhifəsi artıq aşağı sürüşdürülmür.
+- Nəticənin bağlı görünüşündə yalnız auction fee, bütün yol xərci və gömrük USD ilə, yekun isə böyük AZN məbləği ilə göstərilir.
+- Tam bölgü `Ətraflı hesab` bölməsinə keçirilib.
+- `DYP xərclərini əlavə et — 800 AZN` düyməsi yekun manat məbləğinə 800 AZN əlavə edir və təkrar basıldıqda çıxarır.
+
 Oxunan sahələr:
 
 - `Current Bid`, `Bid Now` və `Lot Price` məbləğləri ayrıca
