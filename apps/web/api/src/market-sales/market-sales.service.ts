@@ -48,24 +48,47 @@ export class MarketSalesService {
   async list(query: MarketSaleQueryDto) {
     const days = query.days ?? 30;
     const since = new Date(Date.now() - days * 86400000);
+    const yearFrom = query.yearFrom ?? query.year;
+    const yearTo = query.yearTo ?? query.year;
+    const mileageKmFrom = query.mileageKmFrom;
+    const mileageKmTo = query.mileageKmTo ?? 300000;
+    if (yearFrom && yearTo && yearFrom > yearTo) throw new BadRequestException('Başlanğıc ili son ildən böyük ola bilməz.');
+    if (mileageKmFrom !== undefined && mileageKmFrom > mileageKmTo) {
+      throw new BadRequestException('Minimum yürüş maksimum yürüşdən böyük ola bilməz.');
+    }
+    const mileageMiFrom = mileageKmFrom === undefined ? undefined : Math.ceil(mileageKmFrom / 1.609344);
+    const mileageMiTo = Math.floor(mileageKmTo / 1.609344);
+    const mileageFilter: Prisma.MarketSaleWhereInput = mileageKmFrom !== undefined || query.mileageKmTo !== undefined
+      ? {
+          OR: [
+            { mileageKm: { gte: mileageKmFrom, lte: mileageKmTo } },
+            { mileageKm: null, mileageMi: { gte: mileageMiFrom, lte: mileageMiTo } },
+          ],
+        }
+      : {
+          AND: [
+            { OR: [{ mileageKm: null }, { mileageKm: { lte: 300000 } }] },
+            { OR: [{ mileageKm: { not: null } }, { mileageMi: null }, { mileageMi: { lte: 186411 } }] },
+          ],
+        };
     const where: Prisma.MarketSaleWhereInput = {
       observedAt: { gte: since },
-      AND: [
-        { OR: [{ mileageKm: null }, { mileageKm: { lte: 300000 } }] },
-        { OR: [{ mileageKm: { not: null } }, { mileageMi: null }, { mileageMi: { lte: 186411 } }] },
-      ],
+      AND: [mileageFilter],
       ...(query.make ? { make: { equals: query.make, mode: 'insensitive' } } : {}),
       ...(query.model ? { model: { equals: query.model, mode: 'insensitive' } } : {}),
       ...(query.trim ? { trim: { equals: query.trim, mode: 'insensitive' } } : {}),
       ...(query.fuel ? { fuel: { equals: query.fuel, mode: 'insensitive' } } : {}),
       ...(query.auction ? { auction: query.auction.toUpperCase() } : {}),
-      ...(query.year ? { year: query.year } : {}),
+      ...(yearFrom || yearTo ? { year: { gte: yearFrom, lte: yearTo } } : {}),
       ...(query.engineCc ? { engineCc: { gte: query.engineCc - 100, lte: query.engineCc + 100 } } : {}),
     };
     const [rows, total, facets] = await Promise.all([
       this.prisma.marketSale.findMany({ where, orderBy: [{ saleDate: 'desc' }, { observedAt: 'desc' }], take: query.limit ?? 200 }),
       this.prisma.marketSale.count({ where }),
-      this.prisma.marketSale.findMany({ where: { observedAt: { gte: since }, AND: where.AND }, select: { make: true, model: true, trim: true, fuel: true, auction: true, year: true, engineCc: true } }),
+      this.prisma.marketSale.findMany({
+        where: { observedAt: { gte: since }, AND: [mileageFilter] },
+        select: { make: true, model: true, trim: true, fuel: true, auction: true, year: true, engineCc: true },
+      }),
     ]);
     return { rows, total, days, facets };
   }

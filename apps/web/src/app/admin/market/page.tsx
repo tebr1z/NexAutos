@@ -39,7 +39,10 @@ function fuelCode(fuel?: string | null) {
 
 export default function MarketSalesAdminPage() {
   const [data, setData] = useState<MarketSalesResponse | null>(null);
-  const [filters, setFilters] = useState({ make: "", model: "", trim: "", fuel: "", auction: "", year: "", engineCc: "", days: "30" });
+  const [filters, setFilters] = useState({
+    make: "", model: "", trim: "", fuel: "", auction: "", engineCc: "",
+    yearFrom: "", yearTo: "", mileageKmFrom: "", mileageKmTo: "", days: "30",
+  });
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const [deliveryBusy, setDeliveryBusy] = useState(false);
@@ -98,10 +101,16 @@ export default function MarketSalesAdminPage() {
 
   const facets = data?.facets || [];
   const makes = unique(facets.map((row) => row.make));
-  const models = unique(facets.filter((row) => !filters.make || row.make === filters.make).map((row) => row.model));
-  const trims = unique(facets.filter((row) => (!filters.make || row.make === filters.make) && (!filters.model || row.model === filters.model)).map((row) => row.trim));
-  const engines = unique(facets.map((row) => row.engineCc));
-  const years = unique(facets.map((row) => row.year)).sort((a, b) => b - a);
+  const makeFacets = facets.filter((row) => !filters.make || row.make === filters.make);
+  const models = unique(makeFacets.map((row) => row.model));
+  const modelFacets = makeFacets.filter((row) => !filters.model || row.model === filters.model);
+  const trims = unique(modelFacets.map((row) => row.trim));
+  const trimFacets = modelFacets.filter((row) => !filters.trim || row.trim === filters.trim);
+  const engines = unique(trimFacets.map((row) => row.engineCc));
+  const engineFacets = trimFacets.filter((row) => !filters.engineCc || String(row.engineCc || "") === filters.engineCc);
+  const fuels = unique(engineFacets.map((row) => row.fuel));
+  const fuelFacets = engineFacets.filter((row) => !filters.fuel || row.fuel === filters.fuel);
+  const years = unique(fuelFacets.map((row) => row.year)).sort((a, b) => a - b);
   const stats = useMemo(() => {
     const rows = data?.rows || [];
     const avg = rows.length ? Math.round(rows.reduce((sum, row) => sum + row.finalBidUsd, 0) / rows.length) : 0;
@@ -113,8 +122,11 @@ export default function MarketSalesAdminPage() {
   }, [deliveryById]);
 
   const set = (name: keyof typeof filters, value: string) => setFilters((current) => ({ ...current, [name]: value }));
-  const select = (label: string, name: keyof typeof filters, values: (string | number)[]) => (
-    <label className="text-xs text-zinc-500">{label}<select className={`${input} mt-1`} value={filters[name]} onChange={(e) => set(name, e.target.value)}><option value="">Hamısı</option>{values.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+  const select = (label: string, name: keyof typeof filters, values: (string | number)[], onChange?: (value: string) => void) => (
+    <label className="text-xs text-zinc-500">{label}<select className={`${input} mt-1`} value={filters[name]} onChange={(e) => onChange ? onChange(e.target.value) : set(name, e.target.value)}><option value="">Hamısı</option>{values.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+  );
+  const rangeInput = (label: string, name: keyof typeof filters, placeholder: string, min: number, max: number) => (
+    <label className="text-xs text-zinc-500">{label}<input type="number" inputMode="numeric" min={min} max={max} value={filters[name]} onChange={(e) => set(name, e.target.value)} placeholder={placeholder} className={`${input} mt-1`} /></label>
   );
 
   return (
@@ -126,11 +138,17 @@ export default function MarketSalesAdminPage() {
       {error ? <p className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</p> : null}
 
       <div className="mt-7 grid gap-3 rounded-2xl border border-white/10 p-4 sm:grid-cols-2 lg:grid-cols-4">
-        {select("Marka", "make", makes)}{select("Model", "model", models)}{select("Komplektasiya", "trim", trims)}
-        {select("Mühərrik, cm³", "engineCc", engines)}{select("İl", "year", years)}
-        {select("Yanacaq", "fuel", unique(facets.map((r) => r.fuel)))}{select("Hərrac", "auction", unique(facets.map((r) => r.auction)))}
+        {select("Marka", "make", makes, (value) => setFilters((current) => ({ ...current, make: value, model: "", trim: "", engineCc: "", fuel: "" })))}
+        {select("Model", "model", models, (value) => setFilters((current) => ({ ...current, model: value, trim: "", engineCc: "", fuel: "" })))}
+        {select("Komplektasiya", "trim", trims, (value) => setFilters((current) => ({ ...current, trim: value, engineCc: "", fuel: "" })))}
+        {select("Mühərrik, cm³", "engineCc", engines, (value) => setFilters((current) => ({ ...current, engineCc: value, fuel: "" })))}
+        {select("Yanacaq", "fuel", fuels)}{select("Hərrac", "auction", unique(facets.map((r) => r.auction)))}
+        {rangeInput("İl — başlanğıc", "yearFrom", years.length ? String(years[0]) : "2018", 1900, 2100)}
+        {rangeInput("İl — son", "yearTo", years.length ? String(years[years.length - 1]) : "2024", 1900, 2100)}
+        {rangeInput("Yürüş — minimum km", "mileageKmFrom", "0", 0, 300000)}
+        {rangeInput("Yürüş — maksimum km", "mileageKmTo", "300000", 0, 300000)}
         <label className="text-xs text-zinc-500">Dövr<select className={`${input} mt-1`} value={filters.days} onChange={(e) => set("days", e.target.value)}><option value="7">7 gün</option><option value="30">30 gün</option><option value="90">90 gün</option><option value="365">1 il</option></select></label>
-        <div className="flex gap-2 sm:col-span-2 lg:col-span-4"><button onClick={() => void load()} className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-black">Filtrlə</button><button onClick={() => { const next = { make: "", model: "", trim: "", fuel: "", auction: "", year: "", engineCc: "", days: "30" }; setFilters(next); void load(next); }} className="rounded-xl border border-white/15 px-5 py-2.5 text-sm">Təmizlə</button></div>
+        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4"><button onClick={() => void load()} className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-black">Filtrlə</button><button onClick={() => { const next = { make: "", model: "", trim: "", fuel: "", auction: "", engineCc: "", yearFrom: "", yearTo: "", mileageKmFrom: "", mileageKmTo: "", days: "30" }; setFilters(next); void load(next); }} className="rounded-xl border border-white/15 px-5 py-2.5 text-sm">Təmizlə</button><p className="text-xs text-zinc-500">Nümunə: Hyundai + 2000 cm³ + Hybrid seçərək yalnız həmin kombinasiyanı analiz edə bilərsiniz.</p></div>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">

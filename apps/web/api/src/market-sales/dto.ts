@@ -51,7 +51,11 @@ export class MarketSaleQueryDto {
   @IsOptional() @IsString() fuel?: string;
   @IsOptional() @IsString() auction?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1900) @Max(2100) year?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1900) @Max(2100) yearFrom?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1900) @Max(2100) yearTo?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(20000) engineCc?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(300000) mileageKmFrom?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(300000) mileageKmTo?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(3650) days?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(500) limit?: number;
 }
