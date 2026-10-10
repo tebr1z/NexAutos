@@ -58,6 +58,11 @@ export class MarketSalesService {
     }
     const mileageMiFrom = mileageKmFrom === undefined ? undefined : Math.ceil(mileageKmFrom / 1.609344);
     const mileageMiTo = Math.floor(mileageKmTo / 1.609344);
+    const selectedTrims = String(query.trims || '')
+      .split('||')
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .slice(0, 50);
     const mileageFilter: Prisma.MarketSaleWhereInput = mileageKmFrom !== undefined || query.mileageKmTo !== undefined
       ? {
           OR: [
@@ -76,7 +81,9 @@ export class MarketSalesService {
       AND: [mileageFilter],
       ...(query.make ? { make: { equals: query.make, mode: 'insensitive' } } : {}),
       ...(query.model ? { model: { equals: query.model, mode: 'insensitive' } } : {}),
-      ...(query.trim ? { trim: { equals: query.trim, mode: 'insensitive' } } : {}),
+      ...(selectedTrims.length
+        ? { trim: { in: selectedTrims, mode: 'insensitive' } }
+        : query.trim ? { trim: { equals: query.trim, mode: 'insensitive' } } : {}),
       ...(query.fuel ? { fuel: { equals: query.fuel, mode: 'insensitive' } } : {}),
       ...(query.auction ? { auction: query.auction.toUpperCase() } : {}),
       ...(yearFrom || yearTo ? { year: { gte: yearFrom, lte: yearTo } } : {}),

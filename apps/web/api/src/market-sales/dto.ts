@@ -48,6 +48,7 @@ export class MarketSaleQueryDto {
   @IsOptional() @IsString() make?: string;
   @IsOptional() @IsString() model?: string;
   @IsOptional() @IsString() trim?: string;
+  @IsOptional() @IsString() @MaxLength(2000) trims?: string;
   @IsOptional() @IsString() fuel?: string;
   @IsOptional() @IsString() auction?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1900) @Max(2100) year?: number;

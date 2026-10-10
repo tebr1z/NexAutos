@@ -40,7 +40,7 @@ function fuelCode(fuel?: string | null) {
 export default function MarketSalesAdminPage() {
   const [data, setData] = useState<MarketSalesResponse | null>(null);
   const [filters, setFilters] = useState({
-    make: "", model: "", trim: "", fuel: "", auction: "", engineCc: "",
+    make: "", model: "", trims: "", fuel: "", auction: "", engineCc: "",
     yearFrom: "", yearTo: "", mileageKmFrom: "", mileageKmTo: "", days: "30",
   });
   const [busy, setBusy] = useState(true);
@@ -105,7 +105,8 @@ export default function MarketSalesAdminPage() {
   const models = unique(makeFacets.map((row) => row.model));
   const modelFacets = makeFacets.filter((row) => !filters.model || row.model === filters.model);
   const trims = unique(modelFacets.map((row) => row.trim));
-  const trimFacets = modelFacets.filter((row) => !filters.trim || row.trim === filters.trim);
+  const selectedTrims = filters.trims.split("||").filter(Boolean);
+  const trimFacets = modelFacets.filter((row) => !selectedTrims.length || selectedTrims.includes(row.trim || ""));
   const engines = unique(trimFacets.map((row) => row.engineCc));
   const engineFacets = trimFacets.filter((row) => !filters.engineCc || String(row.engineCc || "") === filters.engineCc);
   const fuels = unique(engineFacets.map((row) => row.fuel));
@@ -128,6 +129,10 @@ export default function MarketSalesAdminPage() {
   const rangeInput = (label: string, name: keyof typeof filters, placeholder: string, min: number, max: number) => (
     <label className="text-xs text-zinc-500">{label}<input type="number" inputMode="numeric" min={min} max={max} value={filters[name]} onChange={(e) => set(name, e.target.value)} placeholder={placeholder} className={`${input} mt-1`} /></label>
   );
+  const toggleTrim = (trim: string) => {
+    const next = selectedTrims.includes(trim) ? selectedTrims.filter((value) => value !== trim) : [...selectedTrims, trim];
+    setFilters((current) => ({ ...current, trims: next.join("||"), engineCc: "", fuel: "" }));
+  };
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -138,9 +143,18 @@ export default function MarketSalesAdminPage() {
       {error ? <p className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</p> : null}
 
       <div className="mt-7 grid gap-3 rounded-2xl border border-white/10 p-4 sm:grid-cols-2 lg:grid-cols-4">
-        {select("Marka", "make", makes, (value) => setFilters((current) => ({ ...current, make: value, model: "", trim: "", engineCc: "", fuel: "" })))}
-        {select("Model", "model", models, (value) => setFilters((current) => ({ ...current, model: value, trim: "", engineCc: "", fuel: "" })))}
-        {select("Komplektasiya", "trim", trims, (value) => setFilters((current) => ({ ...current, trim: value, engineCc: "", fuel: "" })))}
+        {select("Marka", "make", makes, (value) => setFilters((current) => ({ ...current, make: value, model: "", trims: "", engineCc: "", fuel: "" })))}
+        {select("Model", "model", models, (value) => setFilters((current) => ({ ...current, model: value, trims: "", engineCc: "", fuel: "" })))}
+        <div className="relative text-xs text-zinc-500">Komplektasiya
+          <details className="group mt-1">
+            <summary className={`${input} flex cursor-pointer list-none items-center justify-between gap-2 [&::-webkit-details-marker]:hidden`}><span className="truncate">{!selectedTrims.length ? "Hamısı" : selectedTrims.length === 1 ? selectedTrims[0] : `${selectedTrims.length} komplektasiya seçilib`}</span><span className="text-zinc-500 transition group-open:rotate-180">⌄</span></summary>
+            <div className="absolute left-0 right-0 z-20 mt-2 max-h-72 overflow-y-auto rounded-xl border border-white/15 bg-[#111114] p-2 shadow-2xl">
+              <div className="mb-2 flex gap-2 border-b border-white/10 p-1 pb-2"><button type="button" onClick={() => setFilters((current) => ({ ...current, trims: trims.join("||"), engineCc: "", fuel: "" }))} className="rounded-lg bg-white/10 px-2.5 py-1.5 text-[11px] text-white">Hamısını seç</button><button type="button" onClick={() => setFilters((current) => ({ ...current, trims: "", engineCc: "", fuel: "" }))} className="rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-400">Təmizlə</button></div>
+              {trims.map((trim) => <label key={trim} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-xs normal-case text-zinc-300 hover:bg-white/5"><input type="checkbox" checked={selectedTrims.includes(trim)} onChange={() => toggleTrim(trim)} className="h-4 w-4 accent-sky-400"/><span>{trim}</span></label>)}
+              {!trims.length ? <p className="p-3 text-center text-xs text-zinc-500">Əvvəl marka və model seçin.</p> : null}
+            </div>
+          </details>
+        </div>
         {select("Mühərrik, cm³", "engineCc", engines, (value) => setFilters((current) => ({ ...current, engineCc: value, fuel: "" })))}
         {select("Yanacaq", "fuel", fuels)}{select("Hərrac", "auction", unique(facets.map((r) => r.auction)))}
         {rangeInput("İl — başlanğıc", "yearFrom", years.length ? String(years[0]) : "2018", 1900, 2100)}
@@ -148,7 +162,7 @@ export default function MarketSalesAdminPage() {
         {rangeInput("Yürüş — minimum km", "mileageKmFrom", "0", 0, 300000)}
         {rangeInput("Yürüş — maksimum km", "mileageKmTo", "300000", 0, 300000)}
         <label className="text-xs text-zinc-500">Dövr<select className={`${input} mt-1`} value={filters.days} onChange={(e) => set("days", e.target.value)}><option value="7">7 gün</option><option value="30">30 gün</option><option value="90">90 gün</option><option value="365">1 il</option></select></label>
-        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4"><button onClick={() => void load()} className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-black">Filtrlə</button><button onClick={() => { const next = { make: "", model: "", trim: "", fuel: "", auction: "", engineCc: "", yearFrom: "", yearTo: "", mileageKmFrom: "", mileageKmTo: "", days: "30" }; setFilters(next); void load(next); }} className="rounded-xl border border-white/15 px-5 py-2.5 text-sm">Təmizlə</button><p className="text-xs text-zinc-500">Nümunə: Hyundai + 2000 cm³ + Hybrid seçərək yalnız həmin kombinasiyanı analiz edə bilərsiniz.</p></div>
+        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4"><button onClick={() => void load()} className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-black">Filtrlə</button><button onClick={() => { const next = { make: "", model: "", trims: "", fuel: "", auction: "", engineCc: "", yearFrom: "", yearTo: "", mileageKmFrom: "", mileageKmTo: "", days: "30" }; setFilters(next); void load(next); }} className="rounded-xl border border-white/15 px-5 py-2.5 text-sm">Təmizlə</button><p className="text-xs text-zinc-500">Komplektasiyalardan istədiyiniz qədərini seçin; orta qiymət yalnız seçilənlər üzrə hesablanacaq.</p></div>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
