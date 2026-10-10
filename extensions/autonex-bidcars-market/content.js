@@ -16,6 +16,7 @@
   let customsOptions;
   let dbStatus = "DB sinxronizasiya yoxlanılır…";
   let dbStatusError = false;
+  let collectorConfigured = false;
 
   const money = (value) => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
   const azn = (value) => `${Number(value || 0).toLocaleString("az-AZ", { maximumFractionDigits: 0 })} AZN`;
@@ -76,9 +77,14 @@
   }
 
   async function syncToDb(found) {
+    const [synced, local] = await Promise.all([
+      chrome.storage.sync.get({ collectorKey: "" }),
+      chrome.storage.local.get({ collectorKey: "" }),
+    ]);
+    const collectorKey = local.collectorKey || synced.collectorKey || "";
+    collectorConfigured = Boolean(collectorKey);
     if (!found.length) return;
-    const settings = await chrome.storage.sync.get({ collectorKey: "" });
-    if (!settings.collectorKey) {
+    if (!collectorKey) {
       dbStatus = "DB bağlı deyil — collector açarını bir dəfə yazın.";
       dbStatusError = false;
       return;
@@ -160,7 +166,7 @@
     view.innerHTML = `<div class="hero"><small>Seçilmiş kombinasiya · ${stat?.count || 0} satış${stat && stat.count < 3 ? " · zəif nümunə" : ""}</small><strong>${stat ? `${money(stat.q1)} – ${money(stat.q3)}` : "Uyğun satış tapılmadı"}</strong><div>${esc(previous.make || "Marka")} ${esc(previous.model || "Model")} · ${esc(previous.trim || "Komplektasiya")} · ${previous.engineCc ? `${esc(previous.engineCc)} cm³` : "mühərrik"}</div><div class="grid"><div class="metric"><span>Median final</span><b>${stat ? money(stat.median) : "—"}</b></div><div class="metric"><span>Orta final</span><b>${stat ? money(stat.average) : "—"}</b></div></div></div>
       <div class="filters"><label>Marka<select id="make">${options(valid.map((r) => r.make), previous.make)}</select></label><label>Model<select id="model">${options(byMake.map((r) => r.model), previous.model)}</select></label><label>Komplektasiya<select id="trim">${options(byModel.map((r) => r.trim).filter((v) => v !== "Naməlum"), previous.trim)}</select></label><label>Mühərrik<select id="engineCc">${options(byTrim.map((r) => r.engineCc), previous.engineCc)}</select></label><label>İl<select id="year">${options(byTrim.map((r) => r.year), previous.year)}</select></label><label>Yanacaq<select id="fuel">${options(byTrim.map((r) => r.fuel), previous.fuel)}</select></label><label>Hərrac<select id="auction">${options(byTrim.map((r) => r.auction), previous.auction)}</select></label><label>Rəng<select id="color">${options(byTrim.map((r) => r.color).filter((v) => v !== "Naməlum"), previous.color)}</select></label></div>
       <div class="actions"><button class="primary" id="baku">Bakı təhvil hesabla</button><button class="secondary" id="rescan">↻ Oxu</button><button class="danger" id="reset">30 günü sıfırla</button></div><div id="bakuResult"></div>
-      <div class="list"><div class="row"><span>Uyğun nəticə</span><b>${filtered.length} / ${valid.length}</b></div><div class="row"><span>Komplektasiya</span><b>${esc(previous.trim || "Hamısı")}</b></div><div class="row"><span>Mühərrik / yanacaq</span><b>${previous.engineCc ? `${esc(previous.engineCc)} cm³` : "Hamısı"} · ${esc(previous.fuel || "Hamısı")}</b></div></div><p id="dbStatus" class="note ${dbStatusError ? "error" : ""}">${esc(dbStatus)}</p><details><summary class="note" style="cursor:pointer">DB bağlantısı</summary><div class="actions"><input id="collectorKey" type="password" placeholder="MARKET_COLLECTOR_KEY"><button id="saveKey" class="secondary">Açarı saxla</button></div></details><p class="note">Aralıq 25–75 faiz diapazonudur. Yürüşü 300 000 km-dən çox olan avtomobillər analizə daxil edilmir.</p>`;
+      <div class="list"><div class="row"><span>Uyğun nəticə</span><b>${filtered.length} / ${valid.length}</b></div><div class="row"><span>Komplektasiya</span><b>${esc(previous.trim || "Hamısı")}</b></div><div class="row"><span>Mühərrik / yanacaq</span><b>${previous.engineCc ? `${esc(previous.engineCc)} cm³` : "Hamısı"} · ${esc(previous.fuel || "Hamısı")}</b></div></div><p id="dbStatus" class="note ${dbStatusError ? "error" : ""}">${esc(dbStatus)}</p><details ${collectorConfigured ? "" : "open"}><summary class="note" style="cursor:pointer">DB bağlantısı · ${collectorConfigured ? "yadda saxlanılıb" : "açar tələb olunur"}</summary><div class="actions"><input id="collectorKey" type="password" autocomplete="off" placeholder="${collectorConfigured ? "Yeni açar yazın" : "MARKET_COLLECTOR_KEY"}"><button id="saveKey" class="secondary">${collectorConfigured ? "Açarı dəyiş" : "Açarı saxla"}</button></div><p class="note">Açar bu Chrome profilində müddətsiz saxlanılır.</p></details><p class="note">Aralıq 25–75 faiz diapazonudur. Yürüşü 300 000 km-dən çox olan avtomobillər analizə daxil edilmir.</p>`;
     ["make", "model", "trim", "engineCc", "year", "auction", "fuel", "color"].forEach((id) => shadow.getElementById(id).onchange = render);
     shadow.getElementById("rescan").onclick = () => scheduleScan(0);
     shadow.getElementById("baku").disabled = !stat;
@@ -168,7 +174,11 @@
     shadow.getElementById("saveKey").onclick = async () => {
       const key = shadow.getElementById("collectorKey").value.trim();
       if (!key) return;
-      await chrome.storage.sync.set({ collectorKey: key });
+      await Promise.all([
+        chrome.storage.local.set({ collectorKey: key }),
+        chrome.storage.sync.set({ collectorKey: key }),
+      ]);
+      collectorConfigured = true;
       dbStatus = "Açar saxlanıldı, PostgreSQL-ə göndərilir…"; dbStatusError = false; render();
       await syncToDb(targets.length ? targets : records.slice(0, 50)); render();
     };

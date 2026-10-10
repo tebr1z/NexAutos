@@ -3,16 +3,27 @@
 const DEFAULT_API = "https://nex.autos/api/v1";
 const ALLOWED = new Set(["/shipping/quote", "/customs/auto-options?lang=az", "/customs/auto-duty?lang=az", "/market-sales/ingest"]);
 
+async function settings() {
+  const [synced, local] = await Promise.all([
+    chrome.storage.sync.get({ apiBase: DEFAULT_API, collectorKey: "" }),
+    chrome.storage.local.get({ collectorKey: "" }),
+  ]);
+  return {
+    apiBase: synced.apiBase || DEFAULT_API,
+    collectorKey: local.collectorKey || synced.collectorKey || "",
+  };
+}
+
 async function api(path, method = "GET", body) {
   if (!ALLOWED.has(path)) throw new Error("Bu API əməliyyatına icazə yoxdur.");
-  const settings = await chrome.storage.sync.get({ apiBase: DEFAULT_API, collectorKey: "" });
-  const base = String(settings.apiBase || DEFAULT_API).replace(/\/+$/, "");
+  const current = await settings();
+  const base = String(current.apiBase || DEFAULT_API).replace(/\/+$/, "");
   const response = await fetch(`${base}${path}`, {
     method,
     headers: {
       Accept: "application/json",
       ...(body ? { "Content-Type": "application/json" } : {}),
-      ...(["/market-sales/ingest", "/shipping/quote"].includes(path) && settings.collectorKey ? { "X-AutoNex-Collector": settings.collectorKey } : {})
+      ...(["/market-sales/ingest", "/shipping/quote"].includes(path) && current.collectorKey ? { "X-AutoNex-Collector": current.collectorKey } : {})
     },
     body: body ? JSON.stringify(body) : undefined,
     cache: "no-store",
@@ -24,8 +35,11 @@ async function api(path, method = "GET", body) {
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
-  const current = await chrome.storage.sync.get({ apiBase: DEFAULT_API, collectorKey: "" });
-  await chrome.storage.sync.set({ apiBase: current.apiBase || DEFAULT_API, collectorKey: current.collectorKey || "" });
+  const current = await settings();
+  await Promise.all([
+    chrome.storage.sync.set({ apiBase: current.apiBase || DEFAULT_API, collectorKey: current.collectorKey || "" }),
+    chrome.storage.local.set({ collectorKey: current.collectorKey || "" }),
+  ]);
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
