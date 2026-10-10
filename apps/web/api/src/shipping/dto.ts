@@ -12,6 +12,12 @@ export class ShippingQuoteDto {
   priceUsd: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  auctionFeeUsd?: number;
+
+  @IsOptional()
   @IsString()
   state?: string;
 

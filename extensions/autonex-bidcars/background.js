@@ -65,7 +65,8 @@ async function applyBundledRate(quote, requestBody) {
   const requestedYard = String(requestBody?.yard || quote.yard || "");
   const requestedSlug = rateSlug(requestedYard);
   if (!requestedSlug || !/^(COPART|IAAI)$/.test(auction) || !/^[A-Z]{2}$/.test(state)) return quote;
-  const band = quote.band?.id || (Number(requestBody?.priceUsd) <= 3000 ? "a" : Number(requestBody?.priceUsd) <= 7000 ? "b" : "c");
+  const bandBasisUsd = Number(requestBody?.priceUsd) + Number(requestBody?.auctionFeeUsd ?? quote.auctionFeeUsd ?? 0);
+  const band = quote.band?.id || (bandBasisUsd <= 3000 ? "a" : bandBasisUsd <= 7000 ? "b" : "c");
   const localKey = `${state}:${auction}:${requestedSlug}:${band}`;
   const local = await chrome.storage.local.get({ localRateCells: {} });
   const localRate = Number(local.localRateCells?.[localKey]);

@@ -39,6 +39,18 @@ describe('ShippingService', () => {
     expect(result.cellKey).toBe('GA:IAAI:savannah:b');
   });
 
+  it('selects the freight band from vehicle price plus auction fee', async () => {
+    const result = await service({
+      'GA:IAAI:b': 1290,
+      'GA:IAAI:c': 1440,
+    }).quote({ ...quote, priceUsd: 7000, auctionFeeUsd: 1050 });
+
+    expect(result.invoiceUsd).toBe(8050);
+    expect(result.bandBasisUsd).toBe(8050);
+    expect(result.band.id).toBe('c');
+    expect(result.oceanUsd).toBe(1440);
+  });
+
   it('uses exactly three price bands and preserves the old upper-band rate', async () => {
     expect(bandForPrice(0).id).toBe('a');
     expect(bandForPrice(3000).id).toBe('a');

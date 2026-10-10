@@ -215,7 +215,7 @@ export default function ShippingRatesAdminPage() {
               .join(" · ")}
           </p>
           <p className="text-sm text-sky-300">
-            Qiymət ${quote.priceUsd.toLocaleString("en-US")} → aralıq {bandLabel(quote.band)}
+            Avtomobil + auction fee ${(quote.invoiceUsd ?? quote.priceUsd + (quote.auctionFeeUsd ?? 0)).toLocaleString("en-US")} → yol tarifi aralığı {bandLabel(quote.band)}
           </p>
           {!quote.missing && quote.totalUsd != null ? (
             <div>

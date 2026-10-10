@@ -84,7 +84,7 @@ Hesab:
 
 Seçilən qiymət BidCars `Bid Now` / `Lot Price` ilə eynidirsə, səhifədə canlı yenilənən `Auction Fees` istifadə olunur. Bu məbləğ tapılmasa Auto Nex hərrac cədvəli fallback kimi işləyir. Yekun formula `avtomobil + auction fee + ABŞ–Poti + Poti–Bakı + DGK gömrük` şəklindədir və həm USD, həm AZN göstərilir.
 
-Yol tarifləri üç qiymət aralığında saxlanır: `$0–3,000`, `$3,001–7,000`, `$7,001–150,000`. Köhnə `15,001+` tarifi varsa və üçüncü qrup boşdursa avtomatik üçüncü qrupa keçirilir. Paneldə yalnız əsas məbləğlər görünür; avtomobil və hesab detalları bağlı bölmələrdədir.
+Yol tarifləri avtomobilin tək alış qiymətinə yox, `avtomobil + auction fee` invoys cəminə görə üç aralıqda seçilir: `$0–3,000`, `$3,001–7,000`, `$7,001–150,000`. Məsələn, avtomobil `$7,000`, auction fee `$1,050` olarsa tarif `$8,050` əsasında üçüncü qrupdan götürülür. Köhnə `15,001+` tarifi varsa və üçüncü qrup boşdursa avtomatik üçüncü qrupa keçirilir. Paneldə yalnız əsas məbləğlər görünür; avtomobil və hesab detalları bağlı bölmələrdədir.
 
 Tarif tapılmasa panel ABŞ–Poti məbləğini istəyir. Admin hesabı ilə daxil olub **Bazaya yaz və yenidən hesabla** seçildikdə tarif konkret yard/şəhər, ştat, hərrac və qiymət aralığı üçün `shipping_rates` bazasında qalır. Növbəti eyni hesablamada yenidən soruşulmur. Şifrə saxlanmır; access və 30 günlük yenilənən refresh token yalnız extension-un lokal yaddaşında saxlanır. Access token bitəndə extension onu avtomatik yeniləyir və email/parol sahələrini təkrar göstərmir.
 

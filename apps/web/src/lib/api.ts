@@ -569,7 +569,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  shippingQuote: (payload: { url?: string; priceUsd: number; state?: string; auction?: string; titleKind?: string; yard?: string }) =>
+  shippingQuote: (payload: { url?: string; priceUsd: number; auctionFeeUsd?: number; state?: string; auction?: string; titleKind?: string; yard?: string }) =>
     request<{
       lot?: {
         title?: string;
@@ -595,6 +595,7 @@ export const api = {
       band: { id: string; min: number; max: number };
       priceUsd: number;
       auctionFeeUsd?: number;
+      auctionFeeSource?: "provided" | "calculated";
       auctionFee?: {
         titleKind?: string;
         buyerUsd: number;
@@ -605,6 +606,7 @@ export const api = {
         totalUsd: number;
       };
       invoiceUsd?: number;
+      bandBasisUsd?: number;
       year?: number;
       engineCc?: number;
       fuel?: string;

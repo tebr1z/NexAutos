@@ -446,7 +446,7 @@
         ${data.totalWithCustomsUsd == null ? "" : `<div class="row"><span>Yekun USD</span><strong>${usd(data.totalWithCustomsUsd)}</strong></div>`}
         ${finalAzn == null ? "" : `<div class="row"><span>Yekun AZN</span><strong>${azn(finalAzn)}</strong></div>`}
         ${data.quote.rateSource === "state" ? `<p class="note">Bu yard üçün ayrıca tarif tapılmadı; ${escapeHtml(data.quote.state)} ştatının əvvəlki tarifi istifadə olundu.</p>` : ""}
-        ${data.quote.auctionFee ? `<p class="note">${escapeHtml(data.quote.auction)} fee: buyer ${usd(data.quote.auctionFee.buyerUsd)} + live ${usd(data.quote.auctionFee.virtualUsd)} + gate ${usd(data.quote.auctionFee.gateUsd)}${data.quote.auctionFee.envUsd ? ` + env ${usd(data.quote.auctionFee.envUsd)}` : ""}${data.quote.auctionFee.titleUsd ? ` + title ${usd(data.quote.auctionFee.titleUsd)}` : ""}</p>` : ""}
+        ${data.quote.auctionFee && data.quote.auctionFeeSource !== "provided" ? `<p class="note">${escapeHtml(data.quote.auction)} fee: buyer ${usd(data.quote.auctionFee.buyerUsd)} + live ${usd(data.quote.auctionFee.virtualUsd)} + gate ${usd(data.quote.auctionFee.gateUsd)}${data.quote.auctionFee.envUsd ? ` + env ${usd(data.quote.auctionFee.envUsd)}` : ""}${data.quote.auctionFee.titleUsd ? ` + title ${usd(data.quote.auctionFee.titleUsd)}` : ""}</p>` : ""}
         ${data.quote.missing ? `<p class="note">Bu yard və qiymət qrupu üçün yol pulu tarifi admin paneldə yoxdur.</p>` : ""}
         ${data.customsNote ? `<p class="note">${escapeHtml(data.customsNote)}</p>` : ""}
       </div></section>`;
@@ -517,12 +517,20 @@
     refs.result.hidden = true;
 
     try {
+      const pageFee = parser.selectAuctionFee({
+        priceUsd,
+        bidCarsFeeUsd: latestData?.auctionFeeUsd,
+        bidNowUsd: latestData?.bidNowUsd,
+        lotPriceUsd: latestData?.lotPriceUsd,
+        fallbackFeeUsd: 0,
+      });
+      const pageAuctionFeeUsd = pageFee.source === "BidCars" ? pageFee.amount : undefined;
       const [quote, vinDetails] = await Promise.all([
         send({
           type: "ANX_API",
           path: "/shipping/quote",
           method: "POST",
-          body: { url: location.href, priceUsd, auction, yard, state, titleKind: refs.titleKind.value },
+          body: { url: location.href, priceUsd, auctionFeeUsd: pageAuctionFeeUsd, auction, yard, state, titleKind: refs.titleKind.value },
         }),
         latestData?.vin
           ? send({ type: "ANX_API", path: `/vins/${latestData.vin}` }).catch(() => null)

@@ -179,11 +179,15 @@ export class ShippingService {
     const state = knownState(dto.state || place?.state || lot?.state);
     const auctionRaw = (dto.auction || lot?.auction || 'OTHER').toUpperCase();
     const auction: AuctionCode | 'OTHER' = auctionRaw === 'COPART' || auctionRaw === 'IAAI' ? auctionRaw : 'OTHER';
-    const band = bandForPrice(dto.priceUsd);
-    const table = await this.rates();
     if (!state) throw new BadRequestException('Ştat tapılmadı. Bid.cars linkini yoxlayın.');
     if (auction === 'OTHER') throw new BadRequestException('Hərrac Copart və ya IAAI olmalıdır.');
     if (!place?.slug) throw new BadRequestException('Yard tapılmadı. Lotda Sun Valley, Los Angeles kimi lokasiya olmalıdır.');
+    const fee = auctionFeeBreakdown(dto.priceUsd, auction, dto.titleKind);
+    const suppliedAuctionFee = Number(dto.auctionFeeUsd);
+    const auctionFeeUsd = dto.auctionFeeUsd != null && Number.isFinite(suppliedAuctionFee) ? suppliedAuctionFee : fee.totalUsd;
+    const invoiceUsd = dto.priceUsd + auctionFeeUsd;
+    const band = bandForPrice(invoiceUsd);
+    const table = await this.rates();
     const key = cellKey(state, auction, band.id, place.slug);
     const stateKey = cellKey(state, auction, band.id);
     const yardMatch = resolveYardRate(table, state, auction, band.id, place.slug);
@@ -192,7 +196,6 @@ export class ShippingService {
     const ocean = yardRate > 0 ? yardRate : stateRate > 0 ? stateRate : null;
     const rateSource = yardRate > 0 ? (yardMatch?.exact ? 'yard' : 'yard-alias') : stateRate > 0 ? 'state' : null;
     const stateName = US_STATES.find((row) => row.code === state)?.name;
-    const fee = auctionFeeBreakdown(dto.priceUsd, auction, dto.titleKind);
     const freightUsd = ocean != null ? ocean + table.tirUsd : null;
     return {
       lot,
@@ -205,9 +208,11 @@ export class ShippingService {
       auction,
       band,
       priceUsd: dto.priceUsd,
-      auctionFeeUsd: fee.totalUsd,
+      auctionFeeUsd,
+      auctionFeeSource: dto.auctionFeeUsd != null ? 'provided' : 'calculated',
       auctionFee: fee,
-      invoiceUsd: dto.priceUsd + fee.totalUsd,
+      invoiceUsd,
+      bandBasisUsd: invoiceUsd,
       year: lot?.year,
       engineCc: lot?.engineCc,
       fuel: lot?.fuel,
