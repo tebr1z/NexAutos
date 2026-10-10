@@ -299,6 +299,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       await chrome.storage.local.set({ authToken: data.accessToken, refreshToken: data.refreshToken, authEmail: data.user.email });
       return { ok: true, data: { email: data.user.email, role: data.user.role } };
     }
+    if (message.type === "ANX_LOGOUT") {
+      await chrome.storage.local.remove(["authToken", "refreshToken", "authEmail"]);
+      return { ok: true, data: { loggedOut: true } };
+    }
     if (message.type === "ANX_SAVE_RATE_SMART") {
       const cellKey = String(message.cellKey || "").trim();
       const rateUsd = Math.round(Number(message.rateUsd));

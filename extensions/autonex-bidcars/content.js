@@ -23,6 +23,15 @@
       button { font:inherit; }
       .ghost { border:1px solid #334155; border-radius:9px; background:#172033; color:#dbeafe; padding:7px 9px; cursor:pointer; }
       .body { padding:12px 13px 13px; }
+      .auth-box { margin-bottom:10px; padding:11px; border:1px solid #2b4668; border-radius:11px; background:#0d1b30; }
+      .auth-title { color:#f8fafc; font-size:12px; font-weight:800; }
+      .auth-copy { margin:4px 0 0; color:#8da2bd; font-size:10px; line-height:1.45; }
+      .auth-copy a { color:#60a5fa; text-decoration:underline; }
+      .auth-actions { display:grid; grid-template-columns:1fr 1fr auto; gap:7px; margin-top:9px; }
+      .auth-actions input { margin:0; min-width:0; padding:8px; font-size:11px; }
+      .auth-actions button { border:0; border-radius:9px; background:#2563eb; color:white; padding:8px 11px; font-size:11px; font-weight:800; cursor:pointer; }
+      .auth-user { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+      .auth-user button { border:1px solid #3b4e69; border-radius:8px; background:#172033; color:#dbeafe; padding:7px 9px; font-size:10px; cursor:pointer; }
       .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
       label { display:block; color:#8da2bd; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
       input,select { width:100%; margin-top:5px; border:1px solid #334155; border-radius:9px; background:#111827; color:#f8fafc; padding:9px 10px; outline:none; font:600 13px/1.2 inherit; }
@@ -81,6 +90,15 @@
         <div><button class="ghost" id="refresh" type="button" title="Səhifədən yenidən oxu">↻ Oxu</button> <button class="ghost" id="close" type="button" title="Bağla">✕</button></div>
       </header>
       <div class="body">
+        <section class="auth-box" id="authBox">
+          <div id="authGuest">
+            <div class="auth-title">Auto Nex hesabına giriş</div>
+            <p class="auth-copy">Yol pulu yalnız icazəli istifadəçilər üçündür. Qeydiyyat üçün <a href="https://nex.autos/contact" target="_blank" rel="noreferrer">nex.autos-a müraciət edin</a>.</p>
+            <div class="auth-actions"><input id="loginEmail" type="email" autocomplete="username" placeholder="E-poçt"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Şifrə"><button id="loginButton" type="button">Giriş</button></div>
+          </div>
+          <div class="auth-user" id="authUser" hidden><div><div class="auth-title">Giriş edildi</div><p class="auth-copy" id="authEmail"></p></div><button id="logoutButton" type="button">Çıxış</button></div>
+          <p class="status" id="authStatus"></p>
+        </section>
         <section class="advanced" id="advancedControls" hidden>
           <div class="grid">
             <label class="wide">Hesablama qiyməti<select id="priceSource"><option value="bidNow">Bid Now / seçilən qiymət</option><option value="currentBid">Current Bid</option><option value="lotPrice">Lot Price</option><option value="manual">Əl ilə yaz</option></select></label>
@@ -114,7 +132,7 @@
     </section>`;
 
   const refs = Object.fromEntries(
-    ["priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "toggleAdvanced", "advancedControls", "rateEditor", "rateHint", "rateUsd", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
+    ["authGuest", "authUser", "authEmail", "loginEmail", "loginPassword", "loginButton", "logoutButton", "authStatus", "priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "toggleAdvanced", "advancedControls", "rateEditor", "rateHint", "rateUsd", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
   );
   const manual = new Set();
   let lastUrl = location.href;
@@ -127,6 +145,7 @@
   let lastCalculation = null;
   let includeDyp = false;
   let showDetails = false;
+  let authenticated = false;
 
   function send(message) {
     return new Promise((resolve, reject) => {
@@ -136,6 +155,67 @@
         resolve(response.data);
       });
     });
+  }
+
+  function renderAuth(email = "") {
+    refs.authGuest.hidden = authenticated;
+    refs.authUser.hidden = !authenticated;
+    refs.authEmail.textContent = email;
+    refs.calculate.disabled = !authenticated;
+    if (!authenticated) refs.calculate.textContent = "Hesablamaq üçün giriş edin";
+    else if (!calculating) refs.calculate.textContent = "Auto Nex ilə hesabla";
+  }
+
+  async function loadAuth() {
+    try {
+      const settings = await send({ type: "ANX_GET_SETTINGS" });
+      authenticated = Boolean(settings.authenticated);
+      renderAuth(settings.authEmail || "");
+      return authenticated;
+    } catch (error) {
+      authenticated = false;
+      renderAuth();
+      refs.authStatus.className = "status error";
+      refs.authStatus.textContent = error instanceof Error ? error.message : String(error);
+      return false;
+    }
+  }
+
+  async function login() {
+    const email = refs.loginEmail.value.trim();
+    const password = refs.loginPassword.value;
+    if (!email || !password) {
+      refs.authStatus.className = "status error";
+      refs.authStatus.textContent = "E-poçt və şifrəni yazın.";
+      return;
+    }
+    refs.loginButton.disabled = true;
+    refs.authStatus.className = "status";
+    refs.authStatus.textContent = "Giriş yoxlanılır…";
+    try {
+      const account = await send({ type: "ANX_LOGIN", email, password });
+      authenticated = true;
+      refs.loginPassword.value = "";
+      refs.authStatus.textContent = "Giriş uğurludur.";
+      renderAuth(account.email || email);
+      await calculate(false);
+    } catch (error) {
+      refs.authStatus.className = "status error";
+      refs.authStatus.textContent = error instanceof Error ? error.message : String(error);
+    } finally {
+      refs.loginButton.disabled = false;
+    }
+  }
+
+  async function logout() {
+    await send({ type: "ANX_LOGOUT" }).catch(() => undefined);
+    authenticated = false;
+    lastCalculation = null;
+    refs.result.hidden = true;
+    refs.rateEditor.hidden = true;
+    refs.authStatus.className = "status";
+    refs.authStatus.textContent = "Hesabdan çıxış edildi.";
+    renderAuth();
   }
 
   function collectBidCandidates() {
@@ -397,6 +477,13 @@
   }
 
   async function calculate(triggeredAutomatically = false) {
+    if (!authenticated) {
+      if (!triggeredAutomatically) {
+        refs.status.className = "status error";
+        refs.status.textContent = "Hesablamaq üçün Auto Nex hesabına daxil olun.";
+      }
+      return;
+    }
     if (calculating) {
       recalculateAfterCurrent = true;
       return;
@@ -605,6 +692,9 @@
     host.hidden = true;
   });
   refs.calculate.addEventListener("click", () => void calculate(false));
+  refs.loginButton.addEventListener("click", () => void login());
+  refs.loginPassword.addEventListener("keydown", (event) => { if (event.key === "Enter") void login(); });
+  refs.logoutButton.addEventListener("click", () => void logout());
   refs.toggleAdvanced.addEventListener("click", () => {
     showDetails = !showDetails;
     refs.advancedControls.hidden = !showDetails;
@@ -618,13 +708,14 @@
 
   placePanel();
   readPage(true);
+  void loadAuth();
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type !== "ANX_OPEN_CALCULATOR") return false;
     host.hidden = false;
     placePanel();
     readPage(true);
-    void calculate(false);
+    void loadAuth().then((ok) => { if (ok) void calculate(false); });
     sendResponse({ ok: true });
     return false;
   });
