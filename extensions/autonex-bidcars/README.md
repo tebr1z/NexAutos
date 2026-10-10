@@ -24,6 +24,11 @@ Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən 
 - Hərrac növü bütün səhifədəki təsadüfi Copart/IAAI sözlərindən deyil, lot başlığının yanındakı badge-dən seçilir.
 - Eyni state və yard üçün DB-də Copart və IAAI tarifləri ayrı saxlanır və düzgün hərraca uyğun tarif götürülür.
 
+## 1.9.4
+
+- Mühərrik və yanacaq artıq səhifənin gizli axtarış menyusundan deyil, görünən `Engine` və `Fuel Type` etiketlərinin qarşısındakı dəyərdən oxunur.
+- Benzin, dizel, hibrid, plug-in hibrid, elektrik və LPG dəyərləri DGK mühərrik növünə uyğun çevrilir.
+
 Oxunan sahələr:
 
 - `Current Bid`, `Bid Now` və `Lot Price` məbləğləri ayrıca

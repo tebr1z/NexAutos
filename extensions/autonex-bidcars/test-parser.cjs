@@ -31,6 +31,40 @@ assert.equal(lot.fuelCode, "1");
 assert.equal(parser.fuelCode("Diesel"), "2");
 assert.equal(parser.fuelCode("Electric"), "12");
 
+const visibleSpecsWinOverHiddenMenu = parser.parseSnapshot({
+  title: "2021 KIA K5, GT LINE",
+  text: `
+    Search & Bid Engine size, type, horsepower Type Electric Hybrid Gasoline Diesel
+    Location: Freetown (MA) Shipping from: Newark (NJ)
+    Exterior color Gray Engine 2.0L Transmission Automatic Fuel Type Hybrid
+  `,
+  auctionHint: "Copart",
+  engineLabel: "1.6L, 4 cyl.",
+  fuel: "Gasoline",
+});
+assert.equal(visibleSpecsWinOverHiddenMenu.engineCc, 1600);
+assert.equal(visibleSpecsWinOverHiddenMenu.engineLabel, "1.6L, 4 cyl.");
+assert.equal(visibleSpecsWinOverHiddenMenu.fuel, "Gasoline");
+assert.equal(visibleSpecsWinOverHiddenMenu.fuelCode, "1");
+
+const dieselSpecs = parser.parseSnapshot({
+  title: "2020 TEST CAR",
+  text: "Location: Dallas (TX)",
+  engineLabel: "2.2L, 4 cyl.",
+  fuel: "Diesel",
+});
+assert.equal(dieselSpecs.engineCc, 2200);
+assert.equal(dieselSpecs.fuelCode, "2");
+
+const electricSpecs = parser.parseSnapshot({
+  title: "2024 TEST EV",
+  text: "Location: Dallas (TX)",
+  engineLabel: "Electric",
+  fuel: "Electric",
+});
+assert.equal(electricSpecs.engineCc, null);
+assert.equal(electricSpecs.fuelCode, "12");
+
 const liveBid = parser.parseSnapshot({
   title: "2022 HYUNDAI SONATA IAAI",
   text: `

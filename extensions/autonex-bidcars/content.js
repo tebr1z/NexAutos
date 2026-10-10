@@ -165,6 +165,26 @@
     return candidates[0]?.value || "";
   }
 
+  function visibleLabeledValue(label, stopLabels) {
+    const lines = String(document.body?.innerText || "")
+      .split(/\r?\n/)
+      .map((line) => parser.clean(line))
+      .filter(Boolean);
+    const wanted = label.toLowerCase();
+    const stops = new Set(stopLabels.map((value) => value.toLowerCase()));
+    for (let index = 0; index < lines.length; index += 1) {
+      if (lines[index].toLowerCase() !== wanted) continue;
+      const values = [];
+      for (let cursor = index + 1; cursor < lines.length && values.length < 3; cursor += 1) {
+        if (stops.has(lines[cursor].toLowerCase())) break;
+        values.push(lines[cursor]);
+      }
+      const value = parser.clean(values.join(" "));
+      if (value && value.length <= 100) return value;
+    }
+    return "";
+  }
+
   function snapshot() {
     const textParts = [];
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -182,6 +202,8 @@
       title: `${document.title} ${document.querySelector("h1")?.innerText || ""}`,
       url: location.href,
       auctionHint: auctionHintNearTitle(),
+      engineLabel: visibleLabeledValue("Engine", ["Transmission", "Fuel Type", "Drive Type", "Cylinders", "Keys"]),
+      fuel: visibleLabeledValue("Fuel Type", ["Drive Type", "Transmission", "Engine", "Cylinders", "Keys", "Show more"]),
       exactTokens,
       bidCandidates: collectBidCandidates(),
     });

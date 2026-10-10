@@ -93,8 +93,11 @@
       field(text, "Location", ["Shipping from", "Odległość", "Distance", "Estimated cost", "Sale date"]) ||
       field(text, "Shipping from", ["Odległość", "Distance", "Estimated cost", "Sale date"]);
     const state = location.match(/\(([A-Z]{2})\)/)?.[1] || location.match(/,\s*([A-Z]{2})\b/)?.[1] || "";
-    const engineLabel = field(text, "Engine", ["Transmission", "Fuel Type", "Drive Type", "Cylinders", "Keys"]);
-    const fuel = field(text, "Fuel Type", ["Drive Type", "Transmission", "Engine", "Cylinders", "Keys"]);
+    // BidCars has hidden navigation text such as "Engine size, type, horsepower"
+    // before the actual vehicle specification table.  Content scripts provide the
+    // visible label/value pair so that the navigation text cannot win this match.
+    const engineLabel = clean(snapshot.engineLabel) || field(text, "Engine", ["Transmission", "Fuel Type", "Drive Type", "Cylinders", "Keys"]);
+    const fuel = clean(snapshot.fuel) || field(text, "Fuel Type", ["Drive Type", "Transmission", "Engine", "Cylinders", "Keys"]);
     const yearHit = `${title} ${text.slice(0, 500)}`.match(/\b(19[5-9]\d|20[0-3]\d)\b/);
     const exact = (snapshot.exactTokens || []).map((token) => clean(token).toUpperCase());
     const auctionHint = clean(snapshot.auctionHint).toUpperCase();
