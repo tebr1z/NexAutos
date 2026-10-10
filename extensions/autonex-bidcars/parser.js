@@ -54,12 +54,26 @@
     const diesel = /diesel|dizel/.test(value);
     const gas = /\blpg\b|\bcng\b|propane|\bqaz\b/.test(value) && !/gasoline|petrol|benzin/.test(value);
     if (/plug[\s-]?in|phev/.test(value)) return diesel ? "10" : "8";
-    if (/mild[\s-]?hybrid|mhev/.test(value)) return diesel ? "13" : gas ? "14" : "11";
+    if (/mild.*hybrid|mhev/.test(value)) return diesel ? "13" : gas ? "14" : "11";
     if (/hybrid|hev/.test(value)) return diesel ? "7" : gas ? "9" : "6";
     if (/electric|battery|\bev\b|bex/.test(value)) return "12";
     if (diesel) return "2";
     if (gas) return "3";
     return "1";
+  }
+
+  function normalizeFuel(fuel) {
+    const value = clean(fuel).toLowerCase();
+    if (!value) return "";
+    const diesel = /diesel|dizel/.test(value);
+    const gas = /\blpg\b|\bcng\b|propane|\bqaz\b/.test(value) && !/gasoline|petrol|benzin/.test(value);
+    if (/plug[\s-]?in|phev/.test(value)) return diesel ? "Plug-in diesel hybrid" : "Plug-in hybrid";
+    if (/mild.*hybrid|mhev/.test(value)) return diesel ? "Mild diesel hybrid" : gas ? "Mild LPG hybrid" : "Mild hybrid";
+    if (/hybrid|hev/.test(value)) return diesel ? "Diesel hybrid" : gas ? "LPG hybrid" : "Hybrid";
+    if (/electric|battery|\bev\b|bex/.test(value)) return "Electric";
+    if (diesel) return "Diesel";
+    if (gas) return "LPG";
+    return "Gasoline";
   }
 
   function selectAuctionFee({ priceUsd, bidCarsFeeUsd, bidNowUsd, lotPriceUsd, fallbackFeeUsd }) {
@@ -144,7 +158,7 @@
     };
   }
 
-  const api = { clean, parseMoney, parseEngineCc, fuelCode, selectAuctionFee, parseSnapshot };
+  const api = { clean, parseMoney, parseEngineCc, normalizeFuel, fuelCode, selectAuctionFee, parseSnapshot };
   global.AutoNexBidCarsParser = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

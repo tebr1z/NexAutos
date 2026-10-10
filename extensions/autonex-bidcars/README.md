@@ -35,6 +35,11 @@ Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən 
 - `Show more` altında bağlı qalan texniki sahələr birbaşa məlumat cədvəlindən oxunur.
 - BidCars yanacaq və ya mühərriki göstərmədikdə lot linki Auto Nex API-yə ötürülür; Copart/IAAI mənbəsindən tapılan məlumat DGK hesabında fallback kimi istifadə olunur.
 
+## 1.9.6
+
+- `Fuel Type` dəyəri birbaşa BidCars texniki məlumat cədvəlindən götürülür və DGK kateqoriyasına çevrilir.
+- Benzin, dizel, LPG, hibrid, dizel hibrid, plug-in hibrid, plug-in dizel hibrid, mild hibrid və elektrik ayrı saxlanır; gömrük sorğusuna uyğun DGK mühərrik kodu göndərilir.
+
 Oxunan sahələr:
 
 - `Current Bid`, `Bid Now` və `Lot Price` məbləğləri ayrıca

@@ -72,7 +72,7 @@
           <label class="wide">Location / yard<input id="location" type="text" placeholder="Savannah (GA)"></label>
           <label>İl<input id="year" type="number" min="1950" max="2035"></label>
           <label>Mühərrik, cm³<input id="engine" type="number" min="0" step="100"></label>
-          <label class="wide">Yanacaq<select id="fuel"><option value="">Tapılmadı</option><option value="Gasoline">Benzin</option><option value="Diesel">Dizel</option><option value="Hybrid">Hibrid</option><option value="Plug-in hybrid">Plug-in hibrid</option><option value="Electric">Elektrik</option><option value="LPG">Qaz / LPG</option></select></label>
+          <label class="wide">Yanacaq<select id="fuel"><option value="">Tapılmadı</option><option value="Gasoline">Benzin</option><option value="Diesel">Dizel</option><option value="LPG">Qaz / LPG</option><option value="Hybrid">Hibrid</option><option value="Diesel hybrid">Dizel hibrid</option><option value="LPG hybrid">Qaz hibrid</option><option value="Plug-in hybrid">Plug-in hibrid</option><option value="Plug-in diesel hybrid">Plug-in dizel hibrid</option><option value="Mild hybrid">Mild hibrid</option><option value="Mild diesel hybrid">Mild dizel hibrid</option><option value="Mild LPG hybrid">Mild qaz hibrid</option><option value="Electric">Elektrik</option></select></label>
           </div>
         </details>
         <div class="actions"><button class="primary" id="calculate" type="button">Auto Nex ilə hesabla</button></div>
@@ -251,14 +251,7 @@
   }
 
   function normalizeFuel(value) {
-    const fuel = String(value || "").toLowerCase();
-    if (!fuel) return "";
-    if (/electric|battery|\bev\b/.test(fuel) && !/hybrid/.test(fuel)) return "Electric";
-    if (/plug|phev/.test(fuel)) return "Plug-in hybrid";
-    if (/hybrid|hev/.test(fuel)) return "Hybrid";
-    if (/diesel|dizel/.test(fuel)) return "Diesel";
-    if (/lpg|cng|propane|qaz/.test(fuel) && !/gasoline/.test(fuel)) return "LPG";
-    return "Gasoline";
+    return parser.normalizeFuel(value);
   }
 
   function updatePriceChoices(data, force) {
