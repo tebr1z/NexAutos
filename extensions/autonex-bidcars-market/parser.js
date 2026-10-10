@@ -99,7 +99,7 @@
   function valueAfter(text, label, stops) {
     const stop = stops.join("|");
     const hit = clean(text).match(new RegExp(`${label}\\s*:?\\s*(.+?)(?=\\s+(?:${stop})\\s*:?|$)`, "i"));
-    return clean(hit?.[1]);
+    return clean(hit?.[1]).slice(0, 240);
   }
 
   function parseAuctionDate(text) {

@@ -35,8 +35,11 @@
     const auctionNode = [...root.querySelectorAll("a,span,div")].find((node) => /^(Copart|IAAI|IAA)$/i.test(parser.clean(node.textContent)));
     const specRows = [...root.querySelectorAll("tr,li,div")];
     const spec = (name) => {
-      const row = specRows.find((node) => new RegExp(`^${name}\\b`, "i").test(parser.clean(node.innerText)));
-      return row ? parser.clean(row.innerText).replace(new RegExp(`^${name}\\s*:?`, "i"), "") : "";
+      const rows = specRows
+        .map((node) => ({ node, value: parser.clean(node.innerText) }))
+        .filter((row) => new RegExp(`^${name}\\s*:?`, "i").test(row.value) && row.value.length <= 220)
+        .sort((a, b) => a.value.length - b.value.length);
+      return rows[0] ? rows[0].value.replace(new RegExp(`^${name}\\s*:?`, "i"), "").slice(0, 120) : "";
     };
     return {
       text: root.innerText, title: heading, imageAlts: labels, url: link,
@@ -81,12 +84,13 @@
       return;
     }
     try {
+      const short = (value, max) => value ? String(value).trim().slice(0, max) || undefined : undefined;
       const payload = found.slice(0, 50).map((row) => ({
-        key: row.key, url: row.url, lot: row.lot || undefined, vin: row.vin || undefined,
-        auction: row.auction || undefined, make: row.make || undefined, model: row.model || undefined,
-        trim: row.trim || undefined, year: row.year || undefined, engineCc: row.engineCc || undefined,
-        engineLabel: row.engineLabel || undefined, fuel: row.fuel || undefined, color: row.color || undefined,
-        location: row.location || undefined, state: row.state || undefined, mileageMi: row.mileageMi || undefined,
+        key: short(row.key, 128), url: short(row.url, 1000), lot: short(row.lot, 32), vin: short(row.vin, 32),
+        auction: short(row.auction, 16), make: short(row.make, 80), model: short(row.model, 120),
+        trim: short(row.trim, 120), year: row.year || undefined, engineCc: row.engineCc || undefined,
+        engineLabel: short(row.engineLabel, 120), fuel: short(row.fuel, 80), color: short(row.color, 80),
+        location: short(row.location, 180), state: short(row.state, 8), mileageMi: row.mileageMi || undefined,
         mileageKm: row.mileageKm || undefined, finalBidUsd: row.finalBidUsd,
         saleDate: row.saleDate || undefined, observedAt: row.observedAt
       }));
