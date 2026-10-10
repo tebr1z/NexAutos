@@ -233,18 +233,31 @@ function notifyTab(tabId) {
   });
 }
 
-chrome.action.onClicked.addListener(async (tab) => {
+function sendTabMessage(tabId, message) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+      resolve(response);
+    });
+  });
+}
+
+async function showActionError(error) {
+  console.warn("Auto Nex paneli açıla bilmədi:", error instanceof Error ? error.message : String(error));
+  await chrome.action.setBadgeBackgroundColor({ color: "#dc2626" });
+  await chrome.action.setBadgeText({ text: "ERR" });
+  setTimeout(() => {
+    chrome.action.setBadgeText({ text: "" }).catch(() => {});
+  }, 2200);
+}
+
+async function handleActionClick(tab) {
   if (tab.id && isCaucasusUrl(tab.url)) {
     try {
-      await new Promise((resolve, reject) => {
-        chrome.tabs.sendMessage(tab.id, { type: "ANX_OPEN_CAUCASUS_SCANNER" }, (response) => {
-          if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-          resolve(response);
-        });
-      });
+      await sendTabMessage(tab.id, { type: "ANX_OPEN_CAUCASUS_SCANNER" });
     } catch {
       await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["caucasus.js"] });
-      chrome.tabs.sendMessage(tab.id, { type: "ANX_OPEN_CAUCASUS_SCANNER" });
+      await sendTabMessage(tab.id, { type: "ANX_OPEN_CAUCASUS_SCANNER" });
     }
     return;
   }
@@ -265,6 +278,12 @@ chrome.action.onClicked.addListener(async (tab) => {
     });
     await notifyTab(tab.id);
   }
+}
+
+chrome.action.onClicked.addListener((tab) => {
+  void handleActionClick(tab).catch((error) => {
+    void showActionError(error).catch(() => {});
+  });
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
