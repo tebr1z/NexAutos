@@ -38,10 +38,10 @@
       .status { min-height:18px; margin:10px 0 0; color:#93a4bb; font-size:11px; line-height:1.45; }
       .status.error { color:#fca5a5; }
       .result { margin-top:13px; border-top:1px solid #273449; padding-top:8px; }
-      .price-line { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 10px; border:1px solid #273449; border-radius:9px; background:#0f172a; }
-      .price-line span { color:#8da2bd; font-size:9px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
-      .compact-price { display:flex; align-items:center; gap:4px; color:#fff; font-size:14px; font-weight:900; }
-      .compact-price input { width:94px; margin:0; padding:5px 7px; border-radius:7px; text-align:right; font-size:14px; }
+      .price-line { padding:7px; border:1px solid #273449; border-radius:9px; background:#0f172a; }
+      .price-line span { display:block; margin:0 2px 5px; color:#8da2bd; font-size:9px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
+      .compact-source { margin:0; padding:7px 9px; font-size:12px; }
+      .compact-manual { margin-top:6px; padding:7px 9px; font-size:12px; }
       .fee-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:4px; }
       .fee-box { min-width:0; padding:9px 7px; border:1px solid #273449; border-radius:10px; background:#0f172a; text-align:center; }
       .fee-box span { display:block; overflow:hidden; color:#8da2bd; font-size:9px; font-weight:800; letter-spacing:.04em; text-overflow:ellipsis; text-transform:uppercase; white-space:nowrap; }
@@ -334,8 +334,11 @@
     if (!data) return;
     const dypAzn = includeDyp ? 800 : 0;
     const finalAzn = data.totalWithCustomsAzn == null ? null : data.totalWithCustomsAzn + dypAzn;
+    const compactOptions = [...refs.priceSource.options].map((option) =>
+      `<option value="${escapeHtml(option.value)}"${option.value === refs.priceSource.value ? " selected" : ""}${option.disabled ? " disabled" : ""}>${escapeHtml(option.textContent)}</option>`,
+    ).join("");
     refs.result.innerHTML = `
-      <div class="price-line"><span>Hesablama qiyməti</span><label class="compact-price">$<input id="compactPrice" type="number" min="1" step="50" value="${Number(data.priceUsd) || ""}" aria-label="Hesablama qiyməti"></label></div>
+      <div class="price-line"><span>Hesablama qiyməti</span><select class="compact-source" id="compactPriceSource" aria-label="Hesablama qiyməti mənbəyi">${compactOptions}</select>${refs.priceSource.value === "manual" ? `<input class="compact-manual" id="compactPrice" type="number" min="1" step="50" value="${Number(refs.price.value) || ""}" aria-label="Əl ilə hesablama qiyməti">` : ""}</div>
       <div class="azn-total"><small>Yekun məbləğ${includeDyp ? " · DYP daxil" : ""}</small><strong>${finalAzn == null ? "—" : azn(finalAzn)}</strong></div>
       <button class="dyp-button${includeDyp ? " active" : ""}" id="toggleDyp" type="button" ${finalAzn == null ? "disabled" : ""}>${includeDyp ? "✓ DYP xərci əlavə edildi — 800 AZN" : "+ DYP xərclərini əlavə et — 800 AZN"}</button>
       <section class="result-details" ${showDetails ? "" : "hidden"}><div class="detail-body">
@@ -364,6 +367,18 @@
     shadow.getElementById("toggleDyp")?.addEventListener("click", () => {
       includeDyp = !includeDyp;
       renderCalculation();
+    });
+    const compactPriceSource = shadow.getElementById("compactPriceSource");
+    compactPriceSource?.addEventListener("change", () => {
+      refs.priceSource.value = compactPriceSource.value;
+      manual.delete("price");
+      if (latestData) updatePriceChoices(latestData, false);
+      if (compactPriceSource.value === "manual") {
+        renderCalculation();
+        shadow.getElementById("compactPrice")?.focus();
+      } else {
+        void calculate(false);
+      }
     });
     const compactPrice = shadow.getElementById("compactPrice");
     compactPrice?.addEventListener("input", () => {

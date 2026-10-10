@@ -61,6 +61,11 @@ Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən 
 
 - Yığcam görünüşdəki `Hesablama qiyməti` birbaşa dəyişdirilə bilir; yeni rəqəm yazılıb Enter basıldıqda və ya sahədən çıxıldıqda bütün xərclər yenidən hesablanır.
 
+## 1.10.1
+
+- Yığcam görünüşdə hesablama qiyməti rəqəm qutusu əvəzinə `Bid Now`, `Current Bid`, `Lot Price` və `Əl ilə yaz` seçim menyusu kimi göstərilir.
+- `Əl ilə yaz` seçildikdə yığcam paneldə ayrıca qiymət xanası açılır və dəyişiklik bütün hesabı yeniləyir.
+
 Oxunan sahələr:
 
 - `Current Bid`, `Bid Now` və `Lot Price` məbləğləri ayrıca
