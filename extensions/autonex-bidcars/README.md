@@ -13,6 +13,12 @@ Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən 
 - BidCars yard adı DB-dəki ada tam uyğun gəlməyəndə istiqamət aliası tətbiq olunur (məsələn, `Orlando South` → `Orlando`).
 - API həmin yard üçün tarif qaytarmasa extension daxilindəki Copart/IAAI JSON faylları avtomatik fallback kimi işləyir.
 
+## 1.9.2
+
+- Kalkulyator BidCars səhifəsinin sağında 390px enində sabit, scroll edilən panel kimi açılır.
+- Çatışmayan tarif formundan admin email/şifrə sahələri çıxarılıb.
+- Əl ilə yazılan tarif dərhal Chrome lokal yaddaşına düşür və hesablamada istifadə olunur; əvvəlki admin sessiyası varsa DB-yə də səssiz sinxron edilir.
+
 Oxunan sahələr:
 
 - `Current Bid`, `Bid Now` və `Lot Price` məbləğləri ayrıca

@@ -10,18 +10,18 @@
   const shadow = host.attachShadow({ mode: "open" });
   shadow.innerHTML = `
     <style>
-      :host { display:block; width:100%; margin:16px 0; color:#e5e7eb; font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+      :host { display:block; color:#e5e7eb; font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
       :host([hidden]) { display:none !important; }
       .body [hidden] { display:none !important; }
       * { box-sizing:border-box; }
-      .card { overflow:hidden; border:1px solid #273449; border-radius:16px; background:#0b1220; box-shadow:0 16px 44px rgba(3,7,18,.28); }
+      .card { overflow:hidden; border:1px solid #273449; border-radius:18px; background:#0b1220; box-shadow:0 22px 60px rgba(3,7,18,.42); }
       .head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:15px 16px; background:linear-gradient(135deg,#071426,#11223c); border-bottom:1px solid #273449; }
       .brand { display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-.02em; }
       .mark { display:grid; place-items:center; width:29px; height:29px; border-radius:9px; color:white; background:#2563eb; }
       .sub { color:#8da2bd; font-size:11px; margin-top:2px; font-weight:500; }
       button { font:inherit; }
       .ghost { border:1px solid #334155; border-radius:9px; background:#172033; color:#dbeafe; padding:7px 9px; cursor:pointer; }
-      .body { padding:14px 16px 16px; }
+      .body { padding:16px 18px 18px; }
       .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
       label { display:block; color:#8da2bd; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
       input,select { width:100%; margin-top:5px; border:1px solid #334155; border-radius:9px; background:#111827; color:#f8fafc; padding:9px 10px; outline:none; font:600 13px/1.2 inherit; }
@@ -45,13 +45,13 @@
       .total small { color:#93c5fd; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
       .total div { margin-top:3px; color:#fff; font-size:24px; font-weight:900; }
       .note { margin-top:9px; color:#7890ad; font-size:10px; line-height:1.45; }
-      .rate-editor { margin-top:12px; padding:12px; border:1px solid #854d0e; border-radius:11px; background:rgba(120,53,15,.22); }
+      .rate-editor { margin-top:14px; padding:14px; border:1px solid #854d0e; border-radius:13px; background:rgba(120,53,15,.22); }
       .rate-editor h4 { margin:0 0 4px; color:#fde68a; font-size:13px; }
       .rate-editor p { margin:0 0 9px; color:#d6b98b; font-size:10px; line-height:1.45; }
       .rate-editor button { width:100%; margin-top:10px; border:0; border-radius:9px; background:#d97706; color:white; padding:10px; font-weight:800; cursor:pointer; }
       .rate-editor button:disabled { opacity:.55; cursor:wait; }
-      .fallback { position:fixed; z-index:2147483646; right:20px; bottom:20px; width:min(370px,calc(100vw - 32px)); max-height:calc(100vh - 40px); overflow:auto; margin:0; }
-      @media (max-width:700px) { .fallback { right:10px; bottom:10px; width:calc(100vw - 20px); max-height:75vh; } }
+      .dock { position:fixed; z-index:2147483646; right:18px; top:18px; width:min(390px,calc(100vw - 36px)); max-height:calc(100vh - 36px); overflow:auto; margin:0; scrollbar-width:thin; scrollbar-color:#334155 transparent; }
+      @media (max-width:700px) { .dock { right:10px; top:10px; width:calc(100vw - 20px); max-height:calc(100vh - 20px); } }
     </style>
     <section class="card">
       <header class="head">
@@ -83,10 +83,8 @@
           <p id="rateHint">ABŞ–Poti yol pulunu bir dəfə yazın. Poti–Bakı xərci avtomatik əlavə ediləcək və tarif DB-də qalacaq.</p>
           <div class="grid">
             <label class="wide">ABŞ–Poti tarifi, USD<input id="rateUsd" type="number" min="1" step="10" placeholder="Məsələn: 270"></label>
-            <label id="adminEmailWrap">Admin e-poçtu<input id="adminEmail" type="email" autocomplete="username"></label>
-            <label id="adminPasswordWrap">Admin şifrəsi<input id="adminPassword" type="password" autocomplete="current-password"></label>
           </div>
-          <button id="saveRate" type="button">Bazaya yaz və yenidən hesabla</button>
+          <button id="saveRate" type="button">Tarifi yadda saxla və hesabla</button>
           <p class="status" id="rateStatus"></p>
         </section>
         <p class="note">Current Bid və ya Bid Now qiymətini seçin. Auction fee qiymətə görə, yol pulu Auto Nex bazasından, gömrük isə DGK API-dən hesablanır.</p>
@@ -94,7 +92,7 @@
     </section>`;
 
   const refs = Object.fromEntries(
-    ["priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "rateEditor", "rateHint", "rateUsd", "adminEmailWrap", "adminPasswordWrap", "adminEmail", "adminPassword", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
+    ["priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "rateEditor", "rateHint", "rateUsd", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
   );
   const manual = new Set();
   let lastUrl = location.href;
@@ -251,16 +249,6 @@
     return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
   }
 
-  function setAuthUi(authenticated, email = "") {
-    refs.adminEmailWrap.hidden = authenticated;
-    refs.adminPasswordWrap.hidden = authenticated;
-    if (email) refs.adminEmail.value = email;
-    refs.rateStatus.className = "status";
-    refs.rateStatus.textContent = authenticated
-      ? "Admin girişi yadda saxlanıb; email və şifrə yenidən istənməyəcək."
-      : "Tarifi DB-yə yazmaq üçün bir dəfə admin hesabı ilə daxil olun.";
-  }
-
   async function calculate(triggeredAutomatically = false) {
     if (calculating) {
       recalculateAfterCurrent = true;
@@ -398,28 +386,18 @@
     refs.rateStatus.className = "status";
     refs.rateStatus.textContent = "Tarif bazaya yazılır…";
     try {
-      const email = refs.adminEmail.value.trim();
-      const password = refs.adminPassword.value;
-      if (!refs.adminEmailWrap.hidden) {
-        if (!email || !password) throw new Error("Admin e-poçtu və şifrəsini birlikdə yazın.");
-        const session = await send({ type: "ANX_LOGIN", email, password });
-        refs.adminPassword.value = "";
-        setAuthUi(true, session.email);
-      }
-      await send({
-        type: "ANX_SAVE_RATE",
+      const saved = await send({
+        type: "ANX_SAVE_RATE_SMART",
         cellKey: lastQuote.cellKey,
         rateUsd,
         tirUsd: Number(lastQuote.tirUsd || 0),
       });
-      refs.rateStatus.textContent = "Tarif DB-də yadda saxlandı. Növbəti dəfə avtomatik gələcək.";
+      refs.rateStatus.textContent = saved.synced
+        ? "Tarif DB-də və bu brauzerdə yadda saxlandı."
+        : "Tarif bu brauzerdə yadda saxlandı və indi avtomatik istifadə olunacaq.";
       await calculate(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (/sessiya|daxil olun/i.test(message)) {
-        refs.adminEmailWrap.hidden = false;
-        refs.adminPasswordWrap.hidden = false;
-      }
       refs.rateStatus.className = "status error";
       refs.rateStatus.textContent = message;
     } finally {
@@ -428,26 +406,8 @@
   }
 
   function placePanel() {
-    const headings = [...document.querySelectorAll("h1,h2,h3,h4,strong,div")].filter(
-      (element) => parser.clean(element.textContent) === "Final Price Calculator",
-    );
-    const heading = headings[0];
-    if (!heading) {
-      host.classList.add("anx-fallback-host");
-      document.documentElement.appendChild(host);
-      host.className = "";
-      shadow.querySelector(".card").classList.add("fallback");
-      return;
-    }
-    let card = heading;
-    for (let depth = 0; card.parentElement && depth < 5; depth++) {
-      const parent = card.parentElement;
-      const text = parser.clean(parent.innerText);
-      if (text.length > 1200) break;
-      card = parent;
-    }
-    card.insertAdjacentElement("afterend", host);
-    shadow.querySelector(".card").classList.remove("fallback");
+    if (host.parentElement !== document.documentElement) document.documentElement.appendChild(host);
+    shadow.querySelector(".card").classList.add("dock");
   }
 
   function scheduleAuto() {
@@ -496,11 +456,6 @@
 
   placePanel();
   readPage(true);
-  send({ type: "ANX_GET_SETTINGS" })
-    .then((value) => {
-      setAuthUi(value.authenticated, value.authEmail || "");
-    })
-    .catch(() => undefined);
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type !== "ANX_OPEN_CALCULATOR") return false;

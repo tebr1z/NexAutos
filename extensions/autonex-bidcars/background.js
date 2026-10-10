@@ -65,6 +65,25 @@ async function applyBundledRate(quote, requestBody) {
   const requestedYard = String(requestBody?.yard || quote.yard || "");
   const requestedSlug = rateSlug(requestedYard);
   if (!requestedSlug || !/^(COPART|IAAI)$/.test(auction) || !/^[A-Z]{2}$/.test(state)) return quote;
+  const band = quote.band?.id || (Number(requestBody?.priceUsd) <= 3000 ? "a" : Number(requestBody?.priceUsd) <= 7000 ? "b" : "c");
+  const localKey = `${state}:${auction}:${requestedSlug}:${band}`;
+  const local = await chrome.storage.local.get({ localRateCells: {} });
+  const localRate = Number(local.localRateCells?.[localKey]);
+  if (Number.isFinite(localRate) && localRate > 0) {
+    const tirUsd = Number(quote.tirUsd) >= 0 ? Number(quote.tirUsd) : 200;
+    const freightUsd = localRate + tirUsd;
+    return {
+      ...quote,
+      oceanUsd: localRate,
+      tirUsd,
+      freightUsd,
+      totalUsd: freightUsd + (Number(quote.auctionFeeUsd) || 0),
+      missing: false,
+      rateSource: "local",
+      matchedYard: requestedYard,
+      matchedYardSlug: requestedSlug,
+    };
+  }
 
   const candidates = (await bundledRates()).filter((row) => row.auction === auction && row.state === state);
   const comparable = comparableRateSlug(requestedSlug);
@@ -79,7 +98,6 @@ async function applyBundledRate(quote, requestBody) {
     })();
   if (!match || !Number.isFinite(match.baseUsd) || match.baseUsd <= 0) return quote;
 
-  const band = quote.band?.id || (Number(requestBody?.priceUsd) <= 3000 ? "a" : Number(requestBody?.priceUsd) <= 7000 ? "b" : "c");
   const oceanUsd = Math.round(match.baseUsd + (band === "b" ? 50 : band === "c" ? 200 : 0));
   const tirUsd = Number(quote.tirUsd) >= 0 ? Number(quote.tirUsd) : 200;
   const freightUsd = oceanUsd + tirUsd;
@@ -264,6 +282,46 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (!data?.accessToken || !staff.includes(data.user?.role)) throw new Error("Yol tarifini yazmaq üçün admin və ya işçi hesabı lazımdır.");
       await chrome.storage.local.set({ authToken: data.accessToken, refreshToken: data.refreshToken, authEmail: data.user.email });
       return { ok: true, data: { email: data.user.email, role: data.user.role } };
+    }
+    if (message.type === "ANX_SAVE_RATE_SMART") {
+      const cellKey = String(message.cellKey || "").trim();
+      const rateUsd = Math.round(Number(message.rateUsd));
+      const tirUsd = Number(message.tirUsd);
+      if (!/^[A-Z]{2}:(COPART|IAAI):[a-z0-9-]+:[abc]$/.test(cellKey) || !Number.isFinite(rateUsd) || rateUsd <= 0) {
+        throw new Error("Yol pulunu düzgün yazın.");
+      }
+
+      const local = await chrome.storage.local.get({ localRateCells: {}, authToken: "", refreshToken: "" });
+      await chrome.storage.local.set({ localRateCells: { ...local.localRateCells, [cellKey]: rateUsd } });
+      let accessToken = local.authToken || "";
+      if (!accessToken && local.refreshToken) {
+        try {
+          accessToken = await refreshSession();
+        } catch {
+          accessToken = "";
+        }
+      }
+      if (!accessToken) return { ok: true, data: { saved: true, synced: false, rateUsd } };
+
+      const payload = {
+        tirUsd: Number.isFinite(tirUsd) && tirUsd >= 0 ? tirUsd : undefined,
+        cells: { [cellKey]: rateUsd },
+      };
+      try {
+        await apiRequest("/shipping/rates", { method: "PUT", token: accessToken, body: payload });
+        return { ok: true, data: { saved: true, synced: true, rateUsd } };
+      } catch (error) {
+        if (error?.status === 401 && local.refreshToken) {
+          try {
+            accessToken = await refreshSession();
+            await apiRequest("/shipping/rates", { method: "PUT", token: accessToken, body: payload });
+            return { ok: true, data: { saved: true, synced: true, rateUsd } };
+          } catch {
+            /* local rate remains available */
+          }
+        }
+        return { ok: true, data: { saved: true, synced: false, rateUsd } };
+      }
     }
     if (message.type === "ANX_SAVE_RATE") {
       const auth = await chrome.storage.local.get({ authToken: "", refreshToken: "" });
