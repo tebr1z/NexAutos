@@ -61,4 +61,3 @@ export function adminHomeForRole(role: AuthUser["role"] | undefined) {
 export function assignableRolesFor(role: AuthUser["role"] | undefined): AssignableRole[] {
   return role === "SUPER_ADMIN" ? ["ADMIN", "MANAGER", "STAFF", "FREIGHT_USER"] : ["MANAGER", "STAFF", "FREIGHT_USER"];
 }
-
