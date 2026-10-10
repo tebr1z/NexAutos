@@ -55,6 +55,9 @@
       .dyp-button.active { border-color:#16a34a; background:rgba(22,163,74,.17); color:#bbf7d0; }
       .dyp-button:disabled { opacity:.45; cursor:not-allowed; }
       .result-details { margin-top:8px !important; }
+      .advanced { margin-top:10px; padding:12px; border:1px solid #273449; border-radius:11px; background:#0f172a; }
+      .advanced .grid + .grid { margin-top:10px; padding-top:10px; border-top:1px solid #273449; }
+      .details-toggle { width:100%; margin-top:8px; }
       .note { margin-top:9px; color:#7890ad; font-size:10px; line-height:1.45; }
       .rate-editor { margin-top:14px; padding:14px; border:1px solid #854d0e; border-radius:13px; background:rgba(120,53,15,.22); }
       .rate-editor h4 { margin:0 0 4px; color:#fde68a; font-size:13px; }
@@ -70,25 +73,25 @@
         <div><button class="ghost" id="refresh" type="button" title="Səhifədən yenidən oxu">↻ Oxu</button> <button class="ghost" id="close" type="button" title="Bağla">✕</button></div>
       </header>
       <div class="body">
-        <div class="grid">
-          <label class="wide">Hesablama qiyməti<select id="priceSource"><option value="bidNow">Bid Now / seçilən qiymət</option><option value="currentBid">Current Bid</option><option value="lotPrice">Lot Price</option><option value="manual">Əl ilə yaz</option></select></label>
-          <label>Avtomobil qiyməti<input id="price" type="number" min="1" step="50"></label>
-          <label>Hesablanan auction fee<input id="auctionFee" type="number" readonly></label>
-        </div>
-        <details class="compact">
-          <summary>Məlumatları yoxla və düzəlt</summary>
+        <section class="advanced" id="advancedControls" hidden>
           <div class="grid">
-          <label>Hərrac<select id="auction"><option value="">Seçin</option><option value="IAAI">IAAI</option><option value="COPART">Copart</option></select></label>
-          <label>Title<select id="titleKind"><option value="SALVAGE">Salvage</option><option value="CLEAN">Clean title</option></select></label>
-          <label class="wide">Location / yard<input id="location" type="text" placeholder="Savannah (GA)"></label>
-          <label>İl<input id="year" type="number" min="1950" max="2035"></label>
-          <label>Mühərrik, cm³<input id="engine" type="number" min="0" step="100"></label>
-          <label class="wide">Yanacaq<select id="fuel"><option value="">Tapılmadı</option><option value="Gasoline">Benzin</option><option value="Diesel">Dizel</option><option value="LPG">Qaz / LPG</option><option value="Hybrid">Hibrid</option><option value="Diesel hybrid">Dizel hibrid</option><option value="LPG hybrid">Qaz hibrid</option><option value="Plug-in hybrid">Plug-in hibrid</option><option value="Plug-in diesel hybrid">Plug-in dizel hibrid</option><option value="Mild hybrid">Mild hibrid</option><option value="Mild diesel hybrid">Mild dizel hibrid</option><option value="Mild LPG hybrid">Mild qaz hibrid</option><option value="Electric">Elektrik</option></select></label>
+            <label class="wide">Hesablama qiyməti<select id="priceSource"><option value="bidNow">Bid Now / seçilən qiymət</option><option value="currentBid">Current Bid</option><option value="lotPrice">Lot Price</option><option value="manual">Əl ilə yaz</option></select></label>
+            <label>Avtomobil qiyməti<input id="price" type="number" min="1" step="50"></label>
+            <label>Hesablanan auction fee<input id="auctionFee" type="number" readonly></label>
           </div>
-        </details>
+          <div class="grid">
+            <label>Hərrac<select id="auction"><option value="">Seçin</option><option value="IAAI">IAAI</option><option value="COPART">Copart</option></select></label>
+            <label>Title<select id="titleKind"><option value="SALVAGE">Salvage</option><option value="CLEAN">Clean title</option></select></label>
+            <label class="wide">Location / yard<input id="location" type="text" placeholder="Savannah (GA)"></label>
+            <label>İl<input id="year" type="number" min="1950" max="2035"></label>
+            <label>Mühərrik, cm³<input id="engine" type="number" min="0" step="100"></label>
+            <label class="wide">Yanacaq<select id="fuel"><option value="">Tapılmadı</option><option value="Gasoline">Benzin</option><option value="Diesel">Dizel</option><option value="LPG">Qaz / LPG</option><option value="Hybrid">Hibrid</option><option value="Diesel hybrid">Dizel hibrid</option><option value="LPG hybrid">Qaz hibrid</option><option value="Plug-in hybrid">Plug-in hibrid</option><option value="Plug-in diesel hybrid">Plug-in dizel hibrid</option><option value="Mild hybrid">Mild hibrid</option><option value="Mild diesel hybrid">Mild dizel hibrid</option><option value="Mild LPG hybrid">Mild qaz hibrid</option><option value="Electric">Elektrik</option></select></label>
+          </div>
+        </section>
         <div class="actions"><button class="primary" id="calculate" type="button">Auto Nex ilə hesabla</button></div>
         <p class="status" id="status"></p>
         <div class="result" id="result" hidden></div>
+        <button class="ghost details-toggle" id="toggleAdvanced" type="button">Ətraflı</button>
         <section class="rate-editor" id="rateEditor" hidden>
           <h4>Bu marşrutun tarifi bazada yoxdur</h4>
           <p id="rateHint">ABŞ–Poti yol pulunu bir dəfə yazın. Poti–Bakı xərci avtomatik əlavə ediləcək və tarif DB-də qalacaq.</p>
@@ -103,7 +106,7 @@
     </section>`;
 
   const refs = Object.fromEntries(
-    ["priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "rateEditor", "rateHint", "rateUsd", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
+    ["priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "toggleAdvanced", "advancedControls", "rateEditor", "rateHint", "rateUsd", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
   );
   const manual = new Set();
   let lastUrl = location.href;
@@ -115,6 +118,7 @@
   let lastQuote = null;
   let lastCalculation = null;
   let includeDyp = false;
+  let showDetails = false;
 
   function send(message) {
     return new Promise((resolve, reject) => {
@@ -331,7 +335,7 @@
       </div>
       <div class="azn-total"><small>Yekun məbləğ${includeDyp ? " · DYP daxil" : ""}</small><strong>${finalAzn == null ? "—" : azn(finalAzn)}</strong></div>
       <button class="dyp-button${includeDyp ? " active" : ""}" id="toggleDyp" type="button" ${finalAzn == null ? "disabled" : ""}>${includeDyp ? "✓ DYP xərci əlavə edildi — 800 AZN" : "+ DYP xərclərini əlavə et — 800 AZN"}</button>
-      <details class="compact result-details"><summary>Ətraflı hesab</summary><div class="detail-body">
+      <section class="result-details" ${showDetails ? "" : "hidden"}><div class="detail-body">
         <div class="row"><span>Avtomobil</span><strong>${usd(data.priceUsd)}</strong></div>
         <div class="row"><span>Auction fee (${escapeHtml(data.auctionFeeSource)})</span><strong>${usd(data.auctionFeeUsd)}</strong></div>
         <div class="row"><span>Avtomobil + auction</span><strong>${usd(data.invoiceUsd)}</strong></div>
@@ -347,7 +351,7 @@
         ${data.quote.auctionFee ? `<p class="note">${escapeHtml(data.quote.auction)} fee: buyer ${usd(data.quote.auctionFee.buyerUsd)} + live ${usd(data.quote.auctionFee.virtualUsd)} + gate ${usd(data.quote.auctionFee.gateUsd)}${data.quote.auctionFee.envUsd ? ` + env ${usd(data.quote.auctionFee.envUsd)}` : ""}${data.quote.auctionFee.titleUsd ? ` + title ${usd(data.quote.auctionFee.titleUsd)}` : ""}</p>` : ""}
         ${data.quote.missing ? `<p class="note">Bu yard və qiymət qrupu üçün yol pulu tarifi admin paneldə yoxdur.</p>` : ""}
         ${data.customsNote ? `<p class="note">${escapeHtml(data.customsNote)}</p>` : ""}
-      </div></details>`;
+      </div></section>`;
     refs.result.hidden = false;
     shadow.getElementById("toggleDyp")?.addEventListener("click", () => {
       includeDyp = !includeDyp;
@@ -530,6 +534,9 @@
         refs.result.hidden = true;
         lastCalculation = null;
         includeDyp = false;
+        showDetails = false;
+        refs.advancedControls.hidden = true;
+        refs.toggleAdvanced.textContent = "Ətraflı";
       }
       const data = readPage(false);
       const signature = [refs.priceSource.value, refs.price.value, data.bidNowUsd, data.currentBidUsd, data.lotPriceUsd, data.auctionFeeUsd, data.auction, data.location].join("|");
@@ -561,6 +568,12 @@
     host.hidden = true;
   });
   refs.calculate.addEventListener("click", () => void calculate(false));
+  refs.toggleAdvanced.addEventListener("click", () => {
+    showDetails = !showDetails;
+    refs.advancedControls.hidden = !showDetails;
+    refs.toggleAdvanced.textContent = showDetails ? "Yığcam göstər" : "Ətraflı";
+    if (lastCalculation) renderCalculation();
+  });
   refs.saveRate.addEventListener("click", () => void saveMissingRate());
   document.addEventListener("input", (event) => {
     if (!host.contains(event.target)) scheduleAuto();

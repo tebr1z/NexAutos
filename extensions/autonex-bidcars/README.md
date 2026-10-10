@@ -47,6 +47,11 @@ Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən 
 - Tam bölgü `Ətraflı hesab` bölməsinə keçirilib.
 - `DYP xərclərini əlavə et — 800 AZN` düyməsi yekun manat məbləğinə 800 AZN əlavə edir və təkrar basıldıqda çıxarır.
 
+## 1.9.8
+
+- İlk açılışda qiymət seçimi, auction fee və düzəliş sahələri gizli saxlanır; yalnız kompakt nəticə görünür.
+- Tək `Ətraflı` düyməsi qiymət/auction fee sahələrini, avtomobil məlumatlarını və tam hesab bölgüsünü birlikdə açır; `Yığcam göstər` onları yenidən bağlayır.
+
 Oxunan sahələr:
 
 - `Current Bid`, `Bid Now` və `Lot Price` məbləğləri ayrıca
