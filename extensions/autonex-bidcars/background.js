@@ -185,6 +185,19 @@ async function refreshSession() {
   }
 }
 
+async function staffRequest(path, init = {}) {
+  const auth = await chrome.storage.local.get({ authToken: "", refreshToken: "" });
+  let accessToken = auth.authToken || (auth.refreshToken ? await refreshSession() : "");
+  if (!accessToken) throw new Error("Yol pulunu görmək üçün əvvəl admin hesabı ilə daxil olun.");
+  try {
+    return await apiRequest(path, { ...init, token: accessToken });
+  } catch (error) {
+    if (error?.status !== 401 || !auth.refreshToken) throw error;
+    accessToken = await refreshSession();
+    return apiRequest(path, { ...init, token: accessToken });
+  }
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   const current = await chrome.storage.sync.get(DEFAULTS);
   await chrome.storage.sync.set({
@@ -269,7 +282,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return { ok: true, data: next };
     }
     if (message.type === "ANX_API") {
-      const data = await apiRequest(message.path, { method: message.method, body: message.body });
+      const request = message.path === "/shipping/quote" ? staffRequest : apiRequest;
+      const data = await request(message.path, { method: message.method, body: message.body });
       return {
         ok: true,
         data: message.path === "/shipping/quote" ? await applyBundledRate(data, message.body) : data,

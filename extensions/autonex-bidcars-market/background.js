@@ -12,7 +12,7 @@ async function api(path, method = "GET", body) {
     headers: {
       Accept: "application/json",
       ...(body ? { "Content-Type": "application/json" } : {}),
-      ...(path === "/market-sales/ingest" && settings.collectorKey ? { "X-AutoNex-Collector": settings.collectorKey } : {})
+      ...(["/market-sales/ingest", "/shipping/quote"].includes(path) && settings.collectorKey ? { "X-AutoNex-Collector": settings.collectorKey } : {})
     },
     body: body ? JSON.stringify(body) : undefined,
     cache: "no-store",

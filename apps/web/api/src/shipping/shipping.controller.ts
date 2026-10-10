@@ -5,6 +5,7 @@ import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { Roles } from '../common/decorators/roles.decorator';
 import { ShippingQuoteDto, ShippingRatesDto } from './dto';
 import { ShippingService } from './shipping.service';
+import { ShippingAccessGuard } from './shipping-access.guard';
 
 const STAFF: Role[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'];
 
@@ -18,11 +19,13 @@ export class ShippingController {
     return this.shipping.meta();
   }
 
+  @UseGuards(ShippingAccessGuard)
   @Post('quote')
   quote(@Body() dto: ShippingQuoteDto) {
     return this.shipping.quote(dto);
   }
 
+  @UseGuards(ShippingAccessGuard)
   @SkipThrottle()
   @Get('catalog')
   catalog(@Query('auction') auction?: string, @Query('state') state?: string) {
