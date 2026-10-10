@@ -29,6 +29,12 @@ Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən 
 - Mühərrik və yanacaq artıq səhifənin gizli axtarış menyusundan deyil, görünən `Engine` və `Fuel Type` etiketlərinin qarşısındakı dəyərdən oxunur.
 - Benzin, dizel, hibrid, plug-in hibrid, elektrik və LPG dəyərləri DGK mühərrik növünə uyğun çevrilir.
 
+## 1.9.5
+
+- `2.0L4`, `2,0 L I4`, `3.6L-V6`, `1998 cc` kimi qarışıq mühərrik yazılışları düzgün cm³ dəyərinə çevrilir.
+- `Show more` altında bağlı qalan texniki sahələr birbaşa məlumat cədvəlindən oxunur.
+- BidCars yanacaq və ya mühərriki göstərmədikdə lot linki Auto Nex API-yə ötürülür; Copart/IAAI mənbəsindən tapılan məlumat DGK hesabında fallback kimi istifadə olunur.
+
 Oxunan sahələr:
 
 - `Current Bid`, `Bid Now` və `Lot Price` məbləğləri ayrıca

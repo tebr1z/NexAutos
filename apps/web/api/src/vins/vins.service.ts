@@ -8,6 +8,8 @@ type NhtsaRow = {
   DisplacementL?: string;
   EngineCylinders?: string;
   FuelTypePrimary?: string;
+  FuelTypeSecondary?: string;
+  ElectrificationLevel?: string;
   TransmissionStyle?: string;
   BodyClass?: string;
   PlantCity?: string;
@@ -38,9 +40,19 @@ export class VinsService {
       throw new NotFoundException('VIN not found');
     }
 
-    const engine = [decoded?.DisplacementL, decoded?.EngineCylinders]
-      .filter(Boolean)
-      .join(' L / ') || local?.engine;
+    const engine = [
+      decoded?.DisplacementL ? `${decoded.DisplacementL} L` : '',
+      decoded?.EngineCylinders ? `${decoded.EngineCylinders} cyl.` : '',
+    ].filter(Boolean).join(', ') || local?.engine;
+    const primaryFuel = decoded?.FuelTypePrimary?.trim() || '';
+    const secondaryFuel = decoded?.FuelTypeSecondary?.trim() || '';
+    const electrification = decoded?.ElectrificationLevel?.trim() || '';
+    const fuelBlob = `${electrification} ${primaryFuel} ${secondaryFuel}`.toLowerCase();
+    const decodedFuel = /plug[ -]?in|\bphev\b/.test(fuelBlob)
+      ? /diesel/.test(fuelBlob) ? 'Plug-in hybrid diesel' : 'Plug-in hybrid'
+      : /hybrid|\bhev\b|\bmhev\b/.test(fuelBlob) || (primaryFuel && secondaryFuel)
+        ? /diesel/.test(fuelBlob) ? 'Hybrid diesel' : 'Hybrid'
+        : primaryFuel || secondaryFuel;
 
     return {
       vin: clean,
@@ -49,7 +61,7 @@ export class VinsService {
       year: local?.year ?? (decoded?.ModelYear ? Number(decoded.ModelYear) : undefined),
       engine,
       mileage: local?.mileage ?? undefined,
-      fuel: local?.fuel ?? decoded?.FuelTypePrimary,
+      fuel: local?.fuel ?? decodedFuel,
       transmission: local?.transmission ?? decoded?.TransmissionStyle,
       exteriorColor: local?.exteriorColor,
       interiorColor: local?.interiorColor,

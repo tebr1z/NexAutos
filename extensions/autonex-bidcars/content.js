@@ -72,7 +72,7 @@
           <label class="wide">Location / yard<input id="location" type="text" placeholder="Savannah (GA)"></label>
           <label>İl<input id="year" type="number" min="1950" max="2035"></label>
           <label>Mühərrik, cm³<input id="engine" type="number" min="0" step="100"></label>
-          <label class="wide">Yanacaq<select id="fuel"><option value="Gasoline">Benzin</option><option value="Diesel">Dizel</option><option value="Hybrid">Hibrid</option><option value="Plug-in hybrid">Plug-in hibrid</option><option value="Electric">Elektrik</option><option value="LPG">Qaz / LPG</option></select></label>
+          <label class="wide">Yanacaq<select id="fuel"><option value="">Tapılmadı</option><option value="Gasoline">Benzin</option><option value="Diesel">Dizel</option><option value="Hybrid">Hibrid</option><option value="Plug-in hybrid">Plug-in hibrid</option><option value="Electric">Elektrik</option><option value="LPG">Qaz / LPG</option></select></label>
           </div>
         </details>
         <div class="actions"><button class="primary" id="calculate" type="button">Auto Nex ilə hesabla</button></div>
@@ -185,6 +185,21 @@
     return "";
   }
 
+  function specificationValue(labels) {
+    const wanted = new Set(labels.map((label) => label.toLowerCase()));
+    for (const row of document.querySelectorAll(".options-list .option, .vehicle-info .option, .specifications .option")) {
+      if (host.contains(row)) continue;
+      const valueElement = row.querySelector(".right-info");
+      if (!valueElement) continue;
+      const copy = row.cloneNode(true);
+      copy.querySelectorAll(".right-info, img, svg").forEach((element) => element.remove());
+      const label = parser.clean(copy.textContent).replace(/:$/, "").toLowerCase();
+      const value = parser.clean(valueElement.textContent);
+      if (wanted.has(label) && value) return value;
+    }
+    return "";
+  }
+
   function snapshot() {
     const textParts = [];
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -202,8 +217,12 @@
       title: `${document.title} ${document.querySelector("h1")?.innerText || ""}`,
       url: location.href,
       auctionHint: auctionHintNearTitle(),
-      engineLabel: visibleLabeledValue("Engine", ["Transmission", "Fuel Type", "Drive Type", "Cylinders", "Keys"]),
-      fuel: visibleLabeledValue("Fuel Type", ["Drive Type", "Transmission", "Engine", "Cylinders", "Keys", "Show more"]),
+      engineLabel:
+        specificationValue(["Engine", "Engine Size", "Engine displacement", "Engine capacity"]) ||
+        visibleLabeledValue("Engine", ["Transmission", "Fuel Type", "Drive Type", "Cylinders", "Keys"]),
+      fuel:
+        specificationValue(["Fuel Type", "Fuel", "Engine Type"]) ||
+        visibleLabeledValue("Fuel Type", ["Drive Type", "Transmission", "Engine", "Cylinders", "Keys", "Show more"]),
       exactTokens,
       bidCandidates: collectBidCandidates(),
     });
@@ -233,6 +252,7 @@
 
   function normalizeFuel(value) {
     const fuel = String(value || "").toLowerCase();
+    if (!fuel) return "";
     if (/electric|battery|\bev\b/.test(fuel) && !/hybrid/.test(fuel)) return "Electric";
     if (/plug|phev/.test(fuel)) return "Plug-in hybrid";
     if (/hybrid|hev/.test(fuel)) return "Hybrid";
@@ -297,9 +317,9 @@
     const auction = refs.auction.value;
     const yard = refs.location.value.trim();
     const state = stateFromLocation(yard);
-    const year = Number(refs.year.value);
-    const engineCc = Number(refs.engine.value);
-    const fuel = refs.fuel.value;
+    let year = Number(refs.year.value);
+    let engineCc = Number(refs.engine.value);
+    let fuel = refs.fuel.value;
     if (!priceUsd || !auction || !yard || !state) {
       if (!triggeredAutomatically) {
         refs.status.className = "status error";
@@ -316,12 +336,31 @@
     refs.result.hidden = true;
 
     try {
-      const quote = await send({
-        type: "ANX_API",
-        path: "/shipping/quote",
-        method: "POST",
-        body: { priceUsd, auction, yard, state, titleKind: refs.titleKind.value },
-      });
+      const [quote, vinDetails] = await Promise.all([
+        send({
+          type: "ANX_API",
+          path: "/shipping/quote",
+          method: "POST",
+          body: { url: location.href, priceUsd, auction, yard, state, titleKind: refs.titleKind.value },
+        }),
+        latestData?.vin
+          ? send({ type: "ANX_API", path: `/vins/${latestData.vin}` }).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+      const fallbackEngineCc = parser.parseEngineCc(quote.engineLabel || vinDetails?.engine || "") || Number(quote.engineCc) || 0;
+      const fallbackFuel = quote.fuel || vinDetails?.fuel || "";
+      if (!year && Number(quote.year || vinDetails?.year) > 0) {
+        year = Number(quote.year || vinDetails.year);
+        setField("year", year, false);
+      }
+      if (!engineCc && fallbackEngineCc > 0) {
+        engineCc = fallbackEngineCc;
+        setField("engine", engineCc, false);
+      }
+      if (!latestData?.fuel && fallbackFuel) {
+        fuel = normalizeFuel(fallbackFuel);
+        setField("fuel", fuel, false);
+      }
       lastQuote = quote;
       refs.rateEditor.hidden = !quote.missing;
       refs.rateHint.textContent = `${quote.auction} · ${quote.yard || yard} (${quote.state}) · ${quote.band?.min ?? 0}–${quote.band?.max ?? "+"} USD qiymət aralığı üçün ABŞ–Poti tarifini yazın. Poti–Bakı ${usd(quote.tirUsd)} avtomatik əlavə olunacaq.`;
@@ -344,8 +383,8 @@
 
       if (quote.missing || freightUsd == null || freightUsd <= 0) {
         customsNote = "Yol pulu tapılmadığı üçün gömrük hesablanmadı.";
-      } else if (!year || (engineCc <= 0 && fuel !== "Electric")) {
-        customsNote = "DGK hesabı üçün il və mühərrik həcmi lazımdır.";
+      } else if (!year || !fuel || (engineCc <= 0 && fuel !== "Electric")) {
+        customsNote = "DGK hesabı üçün il, mühərrik həcmi və yanacaq növü lazımdır.";
       } else {
         try {
           const options = await send({ type: "ANX_API", path: "/customs/auto-options?lang=az" });

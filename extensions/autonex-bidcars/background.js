@@ -137,7 +137,9 @@ async function settings() {
 }
 
 async function apiRequest(path, init = {}) {
-  if (!API_ROUTES.has(path)) throw new Error("Bu API əməliyyatına icazə yoxdur.");
+  if (!API_ROUTES.has(path) && !/^\/vins\/[A-HJ-NPR-Z0-9]{17}$/.test(path)) {
+    throw new Error("Bu API əməliyyatına icazə yoxdur.");
+  }
   const current = await settings();
   const base = normalizeApiBase(current.apiBase);
   let response;

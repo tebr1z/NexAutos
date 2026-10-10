@@ -29,12 +29,14 @@
 
   function parseEngineCc(value) {
     const text = clean(value);
-    const liters = text.match(/(\d+(?:[.,]\d+)?)\s*(?:L|liter)\b/i);
+    // Auction feeds use many compact variants: 2.0L4, 2.0L I4,
+    // 2,0 L/4 Cyl, 3.6L-V6 and the regular 1.6L, 4 cyl.
+    const liters = text.match(/(\d+(?:[.,]\d+)?)\s*(?:L(?:IT(?:ER|RE)S?)?)(?=\s|\d|[\/,;()\-]|$)/i);
     if (liters) {
       const number = Number(liters[1].replace(",", "."));
       if (number > 0 && number < 20) return Math.round(number * 1000);
     }
-    const cc = text.match(/\b(\d{3,5})\s*(?:cc|cm3|cm³)\b/i);
+    const cc = text.match(/\b(\d{3,5})\s*(?:cc|cm3|cm³|cubic\s*centimeters?)\b/i);
     return cc ? Number(cc[1]) : null;
   }
 
@@ -98,6 +100,7 @@
     // visible label/value pair so that the navigation text cannot win this match.
     const engineLabel = clean(snapshot.engineLabel) || field(text, "Engine", ["Transmission", "Fuel Type", "Drive Type", "Cylinders", "Keys"]);
     const fuel = clean(snapshot.fuel) || field(text, "Fuel Type", ["Drive Type", "Transmission", "Engine", "Cylinders", "Keys"]);
+    const vin = `${title} ${text}`.toUpperCase().match(/\b([A-HJ-NPR-Z0-9]{17})\b/)?.[1] || "";
     const yearHit = `${title} ${text.slice(0, 500)}`.match(/\b(19[5-9]\d|20[0-3]\d)\b/);
     const exact = (snapshot.exactTokens || []).map((token) => clean(token).toUpperCase());
     const auctionHint = clean(snapshot.auctionHint).toUpperCase();
@@ -136,6 +139,7 @@
       engineLabel,
       fuel,
       fuelCode: fuelCode(fuel),
+      vin,
       titleKind,
     };
   }

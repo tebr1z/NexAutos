@@ -30,6 +30,12 @@ assert.equal(lot.fuel, "Gasoline");
 assert.equal(lot.fuelCode, "1");
 assert.equal(parser.fuelCode("Diesel"), "2");
 assert.equal(parser.fuelCode("Electric"), "12");
+assert.equal(parser.parseEngineCc("2.0L4"), 2000);
+assert.equal(parser.parseEngineCc("2,0 L I4"), 2000);
+assert.equal(parser.parseEngineCc("3.6L-V6"), 3600);
+assert.equal(parser.parseEngineCc("1998 cc"), 1998);
+assert.equal(parser.parseEngineCc("1998 cubic centimeters"), 1998);
+assert.equal(parser.parseEngineCc("Electric"), null);
 
 const visibleSpecsWinOverHiddenMenu = parser.parseSnapshot({
   title: "2021 KIA K5, GT LINE",
@@ -46,6 +52,15 @@ assert.equal(visibleSpecsWinOverHiddenMenu.engineCc, 1600);
 assert.equal(visibleSpecsWinOverHiddenMenu.engineLabel, "1.6L, 4 cyl.");
 assert.equal(visibleSpecsWinOverHiddenMenu.fuel, "Gasoline");
 assert.equal(visibleSpecsWinOverHiddenMenu.fuelCode, "1");
+assert.equal(visibleSpecsWinOverHiddenMenu.vin, "");
+
+const compactEngineLot = parser.parseSnapshot({
+  title: "2016 HYUNDAI SONATA, LIMITED KMHE54L29GA021523",
+  text: "Location: Freetown (MA)",
+  engineLabel: "2.0L4",
+});
+assert.equal(compactEngineLot.engineCc, 2000);
+assert.equal(compactEngineLot.vin, "KMHE54L29GA021523");
 
 const dieselSpecs = parser.parseSnapshot({
   title: "2020 TEST CAR",
