@@ -10,6 +10,7 @@ Bu, əsas qiymət kalkulyatorundan ayrı Chrome/Chromium extension-dur.
 - Collector açarı bir dəfə yazıldıqdan sonra final satışları Auto Nex PostgreSQL bazasına avtomatik göndərir.
 - Tam oxşar avtomobillər az olduqda mərhələli şəkildə yaxın komplektasiyaya və eyni model/yanacağa keçir.
 - Orta qiymətlə yanaşı median və 25–75% real satış aralığını göstərir.
+- Uzun maşın siyahısı əvəzinə marka → model → komplektasiya → mühərrik ardıcıllığı ilə filtr edir.
 - Auto Nex yol və DGK API-ləri ilə Bakı təhvil aralığını hesablayır; nəticəyə 800 AZN DYP xərci daxildir.
 
 ## Quraşdırma

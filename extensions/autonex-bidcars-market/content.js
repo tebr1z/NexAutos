@@ -113,12 +113,9 @@
   }
 
   function options(values, selected) {
-    return [`<option value="">Hamısı</option>`, ...[...new Set(values.filter(Boolean))].sort().map((value) => `<option ${value === selected ? "selected" : ""}>${esc(value)}</option>`)].join("");
-  }
-
-  function currentTarget() {
-    const key = shadow.getElementById("target")?.value;
-    return records.find((row) => row.key === key) || targets[0] || records[0];
+    return [`<option value="">Hamısı</option>`, ...[...new Set(values.filter((value) => value !== null && value !== undefined && value !== ""))]
+      .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }))
+      .map((value) => `<option value="${esc(value)}" ${String(value) === String(selected) ? "selected" : ""}>${esc(value)}</option>`)].join("");
   }
 
   function render() {
@@ -129,18 +126,36 @@
       view.innerHTML = "Bu səhifədə son 30 günə aid Final bid tapılmadı.<br>Arxiv səhifələrini açdıqca məlumat avtomatik yığılacaq.";
       return;
     }
-    const previous = { target: shadow.getElementById("target")?.value, auction: shadow.getElementById("auction")?.value || "", fuel: shadow.getElementById("fuel")?.value || "", color: shadow.getElementById("color")?.value || "" };
-    const target = records.find((row) => row.key === previous.target) || targets[0] || records[0];
-    const cohort = parser.chooseCohort(records, target, previous);
-    const stat = parser.statistics(cohort.rows);
+    const pageTarget = targets.find((row) => row.make && row.model) || records.find((row) => row.make && row.model) || records[0];
+    const read = (id, fallback = "") => shadow.getElementById(id)?.value ?? fallback;
+    const previous = {
+      make: read("make", pageTarget.make || ""), model: read("model", pageTarget.model || ""),
+      trim: read("trim", pageTarget.trim === "Naməlum" ? "" : pageTarget.trim || ""), engineCc: read("engineCc", pageTarget.engineCc || ""),
+      year: read("year", ""), auction: read("auction", ""), fuel: read("fuel", pageTarget.fuel === "Naməlum" ? "" : pageTarget.fuel || ""), color: read("color", "")
+    };
+    const valid = records.filter((row) => row.make && row.model);
+    const byMake = valid.filter((row) => !previous.make || row.make === previous.make);
+    if (previous.model && !byMake.some((row) => row.model === previous.model)) previous.model = "";
+    const byModel = byMake.filter((row) => !previous.model || row.model === previous.model);
+    if (previous.trim && !byModel.some((row) => row.trim === previous.trim)) previous.trim = "";
+    const byTrim = byModel.filter((row) => !previous.trim || row.trim === previous.trim);
+    if (previous.engineCc && !byTrim.some((row) => String(row.engineCc || "") === String(previous.engineCc))) previous.engineCc = "";
+    const filtered = byTrim.filter((row) =>
+      (!previous.engineCc || String(row.engineCc || "") === String(previous.engineCc)) &&
+      (!previous.year || String(row.year || "") === String(previous.year)) &&
+      (!previous.auction || row.auction === previous.auction) && (!previous.fuel || row.fuel === previous.fuel) &&
+      (!previous.color || row.color === previous.color));
+    const target = filtered[0] || pageTarget;
+    const stat = parser.statistics(filtered);
     view.className = "";
-    view.innerHTML = `<div class="hero"><small>${esc(cohort.label)} · ${stat?.count || 0} satış${stat && stat.count < 3 ? " · zəif nümunə" : ""}</small><strong>${stat ? `${money(stat.q1)} – ${money(stat.q3)}` : "Məlumat azdır"}</strong><div>${esc(target.year)} ${esc(target.make)} ${esc(target.model)} · ${esc(target.trim)} · ${esc(target.fuel)}</div><div class="grid"><div class="metric"><span>Median final</span><b>${stat ? money(stat.median) : "—"}</b></div><div class="metric"><span>Orta final</span><b>${stat ? money(stat.average) : "—"}</b></div></div></div>
-      <div class="filters"><label class="wide">Analiz edilən maşın<select id="target">${records.map((row) => `<option value="${esc(row.key)}" ${row.key === target.key ? "selected" : ""}>${esc(`${row.year} ${row.make} ${row.model} ${row.trim} · ${money(row.finalBidUsd)}`)}</option>`).join("")}</select></label><label>Hərrac<select id="auction">${options(records.map((r) => r.auction), previous.auction)}</select></label><label>Yanacaq<select id="fuel">${options(records.map((r) => r.fuel), previous.fuel)}</select></label><label class="wide">Rəng<select id="color">${options(records.map((r) => r.color), previous.color)}</select></label></div>
+    view.innerHTML = `<div class="hero"><small>Seçilmiş kombinasiya · ${stat?.count || 0} satış${stat && stat.count < 3 ? " · zəif nümunə" : ""}</small><strong>${stat ? `${money(stat.q1)} – ${money(stat.q3)}` : "Uyğun satış tapılmadı"}</strong><div>${esc(previous.make || "Marka")} ${esc(previous.model || "Model")} · ${esc(previous.trim || "Komplektasiya")} · ${previous.engineCc ? `${esc(previous.engineCc)} cm³` : "mühərrik"}</div><div class="grid"><div class="metric"><span>Median final</span><b>${stat ? money(stat.median) : "—"}</b></div><div class="metric"><span>Orta final</span><b>${stat ? money(stat.average) : "—"}</b></div></div></div>
+      <div class="filters"><label>Marka<select id="make">${options(valid.map((r) => r.make), previous.make)}</select></label><label>Model<select id="model">${options(byMake.map((r) => r.model), previous.model)}</select></label><label>Komplektasiya<select id="trim">${options(byModel.map((r) => r.trim).filter((v) => v !== "Naməlum"), previous.trim)}</select></label><label>Mühərrik<select id="engineCc">${options(byTrim.map((r) => r.engineCc), previous.engineCc)}</select></label><label>İl<select id="year">${options(byTrim.map((r) => r.year), previous.year)}</select></label><label>Yanacaq<select id="fuel">${options(byTrim.map((r) => r.fuel), previous.fuel)}</select></label><label>Hərrac<select id="auction">${options(byTrim.map((r) => r.auction), previous.auction)}</select></label><label>Rəng<select id="color">${options(byTrim.map((r) => r.color).filter((v) => v !== "Naməlum"), previous.color)}</select></label></div>
       <div class="actions"><button class="primary" id="baku">Bakı təhvil hesabla</button><button class="secondary" id="rescan">↻ Oxu</button><button class="danger" id="reset">30 günü sıfırla</button></div><div id="bakuResult"></div>
-      <div class="list"><div class="row"><span>Komplektasiya</span><b>${esc(target.trim)}</b></div><div class="row"><span>İl / yürüş</span><b>${esc(target.year || "—")} · ${target.mileageKm ? `${Math.round(target.mileageKm / 1000)} min km` : "—"}</b></div><div class="row"><span>Mühərrik / yanacaq</span><b>${target.engineCc ? `${target.engineCc} cm³` : "—"} · ${esc(target.fuel)}</b></div><div class="row"><span>Rəng / hərrac</span><b>${esc(target.color)} · ${esc(target.auction)}</b></div><div class="row"><span>Lokal bazada</span><b>${records.length} final satış</b></div></div><p id="dbStatus" class="note ${dbStatusError ? "error" : ""}">${esc(dbStatus)}</p><details><summary class="note" style="cursor:pointer">DB bağlantısı</summary><div class="actions"><input id="collectorKey" type="password" placeholder="MARKET_COLLECTOR_KEY"><button id="saveKey" class="secondary">Açarı saxla</button></div></details><p class="note">Aralıq 25–75 faiz diapazonudur; qeyri-adi ucuz/bahalı nəticələr ortalamanı pozmasın deyə median əsas götürülür.</p>`;
-    ["target", "auction", "fuel", "color"].forEach((id) => shadow.getElementById(id).onchange = render);
+      <div class="list"><div class="row"><span>Uyğun nəticə</span><b>${filtered.length} / ${records.length}</b></div><div class="row"><span>Komplektasiya</span><b>${esc(previous.trim || "Hamısı")}</b></div><div class="row"><span>Mühərrik / yanacaq</span><b>${previous.engineCc ? `${esc(previous.engineCc)} cm³` : "Hamısı"} · ${esc(previous.fuel || "Hamısı")}</b></div></div><p id="dbStatus" class="note ${dbStatusError ? "error" : ""}">${esc(dbStatus)}</p><details><summary class="note" style="cursor:pointer">DB bağlantısı</summary><div class="actions"><input id="collectorKey" type="password" placeholder="MARKET_COLLECTOR_KEY"><button id="saveKey" class="secondary">Açarı saxla</button></div></details><p class="note">Aralıq 25–75 faiz diapazonudur; yalnız seçilmiş marka, model, komplektasiya və mühərrik üzrə hesablanır.</p>`;
+    ["make", "model", "trim", "engineCc", "year", "auction", "fuel", "color"].forEach((id) => shadow.getElementById(id).onchange = render);
     shadow.getElementById("rescan").onclick = () => scheduleScan(0);
-    shadow.getElementById("baku").onclick = () => void calculateBaku(currentTarget(), stat);
+    shadow.getElementById("baku").disabled = !stat;
+    shadow.getElementById("baku").onclick = () => void calculateBaku(target, stat);
     shadow.getElementById("saveKey").onclick = async () => {
       const key = shadow.getElementById("collectorKey").value.trim();
       if (!key) return;
