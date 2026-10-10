@@ -19,6 +19,11 @@ Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən 
 - Çatışmayan tarif formundan admin email/şifrə sahələri çıxarılıb.
 - Əl ilə yazılan tarif dərhal Chrome lokal yaddaşına düşür və hesablamada istifadə olunur; əvvəlki admin sessiyası varsa DB-yə də səssiz sinxron edilir.
 
+## 1.9.3
+
+- Hərrac növü bütün səhifədəki təsadüfi Copart/IAAI sözlərindən deyil, lot başlığının yanındakı badge-dən seçilir.
+- Eyni state və yard üçün DB-də Copart və IAAI tarifləri ayrı saxlanır və düzgün hərraca uyğun tarif götürülür.
+
 Oxunan sahələr:
 
 - `Current Bid`, `Bid Now` və `Lot Price` məbləğləri ayrıca

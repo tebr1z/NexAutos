@@ -53,6 +53,24 @@ const copartFromBody = parser.parseSnapshot({
   bidCandidates: [{ value: "$3,100", score: 20, kind: "bidNow" }],
 });
 assert.equal(copartFromBody.auction, "COPART");
+
+const copartBadgeWins = parser.parseSnapshot({
+  title: "2016 HYUNDAI SONATA, LIMITED",
+  text: "Copart and IAAI vehicles Location: Freetown (MA)",
+  auctionHint: "Copart",
+  exactTokens: ["IAAI", "Copart"],
+  bidCandidates: [{ value: "$8,400", score: 20, kind: "bidNow" }],
+});
+assert.equal(copartBadgeWins.auction, "COPART");
+
+const iaaiBadgeWins = parser.parseSnapshot({
+  title: "2021 KIA K5",
+  text: "Copart and IAAI vehicles Location: Orlando South (FL)",
+  auctionHint: "IAAI",
+  exactTokens: ["Copart", "IAAI"],
+  bidCandidates: [{ value: "$12,500", score: 20, kind: "bidNow" }],
+});
+assert.equal(iaaiBadgeWins.auction, "IAAI");
 assert.deepEqual(
   parser.selectAuctionFee({ priceUsd: 2700, bidCarsFeeUsd: 720, bidNowUsd: 2700, lotPriceUsd: 2700, fallbackFeeUsd: 860 }),
   { amount: 720, source: "BidCars" },

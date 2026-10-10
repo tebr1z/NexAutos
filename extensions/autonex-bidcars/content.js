@@ -149,6 +149,22 @@
     return candidates;
   }
 
+  function auctionHintNearTitle() {
+    const heading = document.querySelector("h1");
+    if (!heading) return "";
+    const headingRect = heading.getBoundingClientRect();
+    const candidates = [...document.querySelectorAll("span,a,button,strong")]
+      .filter((element) => !host.contains(element) && /^(Copart|IAA|IAAI)$/i.test(parser.clean(element.textContent)))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        const sameParent = element.parentElement === heading.parentElement ? 10000 : 0;
+        const distance = Math.abs(rect.top - headingRect.top) + Math.abs(rect.left - headingRect.right);
+        return { value: parser.clean(element.textContent), score: sameParent - distance };
+      })
+      .sort((left, right) => right.score - left.score);
+    return candidates[0]?.value || "";
+  }
+
   function snapshot() {
     const textParts = [];
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -165,6 +181,7 @@
       text: pageText,
       title: `${document.title} ${document.querySelector("h1")?.innerText || ""}`,
       url: location.href,
+      auctionHint: auctionHintNearTitle(),
       exactTokens,
       bidCandidates: collectBidCandidates(),
     });

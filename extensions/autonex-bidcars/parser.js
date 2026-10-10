@@ -97,13 +97,26 @@
     const fuel = field(text, "Fuel Type", ["Drive Type", "Transmission", "Engine", "Cylinders", "Keys"]);
     const yearHit = `${title} ${text.slice(0, 500)}`.match(/\b(19[5-9]\d|20[0-3]\d)\b/);
     const exact = (snapshot.exactTokens || []).map((token) => clean(token).toUpperCase());
+    const auctionHint = clean(snapshot.auctionHint).toUpperCase();
     const auctionText = `${title} ${text.slice(0, 1500)}`;
     const auction =
-      exact.includes("IAAI") || /\bIAA(?:I)?\b/i.test(auctionText)
+      auctionHint === "COPART"
+        ? "COPART"
+        : auctionHint === "IAA" || auctionHint === "IAAI"
         ? "IAAI"
-        : exact.includes("COPART") || /\bCOPART\b/i.test(auctionText)
+        : /\bCOPART\b/i.test(title)
           ? "COPART"
-          : "";
+          : /\bIAA(?:I)?\b/i.test(title)
+            ? "IAAI"
+            : exact.includes("COPART") && !exact.some((token) => token === "IAA" || token === "IAAI")
+              ? "COPART"
+              : exact.some((token) => token === "IAA" || token === "IAAI") && !exact.includes("COPART")
+                ? "IAAI"
+                : /\bCOPART\b/i.test(auctionText) && !/\bIAA(?:I)?\b/i.test(auctionText)
+                  ? "COPART"
+                  : /\bIAA(?:I)?\b/i.test(auctionText) && !/\bCOPART\b/i.test(auctionText)
+                    ? "IAAI"
+                    : "";
     const titleKind = /\bclean title\b/i.test(text) ? "CLEAN" : "SALVAGE";
 
     return {
