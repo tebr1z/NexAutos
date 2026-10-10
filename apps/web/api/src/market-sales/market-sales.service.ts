@@ -50,6 +50,10 @@ export class MarketSalesService {
     const since = new Date(Date.now() - days * 86400000);
     const where: Prisma.MarketSaleWhereInput = {
       observedAt: { gte: since },
+      AND: [
+        { OR: [{ mileageKm: null }, { mileageKm: { lte: 300000 } }] },
+        { OR: [{ mileageKm: { not: null } }, { mileageMi: null }, { mileageMi: { lte: 186411 } }] },
+      ],
       ...(query.make ? { make: { equals: query.make, mode: 'insensitive' } } : {}),
       ...(query.model ? { model: { equals: query.model, mode: 'insensitive' } } : {}),
       ...(query.trim ? { trim: { equals: query.trim, mode: 'insensitive' } } : {}),
@@ -61,7 +65,7 @@ export class MarketSalesService {
     const [rows, total, facets] = await Promise.all([
       this.prisma.marketSale.findMany({ where, orderBy: [{ saleDate: 'desc' }, { observedAt: 'desc' }], take: query.limit ?? 200 }),
       this.prisma.marketSale.count({ where }),
-      this.prisma.marketSale.findMany({ where: { observedAt: { gte: since } }, select: { make: true, model: true, trim: true, fuel: true, auction: true, year: true, engineCc: true } }),
+      this.prisma.marketSale.findMany({ where: { observedAt: { gte: since }, AND: where.AND }, select: { make: true, model: true, trim: true, fuel: true, auction: true, year: true, engineCc: true } }),
     ]);
     return { rows, total, days, facets };
   }

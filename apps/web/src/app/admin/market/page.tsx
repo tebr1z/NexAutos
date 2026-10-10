@@ -140,6 +140,7 @@ export default function MarketSalesAdminPage() {
       <div className="mt-5 rounded-2xl border border-sky-500/25 bg-sky-500/[.07] p-5">
         <div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-sky-300">Bakı təhvil ortalaması</p>{deliveryStats.count ? <><p className="mt-2 text-3xl font-semibold text-white">{deliveryStats.average.toLocaleString("az-AZ")} AZN</p><p className="mt-1 text-sm text-zinc-400">Real aralıq: {deliveryStats.low.toLocaleString("az-AZ")}–{deliveryStats.high.toLocaleString("az-AZ")} AZN · median {deliveryStats.median.toLocaleString("az-AZ")} AZN · {deliveryStats.count} satış</p></> : <p className="mt-2 text-sm text-zinc-400">Marka və modeli seçib “Filtrlə” basın; uyğun nəticələrin Bakı təhvil qiyməti avtomatik hesablanacaq.</p>}</div><button disabled={deliveryBusy || !data?.rows.length} onClick={() => void calculateDelivery(data?.rows || [])} className="rounded-xl bg-sky-400 px-5 py-3 text-sm font-semibold text-slate-950 disabled:opacity-50">{deliveryBusy ? "Bakı təhvil hesablanır…" : "Yenidən hesabla"}</button></div>
         {deliveryNote ? <p className="mt-3 text-xs text-zinc-500">{deliveryNote}</p> : null}
+        <p className="mt-2 text-xs text-zinc-500">Yürüşü 300 000 km-dən çox olan avtomobillər nəticəyə və ortalamaya daxil edilmir.</p>
       </div>
 
       <div className="mt-5 overflow-x-auto rounded-2xl border border-white/10">

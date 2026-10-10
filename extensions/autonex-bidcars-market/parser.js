@@ -142,8 +142,15 @@
     return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
   }
 
+  function acceptableMileage(row) {
+    const km = Number(row?.mileageKm);
+    if (Number.isFinite(km) && km > 0) return km <= 300000;
+    const miles = Number(row?.mileageMi);
+    return !Number.isFinite(miles) || miles <= 0 || miles * 1.609344 <= 300000;
+  }
+
   function statistics(records) {
-    const values = records.map((row) => Number(row.finalBidUsd)).filter((value) => value > 0).sort((a, b) => a - b);
+    const values = records.filter(acceptableMileage).map((row) => Number(row.finalBidUsd)).filter((value) => value > 0).sort((a, b) => a - b);
     if (!values.length) return null;
     const q1 = percentile(values, 0.25);
     const q3 = percentile(values, 0.75);
@@ -157,7 +164,7 @@
 
   function chooseCohort(records, target, filters = {}) {
     const same = (a, b) => clean(a).toLowerCase() === clean(b).toLowerCase();
-    const base = records.filter((row) => (!filters.auction || row.auction === filters.auction) && (!filters.fuel || row.fuel === filters.fuel) && (!filters.color || same(row.color, filters.color)));
+    const base = records.filter((row) => acceptableMileage(row) && (!filters.auction || row.auction === filters.auction) && (!filters.fuel || row.fuel === filters.fuel) && (!filters.color || same(row.color, filters.color)));
     const tiers = [
       { label: "Tam oxşar", rows: base.filter((r) => same(r.make, target.make) && same(r.model, target.model) && same(r.trim, target.trim) && same(r.fuel, target.fuel) && Math.abs((r.year || 0) - (target.year || 0)) <= 1 && (!r.engineCc || !target.engineCc || Math.abs(r.engineCc - target.engineCc) <= 200) && (!r.mileageMi || !target.mileageMi || Math.abs(r.mileageMi - target.mileageMi) <= 30000)) },
       { label: "Yaxın komplektasiya", rows: base.filter((r) => same(r.make, target.make) && same(r.model, target.model) && same(r.trim, target.trim) && same(r.fuel, target.fuel) && Math.abs((r.year || 0) - (target.year || 0)) <= 2) },
@@ -166,7 +173,7 @@
     return tiers.find((tier) => tier.rows.length >= 3) || tiers.find((tier) => tier.rows.length) || { label: "Nəticə yoxdur", rows: [] };
   }
 
-  const api = { clean, parseMoney, parseMileage, parseEngineCc, normalizeFuel, normalizeTrim, parseVehicleTitle, parseAuctionDate, parseRecordSnapshot, percentile, statistics, chooseCohort };
+  const api = { clean, parseMoney, parseMileage, parseEngineCc, normalizeFuel, normalizeTrim, parseVehicleTitle, parseAuctionDate, parseRecordSnapshot, percentile, acceptableMileage, statistics, chooseCohort };
   global.AutoNexMarketParser = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

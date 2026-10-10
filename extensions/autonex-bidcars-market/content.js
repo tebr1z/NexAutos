@@ -130,14 +130,19 @@
       view.innerHTML = "Bu səhifədə son 30 günə aid Final bid tapılmadı.<br>Arxiv səhifələrini açdıqca məlumat avtomatik yığılacaq.";
       return;
     }
-    const pageTarget = targets.find((row) => row.make && row.model) || records.find((row) => row.make && row.model) || records[0];
+    const valid = records.filter((row) => row.make && row.model && parser.acceptableMileage(row));
+    if (!valid.length) {
+      view.className = "empty";
+      view.innerHTML = "Analizə uyğun satış tapılmadı.<br>Yürüşü 300 000 km-dən çox olan avtomobillər hesablanmır.";
+      return;
+    }
+    const pageTarget = targets.find((row) => row.make && row.model && parser.acceptableMileage(row)) || valid[0];
     const read = (id, fallback = "") => shadow.getElementById(id)?.value ?? fallback;
     const previous = {
       make: read("make", pageTarget.make || ""), model: read("model", pageTarget.model || ""),
       trim: read("trim", pageTarget.trim === "Naməlum" ? "" : pageTarget.trim || ""), engineCc: read("engineCc", pageTarget.engineCc || ""),
       year: read("year", ""), auction: read("auction", ""), fuel: read("fuel", pageTarget.fuel === "Naməlum" ? "" : pageTarget.fuel || ""), color: read("color", "")
     };
-    const valid = records.filter((row) => row.make && row.model);
     const byMake = valid.filter((row) => !previous.make || row.make === previous.make);
     if (previous.model && !byMake.some((row) => row.model === previous.model)) previous.model = "";
     const byModel = byMake.filter((row) => !previous.model || row.model === previous.model);
@@ -155,7 +160,7 @@
     view.innerHTML = `<div class="hero"><small>Seçilmiş kombinasiya · ${stat?.count || 0} satış${stat && stat.count < 3 ? " · zəif nümunə" : ""}</small><strong>${stat ? `${money(stat.q1)} – ${money(stat.q3)}` : "Uyğun satış tapılmadı"}</strong><div>${esc(previous.make || "Marka")} ${esc(previous.model || "Model")} · ${esc(previous.trim || "Komplektasiya")} · ${previous.engineCc ? `${esc(previous.engineCc)} cm³` : "mühərrik"}</div><div class="grid"><div class="metric"><span>Median final</span><b>${stat ? money(stat.median) : "—"}</b></div><div class="metric"><span>Orta final</span><b>${stat ? money(stat.average) : "—"}</b></div></div></div>
       <div class="filters"><label>Marka<select id="make">${options(valid.map((r) => r.make), previous.make)}</select></label><label>Model<select id="model">${options(byMake.map((r) => r.model), previous.model)}</select></label><label>Komplektasiya<select id="trim">${options(byModel.map((r) => r.trim).filter((v) => v !== "Naməlum"), previous.trim)}</select></label><label>Mühərrik<select id="engineCc">${options(byTrim.map((r) => r.engineCc), previous.engineCc)}</select></label><label>İl<select id="year">${options(byTrim.map((r) => r.year), previous.year)}</select></label><label>Yanacaq<select id="fuel">${options(byTrim.map((r) => r.fuel), previous.fuel)}</select></label><label>Hərrac<select id="auction">${options(byTrim.map((r) => r.auction), previous.auction)}</select></label><label>Rəng<select id="color">${options(byTrim.map((r) => r.color).filter((v) => v !== "Naməlum"), previous.color)}</select></label></div>
       <div class="actions"><button class="primary" id="baku">Bakı təhvil hesabla</button><button class="secondary" id="rescan">↻ Oxu</button><button class="danger" id="reset">30 günü sıfırla</button></div><div id="bakuResult"></div>
-      <div class="list"><div class="row"><span>Uyğun nəticə</span><b>${filtered.length} / ${records.length}</b></div><div class="row"><span>Komplektasiya</span><b>${esc(previous.trim || "Hamısı")}</b></div><div class="row"><span>Mühərrik / yanacaq</span><b>${previous.engineCc ? `${esc(previous.engineCc)} cm³` : "Hamısı"} · ${esc(previous.fuel || "Hamısı")}</b></div></div><p id="dbStatus" class="note ${dbStatusError ? "error" : ""}">${esc(dbStatus)}</p><details><summary class="note" style="cursor:pointer">DB bağlantısı</summary><div class="actions"><input id="collectorKey" type="password" placeholder="MARKET_COLLECTOR_KEY"><button id="saveKey" class="secondary">Açarı saxla</button></div></details><p class="note">Aralıq 25–75 faiz diapazonudur; yalnız seçilmiş marka, model, komplektasiya və mühərrik üzrə hesablanır.</p>`;
+      <div class="list"><div class="row"><span>Uyğun nəticə</span><b>${filtered.length} / ${valid.length}</b></div><div class="row"><span>Komplektasiya</span><b>${esc(previous.trim || "Hamısı")}</b></div><div class="row"><span>Mühərrik / yanacaq</span><b>${previous.engineCc ? `${esc(previous.engineCc)} cm³` : "Hamısı"} · ${esc(previous.fuel || "Hamısı")}</b></div></div><p id="dbStatus" class="note ${dbStatusError ? "error" : ""}">${esc(dbStatus)}</p><details><summary class="note" style="cursor:pointer">DB bağlantısı</summary><div class="actions"><input id="collectorKey" type="password" placeholder="MARKET_COLLECTOR_KEY"><button id="saveKey" class="secondary">Açarı saxla</button></div></details><p class="note">Aralıq 25–75 faiz diapazonudur. Yürüşü 300 000 km-dən çox olan avtomobillər analizə daxil edilmir.</p>`;
     ["make", "model", "trim", "engineCc", "year", "auction", "fuel", "color"].forEach((id) => shadow.getElementById(id).onchange = render);
     shadow.getElementById("rescan").onclick = () => scheduleScan(0);
     shadow.getElementById("baku").disabled = !stat;

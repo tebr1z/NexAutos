@@ -25,4 +25,10 @@ const stat = p.statistics(rows);
 assert.equal(stat.median, 5000);
 assert.equal(stat.average, 4500);
 assert.equal(p.chooseCohort(rows, card).rows.length, 5);
+
+const highMileage = { ...card, key: "high-mileage", mileageMi: 620758, mileageKm: 999000, finalBidUsd: 500 };
+assert.equal(p.acceptableMileage(highMileage), false);
+assert.equal(p.acceptableMileage({ ...card, mileageMi: 186411, mileageKm: 300000 }), true);
+assert.equal(p.statistics([...rows, highMileage]).count, 5);
+assert.equal(p.chooseCohort([...rows, highMileage], card).rows.length, 5);
 console.log("Auto Nex Market parser tests passed");
