@@ -57,6 +57,10 @@ Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən 
 - Auction, yol və gömrük kartları ilkin görünüşdən `Ətraflı` hissəyə keçirilib; onların yerində seçilmiş hesablama qiyməti göstərilir.
 - Panel 360px enə endirilib, daxili boşluqlar və böyük AZN yekun bloku kiçildilib.
 
+## 1.10.0
+
+- Yığcam görünüşdəki `Hesablama qiyməti` birbaşa dəyişdirilə bilir; yeni rəqəm yazılıb Enter basıldıqda və ya sahədən çıxıldıqda bütün xərclər yenidən hesablanır.
+
 Oxunan sahələr:
 
 - `Current Bid`, `Bid Now` və `Lot Price` məbləğləri ayrıca
