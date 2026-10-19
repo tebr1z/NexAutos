@@ -148,3 +148,10 @@ Paneldən nəticələri JSON kimi yükləmək və yadda saxlanmış admin sessiy
 - Əsas tarif siyahısı və redaktəsi yalnız ADMIN / SUPER_ADMIN üçündür.
 
 Deploy zamanı API/Web və extension birlikdə yenilənməlidir. Repo kökündə `node apps/web/api/scripts/migrate-deploy.cjs` işlədin, sonra adi build və PM2 restart edin. Skript `.env` faylını özü oxuyur; `source .env` lazım deyil. Bu buraxılışın migrasiyası mövcud hesablarda şəxsi qiymət icazəsini açır; admin onu yenidən hesab üzrə bağlaya bilər. İstifadə tarixləri avtomatik təyin olunmur. Production DB migrasiyasından əvvəl backup alın.
+
+## v1.13.0 — hesaba məxsus ad
+
+- Müştəri `/freight` səhifəsində **Extension-da görünəcək ad** sahəsinə öz şirkət və ya xidmət adını yaza bilər. Boş saxlanarsa `Auto Nex` görünür.
+- Ad PostgreSQL-də həmin kalkulyator hesabına bağlı saxlanır. Eyni extension paketi ilə daxil olan hər müştəri yalnız öz adını görür; ayrıca ZIP hazırlamaq lazım deyil.
+- Mobil test tətbiqi `apps/mobile` qovluğundadır. O, extension kodundan, Chrome yaddaşından və extension sessiyasından asılı deyil; yalnız eyni API-yə ayrıca hesabla daxil olur.
+- Bu versiya üçün `20261020010000_calculator_brand_name` migrasiyasını production bazaya tətbiq etmək lazımdır.

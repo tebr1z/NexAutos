@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import { IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class PricingDto {
+  @IsOptional() @IsString() @MaxLength(40) brandName?: string | null;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(-10000) @Max(10000) discountAUsd?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(-10000) @Max(10000) discountBUsd?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(-10000) @Max(10000) discountCUsd?: number;

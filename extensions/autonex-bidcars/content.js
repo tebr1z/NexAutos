@@ -87,7 +87,7 @@
     </style>
     <section class="card">
       <header class="head">
-        <div class="brand"><span class="mark"><svg aria-hidden="true" viewBox="0 0 128 128"><defs><linearGradient id="route" x1="20" y1="110" x2="105" y2="20" gradientUnits="userSpaceOnUse"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#67e8f9"/></linearGradient></defs><rect x="3" y="3" width="122" height="122" rx="32" fill="#091525"/><rect x="4" y="4" width="120" height="120" rx="31" fill="none" stroke="#284568" stroke-width="2"/><path d="M28 91V37h17l38 54h17V37H83v32L61 37H45v54z" fill="url(#route)"/><path d="M28 103h27" stroke="#67e8f9" stroke-width="5" stroke-linecap="round"/></svg></span><div>Auto Nex<div class="sub">BidCars ümumi qiymət hesabı</div></div></div>
+        <div class="brand"><span class="mark"><svg aria-hidden="true" viewBox="0 0 128 128"><defs><linearGradient id="route" x1="20" y1="110" x2="105" y2="20" gradientUnits="userSpaceOnUse"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#67e8f9"/></linearGradient></defs><rect x="3" y="3" width="122" height="122" rx="32" fill="#091525"/><rect x="4" y="4" width="120" height="120" rx="31" fill="none" stroke="#284568" stroke-width="2"/><path d="M28 91V37h17l38 54h17V37H83v32L61 37H45v54z" fill="url(#route)"/><path d="M28 103h27" stroke="#67e8f9" stroke-width="5" stroke-linecap="round"/></svg></span><div><span id="brandTitle">Auto Nex</span><div class="sub">BidCars ümumi qiymət hesabı</div></div></div>
         <div><button class="ghost" id="refresh" type="button" title="Səhifədən yenidən oxu">↻ Oxu</button> <button class="ghost" id="close" type="button" title="Bağla">✕</button></div>
       </header>
       <div class="body">
@@ -153,7 +153,7 @@
     </section>`;
 
   const refs = Object.fromEntries(
-    ["authBox", "authGuest", "authUser", "authEmail", "loginEmail", "loginPassword", "loginButton", "logoutButton", "authStatus", "calculatorContent", "priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "toggleAdvanced", "advancedControls", "rateEditor", "rateHint", "rateUsd", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
+    ["brandTitle", "authBox", "authGuest", "authUser", "authEmail", "loginEmail", "loginPassword", "loginButton", "logoutButton", "authStatus", "calculatorContent", "priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "toggleAdvanced", "advancedControls", "rateEditor", "rateHint", "rateUsd", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
   );
   const manual = new Set();
   for (const id of ["usageInfo", "planInfo", "personalPricing", "discountA", "discountB", "discountC", "profitMargin", "accessStatus", "savePersonal", "bugMessage", "sendBug", "bugStatus"]) refs[id] = shadow.getElementById(id);
@@ -170,12 +170,17 @@
   let authenticated = false;
   let profile = null;
 
+  function calculatorBrand() {
+    return String(profile?.brandName || "Auto Nex").replace(/\s+/g, " ").trim().slice(0, 40) || "Auto Nex";
+  }
+
   function showUsage(usage) {
     if (!usage) return;
     refs.usageInfo.textContent = `${usage.month} · ${usage.used} hesab · ${usage.monthlyLimit == null ? "Limitsiz" : `${usage.remaining} / ${usage.monthlyLimit} qalıb`}`;
   }
   async function loadProfile() {
     profile = await send({ type: "ANX_API", path: "/calculator/me" });
+    refs.brandTitle.textContent = calculatorBrand();
     showUsage(profile);
     refs.accessStatus.hidden = false;
     refs.accessStatus.className = profile.expired ? "status error" : "auth-copy";
@@ -228,10 +233,10 @@
     refs.authBox.classList.toggle("signed-in", authenticated);
     refs.authStatus.hidden = authenticated;
     refs.authEmail.textContent = email;
-    if (!authenticated) { profile = null; refs.accessStatus.hidden = true; }
+    if (!authenticated) { profile = null; refs.brandTitle.textContent = "Auto Nex"; refs.accessStatus.hidden = true; }
     refs.calculate.disabled = !authenticated;
     if (!authenticated) refs.calculate.textContent = "Hesablamaq üçün giriş edin";
-    else if (!calculating) refs.calculate.textContent = "Auto Nex ilə hesabla";
+    else if (!calculating) refs.calculate.textContent = `${calculatorBrand()} ilə hesabla`;
   }
 
   async function loadAuth() {
@@ -690,7 +695,7 @@
     } finally {
       calculating = false;
       refs.calculate.disabled = Boolean(profile?.expired);
-      refs.calculate.textContent = "Auto Nex ilə hesabla";
+      refs.calculate.textContent = `${calculatorBrand()} ilə hesabla`;
       if (recalculateAfterCurrent) {
         recalculateAfterCurrent = false;
         window.setTimeout(() => void calculate(false), 0);

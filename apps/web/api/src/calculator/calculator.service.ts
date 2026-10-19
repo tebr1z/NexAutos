@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FULL_ACCESS_ROLES, INTERNAL_ROLES } from '../common/access-roles';
 import { BugReportDto, CalculatorPlanDto, PricingDto } from './dto';
 
-const defaults = { monthlyLimit: null as number | null, allowSelfPricing: true, accessUntil: null as string | null, profitMarginUsd: 0, surchargeAUsd: 0, surchargeBUsd: 0, surchargeCUsd: 0, discountAUsd: 0, discountBUsd: 0, discountCUsd: 0, potiBakuUsd: null as number | null };
+const defaults = { monthlyLimit: null as number | null, allowSelfPricing: true, brandName: null as string | null, accessUntil: null as string | null, profitMarginUsd: 0, surchargeAUsd: 0, surchargeBUsd: 0, surchargeCUsd: 0, discountAUsd: 0, discountBUsd: 0, discountCUsd: 0, potiBakuUsd: null as number | null };
 const EXPIRED_MESSAGE = 'Kalkulyatordan istifadə müddətiniz bitib. VexiraLabs ilə əlaqə qurun.';
 export function accessExpired(accessUntil: string | null | undefined, date = new Date()) {
   return !!accessUntil && new Date(date.getTime() + 4 * 3600000).toISOString().slice(0, 10) > accessUntil;
@@ -52,11 +52,13 @@ export class CalculatorService {
       await tx.$queryRaw`SELECT true AS locked FROM pg_advisory_xact_lock(hashtext(${userId}))`;
       const current = await tx.calculatorPlan.findUnique({ where: { userId } });
       if (!actor && accessExpired(current?.accessUntil)) throw new ForbiddenException(EXPIRED_MESSAGE);
-      if (!actor && !(current?.allowSelfPricing ?? defaults.allowSelfPricing)) throw new ForbiddenException('Fərdi qiymət dəyişmək üçün admin icazəsi lazımdır.');
       const data: CalculatorPlanDto = { ...dto };
-      if (!actor && Object.keys(data).some((key) => !['discountAUsd', 'discountBUsd', 'discountCUsd', 'profitMarginUsd'].includes(key))) {
+      if (!actor && Object.keys(data).some((key) => !['brandName', 'discountAUsd', 'discountBUsd', 'discountCUsd', 'profitMarginUsd'].includes(key))) {
         throw new ForbiddenException('Bu ayarı yalnız administrator dəyişə bilər.');
       }
+      const changesPersonalPricing = Object.keys(data).some((key) => ['discountAUsd', 'discountBUsd', 'discountCUsd', 'profitMarginUsd'].includes(key));
+      if (!actor && changesPersonalPricing && !(current?.allowSelfPricing ?? defaults.allowSelfPricing)) throw new ForbiddenException('Fərdi qiymət dəyişmək üçün admin icazəsi lazımdır.');
+      if ('brandName' in data) data.brandName = data.brandName?.replace(/\s+/g, ' ').trim() || null;
       for (const key of ['discountAUsd', 'discountBUsd', 'discountCUsd', 'profitMarginUsd', 'surchargeAUsd', 'surchargeBUsd', 'surchargeCUsd', 'allowSelfPricing'] as const) {
         if (key in data && data[key] === null) throw new BadRequestException('Endirim və icazə boş ola bilməz.');
       }

@@ -260,6 +260,7 @@ export type MarketSalesResponse = {
 };
 
 export type CalculatorProfile = {
+  brandName: string | null;
   accessUntil: string | null; expired: boolean; accessMessage: string | null;
   profitMarginUsd: number; surchargeAUsd: number; surchargeBUsd: number; surchargeCUsd: number;
   monthlyLimit: number | null; used: number; remaining: number | null; month: string;

@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Auto Nex Mobile",
+    "slug": "autonex-mobile",
+    "version": "0.1.0",
+    "scheme": "autonex",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "autos.nex.mobile"
+    },
+    "android": {
+      "package": "autos.nex.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#091525",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": { "typedRoutes": true },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

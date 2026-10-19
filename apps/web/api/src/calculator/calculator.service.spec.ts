@@ -5,7 +5,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CalculatorPlanDto, PricingDto } from './dto';
 
-const plan = { monthlyLimit: 1 as number | null, allowSelfPricing: false, accessUntil: null as string | null, profitMarginUsd: 0, surchargeAUsd: 0, surchargeBUsd: 0, surchargeCUsd: 0, discountAUsd: 0, discountBUsd: 50, discountCUsd: 200, potiBakuUsd: 0 };
+const plan = { monthlyLimit: 1 as number | null, allowSelfPricing: false, brandName: null as string | null, accessUntil: null as string | null, profitMarginUsd: 0, surchargeAUsd: 0, surchargeBUsd: 0, surchargeCUsd: 0, discountAUsd: 0, discountBUsd: 50, discountCUsd: 200, potiBakuUsd: 0 };
 const quote = { oceanUsd: 1640, tirUsd: 200, auctionFeeUsd: 1050, priceUsd: 7000, band: { id: 'c' }, missing: false };
 function setup(used = 0, recent = false, customPlan: Partial<typeof plan> = {}) {
   const tx = {
@@ -70,6 +70,14 @@ describe('Calculator account pricing and quota', () => {
     await service.save('user', { discountAUsd: 50, profitMarginUsd: 10 });
     expect(tx.calculatorPlan.upsert).toHaveBeenCalledWith({ where: { userId: 'user' }, create: { userId: 'user', discountAUsd: 50, profitMarginUsd: 10 }, update: { discountAUsd: 50, profitMarginUsd: 10 } });
   });
+  it('normalizes and stores the extension brand only for the current account', async () => {
+    const tx = { $queryRaw: jest.fn().mockResolvedValue([]), calculatorPlan: { findUnique: jest.fn().mockResolvedValue({ ...plan, allowSelfPricing: false }), upsert: jest.fn().mockResolvedValue({}) } };
+    const prisma = { user: { findUnique: jest.fn().mockResolvedValue({ role: 'FREIGHT_USER' }) }, $transaction: jest.fn((cb) => cb(tx)) } as unknown as PrismaService;
+    const service = new CalculatorService(prisma);
+    jest.spyOn(service, 'profile').mockResolvedValue({ ...plan, brandName: 'My Cars', expired: false, accessMessage: null, allowSelfPricing: false, month: '2026-10', used: 0, remaining: 1, canManageRates: false });
+    await service.save('customer-a', { brandName: '  My   Cars  ' });
+    expect(tx.calculatorPlan.upsert).toHaveBeenCalledWith({ where: { userId: 'customer-a' }, create: { userId: 'customer-a', brandName: 'My Cars' }, update: { brandName: 'My Cars' } });
+  });
 
   it('includes the selected end date until midnight Baku time', () => {
     expect(accessExpired('2026-10-30', new Date('2026-10-30T19:59:59Z'))).toBe(false);
@@ -94,6 +102,7 @@ describe('Calculator account pricing and quota', () => {
     expect(await validate(plainToInstance(CalculatorPlanDto, { accessUntil: '2026-10-30' }))).toHaveLength(0);
     expect(await validate(plainToInstance(CalculatorPlanDto, { accessUntil: null }))).toHaveLength(0);
     expect(await validate(plainToInstance(PricingDto, { profitMarginUsd: -10 }))).not.toHaveLength(0);
+    expect(await validate(plainToInstance(PricingDto, { brandName: 'A'.repeat(41) }))).not.toHaveLength(0);
   });
   it('does not apply one account margin to another account', async () => {
     const plans: Record<string, typeof plan> = {
