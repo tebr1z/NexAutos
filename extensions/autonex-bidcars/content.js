@@ -87,7 +87,7 @@
     </style>
     <section class="card">
       <header class="head">
-        <div class="brand"><span class="mark"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M10 40c2-7 7-11 14-12l6-10h15l8 10c5 1 8 5 9 12h-7c-1-4-4-6-8-6s-7 2-8 6H27c-1-4-4-6-8-6s-7 2-8 6z" fill="#2f7cff"/><circle cx="19" cy="41" r="6" fill="none" stroke="white" stroke-width="3"/><circle cx="47" cy="41" r="6" fill="none" stroke="white" stroke-width="3"/><path d="M31 15h20M41 8v14" stroke="#65f0c1" stroke-width="4" stroke-linecap="round"/></svg></span><div>Auto Nex<div class="sub">BidCars ümumi qiymət hesabı</div></div></div>
+        <div class="brand"><span class="mark"><svg aria-hidden="true" viewBox="0 0 128 128"><defs><linearGradient id="route" x1="20" y1="110" x2="105" y2="20" gradientUnits="userSpaceOnUse"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#67e8f9"/></linearGradient></defs><rect x="3" y="3" width="122" height="122" rx="32" fill="#091525"/><rect x="4" y="4" width="120" height="120" rx="31" fill="none" stroke="#284568" stroke-width="2"/><path d="M28 91V37h17l38 54h17V37H83v32L61 37H45v54z" fill="url(#route)"/><path d="M28 103h27" stroke="#67e8f9" stroke-width="5" stroke-linecap="round"/></svg></span><div>Auto Nex<div class="sub">BidCars ümumi qiymət hesabı</div></div></div>
         <div><button class="ghost" id="refresh" type="button" title="Səhifədən yenidən oxu">↻ Oxu</button> <button class="ghost" id="close" type="button" title="Bağla">✕</button></div>
       </header>
       <div class="body">
@@ -129,7 +129,24 @@
           <button id="saveRate" type="button">Tarifi yadda saxla və hesabla</button>
           <p class="status" id="rateStatus"></p>
         </section>
-        <p class="note">Qiymət + auction fee + yol + gömrük hesablanır.</p>
+        <p class="note" id="usageInfo"></p>
+        <details class="compact"><summary>Mənim paketim və endirimlərim</summary><div class="detail-body">
+          <p class="note" id="planInfo">Paket yüklənir…</p>
+          <div id="personalPricing" hidden>
+            <label>0–3000 USD · endirim<input id="discountA" type="number" min="-10000" max="10000" step="0.01"></label>
+            <label>3000-dən çox – 7000 USD · endirim<input id="discountB" type="number" min="-10000" max="10000" step="0.01"></label>
+            <label>7000-dən çox – 150000 USD · endirim<input id="discountC" type="number" min="-10000" max="10000" step="0.01"></label>
+            <label>Poti–Bakı, USD<input id="personalTir" type="number" min="0" max="10000" step="0.01" placeholder="Ümumi tarif"></label>
+            <p class="note">50 = $50 endirim; −50 = $50 əlavə xərc. Poti–Bakı: boş = ümumi tarif, 0 = çıxarılsın. Qrup maşın + auction fee cəminə görə seçilir.</p>
+            <button class="ghost" id="savePersonal" type="button">Ayarları yadda saxla</button>
+          </div>
+          <a href="https://nex.autos/admin/market" target="_blank" rel="noreferrer" style="color:#67e8f9">Final qiymətlər · Bazar analizi ↗</a>
+        </div></details>
+        <details class="compact"><summary>Xəta bildir</summary><div class="detail-body">
+          <label>Xətanın təsviri<textarea id="bugMessage" rows="3" maxlength="2000" style="width:100%;background:#111827;color:white;border:1px solid #334155;border-radius:8px;padding:8px" placeholder="Nə baş verdi? Şifrə və şəxsi məlumat yazmayın."></textarea></label>
+          <p class="note">Təsvir, bu lotun linki və extension versiyası adminə göndərilir.</p>
+          <button class="ghost" id="sendBug" type="button">Bildirişi göndər</button><p class="note" id="bugStatus"></p>
+        </div></details>
         </div>
       </div>
     </section>`;
@@ -138,6 +155,7 @@
     ["authBox", "authGuest", "authUser", "authEmail", "loginEmail", "loginPassword", "loginButton", "logoutButton", "authStatus", "calculatorContent", "priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "toggleAdvanced", "advancedControls", "rateEditor", "rateHint", "rateUsd", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
   );
   const manual = new Set();
+  for (const id of ["usageInfo", "planInfo", "personalPricing", "discountA", "discountB", "discountC", "personalTir", "savePersonal", "bugMessage", "sendBug", "bugStatus"]) refs[id] = shadow.getElementById(id);
   let lastUrl = location.href;
   let lastAutoSignature = "";
   let calculating = false;
@@ -149,9 +167,45 @@
   let includeDyp = false;
   let showDetails = false;
   let authenticated = false;
+  let profile = null;
+
+  function showUsage(usage) {
+    if (!usage) return;
+    refs.usageInfo.textContent = `${usage.month} · ${usage.used} hesab · ${usage.monthlyLimit == null ? "Limitsiz" : `${usage.remaining} / ${usage.monthlyLimit} qalıb`}`;
+  }
+  async function loadProfile() {
+    profile = await send({ type: "ANX_API", path: "/calculator/me" });
+    showUsage(profile);
+    refs.planInfo.textContent = profile.allowSelfPricing ? "Endirimləri dəyişib yadda saxlaya bilərsiniz." : "Fərdi tarifləriniz administrator tərəfindən idarə edilir.";
+    refs.personalPricing.hidden = !profile.allowSelfPricing;
+    refs.discountA.value = profile.discountAUsd;
+    refs.discountB.value = profile.discountBUsd;
+    refs.discountC.value = profile.discountCUsd;
+    refs.personalTir.value = profile.potiBakuUsd ?? "";
+  }
+  async function savePersonal() {
+    refs.savePersonal.disabled = true;
+    try {
+      await send({ type: "ANX_API", path: "/calculator/me", method: "PATCH", body: { discountAUsd: Number(refs.discountA.value), discountBUsd: Number(refs.discountB.value), discountCUsd: Number(refs.discountC.value), potiBakuUsd: refs.personalTir.value === "" ? null : Number(refs.personalTir.value) } });
+      await loadProfile();
+      refs.planInfo.textContent = "Yadda saxlanıldı. Yeni tariflə hesablamaq üçün Hesabla basın.";
+      lastCalculation = null; refs.result.hidden = true;
+    } catch (error) { refs.planInfo.textContent = error.message; }
+    finally { refs.savePersonal.disabled = false; }
+  }
+  async function reportBug() {
+    refs.sendBug.disabled = true;
+    try {
+      const pageUrl = new URL(location.href); pageUrl.search = ""; pageUrl.hash = "";
+      await send({ type: "ANX_API", path: "/calculator/reports", method: "POST", body: { message: refs.bugMessage.value.trim(), pageUrl: pageUrl.href, version: chrome.runtime.getManifest().version } });
+      refs.bugMessage.value = ""; refs.bugStatus.textContent = "Bildiriş adminə göndərildi.";
+    } catch (error) { refs.bugStatus.textContent = error.message; }
+    finally { refs.sendBug.disabled = false; }
+  }
 
   function send(message) {
     return new Promise((resolve, reject) => {
+      if (!chrome.runtime?.id) return reject(new Error("Extension yenilənib. BidCars səhifəsini yeniləyin (Ctrl+R)."));
       chrome.runtime.sendMessage(message, (response) => {
         if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
         if (!response?.ok) return reject(new Error(response?.error || "Auto Nex əlavəsi cavab vermədi."));
@@ -177,6 +231,7 @@
       const settings = await send({ type: "ANX_GET_SETTINGS" });
       authenticated = Boolean(settings.authenticated);
       renderAuth(settings.authEmail || "");
+      if (authenticated) await loadProfile();
       return authenticated;
     } catch (error) {
       authenticated = false;
@@ -204,7 +259,7 @@
       refs.loginPassword.value = "";
       refs.authStatus.textContent = "";
       renderAuth(account.email || email);
-      await calculate(false);
+      await loadProfile();
     } catch (error) {
       refs.authStatus.className = "status error";
       refs.authStatus.textContent = error instanceof Error ? error.message : String(error);
@@ -427,6 +482,8 @@
     refs.result.innerHTML = `
       <div class="price-line"><span>Hesablama qiyməti</span><select class="compact-source" id="compactPriceSource" aria-label="Hesablama qiyməti mənbəyi">${compactOptions}</select>${refs.priceSource.value === "manual" ? `<input class="compact-manual" id="compactPrice" type="number" min="1" step="50" value="${Number(refs.price.value) || ""}" aria-label="Əl ilə hesablama qiyməti">` : ""}</div>
       <div class="azn-total"><small>Yekun məbləğ${includeDyp ? " · DYP daxil" : ""}</small><strong>${finalAzn == null ? "—" : azn(finalAzn)}</strong></div>
+      <p class="note" style="text-align:center">Təxmini məbləğ · ±1–2% fərqlənə bilər; zəmanətli diapazon deyil.</p>
+      ${data.quote.discountUsd ? `<p class="note" style="color:#67e8f9">${data.quote.discountUsd > 0 ? "Xüsusi endirim" : "Fərdi tarif əlavəsi"}: ${usd(Math.abs(data.quote.discountUsd))} · ${data.quote.band?.id === "a" ? "0–3000" : data.quote.band?.id === "b" ? "3000-dən çox – 7000" : "7000-dən çox – 150000"} USD qrupu</p>` : ""}
       <button class="dyp-button${includeDyp ? " active" : ""}" id="toggleDyp" type="button" ${finalAzn == null ? "disabled" : ""}>${includeDyp ? "✓ DYP xərci əlavə edildi — 800 AZN" : "+ DYP xərclərini əlavə et — 800 AZN"}</button>
       <section class="result-details" ${showDetails ? "" : "hidden"}><div class="detail-body">
         <div class="fee-strip">
@@ -483,6 +540,7 @@
   }
 
   async function calculate(triggeredAutomatically = false) {
+    if (triggeredAutomatically) return;
     if (!authenticated) {
       if (!triggeredAutomatically) {
         refs.status.className = "status error";
@@ -551,7 +609,8 @@
         setField("fuel", fuel, false);
       }
       lastQuote = quote;
-      refs.rateEditor.hidden = !quote.missing;
+      showUsage(quote.usage);
+      refs.rateEditor.hidden = !quote.missing || !profile?.canManageRates;
       refs.rateHint.textContent = `${quote.auction} · ${quote.yard || yard} (${quote.state}) · ${quote.band?.min ?? 0}–${quote.band?.max ?? "+"} USD qiymət aralığı üçün ABŞ–Poti tarifini yazın. Poti–Bakı ${usd(quote.tirUsd)} avtomatik əlavə olunacaq.`;
       const pickedFee = parser.selectAuctionFee({
         priceUsd,
@@ -570,7 +629,7 @@
       let customsUsd = 0;
       let customsNote = "";
 
-      if (quote.missing || freightUsd == null || freightUsd <= 0) {
+      if (quote.missing || freightUsd == null || freightUsd < 0) {
         customsNote = "Yol pulu tapılmadığı üçün gömrük hesablanmadı.";
       } else if (!year || !fuel || (engineCc <= 0 && fuel !== "Electric")) {
         customsNote = "DGK hesabı üçün il, mühərrik həcmi və yanacaq növü lazımdır.";
@@ -622,7 +681,7 @@
       refs.calculate.textContent = "Auto Nex ilə hesabla";
       if (recalculateAfterCurrent) {
         recalculateAfterCurrent = false;
-        window.setTimeout(() => void calculate(true), 0);
+        window.setTimeout(() => void calculate(false), 0);
       }
     }
   }
@@ -680,7 +739,7 @@
       const signature = [refs.priceSource.value, refs.price.value, data.bidNowUsd, data.currentBidUsd, data.lotPriceUsd, data.auctionFeeUsd, data.auction, data.location].join("|");
       if (!host.hidden && signature !== lastAutoSignature) {
         lastAutoSignature = signature;
-        void calculate(true);
+        if (lastCalculation) { refs.result.hidden = true; refs.status.textContent = "Səhifə qiyməti dəyişib. Yenidən Hesabla basın."; }
       }
     }, 900);
   }
@@ -706,6 +765,8 @@
     host.hidden = true;
   });
   refs.calculate.addEventListener("click", () => void calculate(false));
+  refs.savePersonal.addEventListener("click", () => void savePersonal());
+  refs.sendBug.addEventListener("click", () => void reportBug());
   refs.loginButton.addEventListener("click", () => void login());
   refs.loginPassword.addEventListener("keydown", (event) => { if (event.key === "Enter") void login(); });
   refs.logoutButton.addEventListener("click", () => void logout());
@@ -729,7 +790,7 @@
     host.hidden = false;
     placePanel();
     readPage(true);
-    void loadAuth().then((ok) => { if (ok) void calculate(false); });
+    void loadAuth();
     sendResponse({ ok: true });
     return false;
   });

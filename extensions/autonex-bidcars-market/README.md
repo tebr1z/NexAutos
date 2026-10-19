@@ -2,6 +2,10 @@
 
 Bu, əsas qiymət kalkulyatorundan ayrı Chrome/Chromium extension-dur.
 
+## 1.2.7
+
+Yalnız rəqəmli `Final bid` qəbul olunur. `Final bid —`, cari təklif, təxmini dəyər və başqa `Sold for` qiymətinə keçid yoxdur. Rəqəmli final təklif satışın ödənişlə tamamlandığını təsdiqləmir. Bu collector admin istifadəsi üçündür; müştərilər hesabları ilə `/admin/market` panelində ortalamalara baxırlar. Collector açarını müştərilərə verməyin.
+
 ## Nə edir
 
 - BidCars arxiv siyahısında və final olmuş lot səhifəsində `Final bid` məlumatını avtomatik oxuyur.

@@ -25,9 +25,9 @@ export const ROLE_DETAILS: Record<InternalRole, { label: string; short: string; 
     description: "Maşınlar, müqavilələr, sığorta, arxiv və müştəri müraciətləri.",
   },
   FREIGHT_USER: {
-    label: "Yol pulu istifadəçisi",
+    label: "Kalkulyator müştərisi",
     short: "Məhdud giriş",
-    description: "Yalnız yol pulu kalkulyatoru və BidCars extension istifadəsi.",
+    description: "Fərdi limit və endirimlə kalkulyator, BidCars extension və final qiymətlər üzrə bazar analizi.",
   },
 };
 
@@ -49,7 +49,7 @@ function pathMatches(pathname: string, allowed: string) {
 export function canAccessAdminPath(role: AuthUser["role"] | undefined, pathname: string) {
   if (!role || role === "CUSTOMER") return false;
   if (role === "SUPER_ADMIN" || role === "ADMIN") return true;
-  if (role === "FREIGHT_USER") return pathMatches(pathname, "/admin/freight");
+  if (role === "FREIGHT_USER") return ["/admin/freight", "/admin/market"].some((path) => pathMatches(pathname, path));
   const paths = role === "MANAGER" ? MANAGER_PATHS : STAFF_PATHS;
   return paths.some((allowed) => pathMatches(pathname, allowed));
 }

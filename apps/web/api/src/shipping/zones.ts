@@ -66,7 +66,7 @@ export type StateCode = (typeof US_STATES)[number]["code"];
 
 export function bandForPrice(price: number): (typeof BANDS)[number] {
   const value = Number(price);
-  return BANDS.find((band) => value >= band.min && value <= band.max) ?? BANDS[BANDS.length - 1];
+  return BANDS.find((band) => value <= band.max) ?? BANDS[BANDS.length - 1];
 }
 
 export function knownState(state?: string | null): StateCode | null {

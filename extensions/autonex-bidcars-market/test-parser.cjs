@@ -1,6 +1,8 @@
 "use strict";
 const assert = require("node:assert/strict");
 const p = require("./parser.js");
+assert.equal(p.parseRecordSnapshot({ title: "2021 Hyundai Sonata SEL", text: "Final bid: --- Estimated cost $9,600 Sold for $4,000 Archived Auction", url: "x" }), null);
+assert.equal(p.parseRecordSnapshot({ title: "2021 Hyundai Sonata SEL", text: "Current Bid: $4,000 Archived Auction", url: "x" }), null);
 
 const card = p.parseRecordSnapshot({
   title: "2021 Hyundai Sonata, SEL",

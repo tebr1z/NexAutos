@@ -107,7 +107,7 @@ export function FreightCalculator() {
 
       const invoiceUsd = next.invoiceUsd ?? next.priceUsd + (next.auctionFeeUsd ?? 0);
       const freightUsd = next.freightUsd;
-      if (next.missing || freightUsd == null || freightUsd <= 0) {
+      if (next.missing || freightUsd == null || freightUsd < 0) {
         setDutyNote(t.pages.freightMissing);
       } else if (!resolvedYear || (resolvedEngine <= 0 && next.dgkEngineCode !== "12")) {
         setDutyNote(t.pages.freightNeedSpecs);

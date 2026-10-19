@@ -115,7 +115,7 @@
   function parseRecordSnapshot(snapshot) {
     const text = clean(snapshot.text);
     const titleInfo = parseVehicleTitle(snapshot.title || text.slice(0, 160));
-    const finalBidUsd = moneyAfter(text, "Final bid") || moneyAfter(text, "Sold for") || moneyAfter(text, "Winning bid");
+    const finalBidUsd = moneyAfter(text, "Final bid");
     if (!finalBidUsd || !/(final bid|archived auction|auction ended|sold by buy now)/i.test(text)) return null;
     const combinedFuel = `${snapshot.fuel || ""} ${snapshot.imageAlts || ""} ${valueAfter(text, "Fuel Type", ["Drive Type", "Transmission", "Engine", "Data fetched"])} ${titleInfo.title}`;
     const mileage = parseMileage(text);

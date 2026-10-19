@@ -57,7 +57,6 @@ export default function MarketSalesAdminPage() {
     try {
       const response = await api.marketSales(next);
       setData(response); setDeliveryById({}); setDeliveryNote("");
-      if (next.make && next.model) void calculateDelivery(response.rows);
     }
     catch (err) { setError(err instanceof Error ? err.message : "Bazar məlumatları yüklənmədi."); }
     setBusy(false);
@@ -71,7 +70,7 @@ export default function MarketSalesAdminPage() {
       url: row.sourceUrl, priceUsd: row.finalBidUsd, auction: row.auction,
       state: row.state || undefined, yard: row.location, titleKind: "SALVAGE",
     });
-    if (quote.missing || !quote.freightUsd) return null;
+    if (quote.missing || quote.freightUsd == null) return null;
     const invoiceUsd = row.finalBidUsd + Number(quote.auctionFeeUsd || 0);
     const duty = await fetchCustomsDuty({ locale: "az", invoiceUsd, freightUsd: Number(quote.freightUsd), year: row.year, engineCc: Number(row.engineCc || 0), fuelCode: fuelCode(row.fuel) });
     const rate = Number(duty.usdCourse || 0);
@@ -137,7 +136,7 @@ export default function MarketSalesAdminPage() {
   return (
     <div className="mx-auto max-w-7xl">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><h1 className="font-display text-3xl">BidCars bazar analizi</h1><p className="mt-2 text-sm text-zinc-400">Extension-un PostgreSQL-ə yazdığı final satışlar. Filtrlər serverdə tətbiq olunur.</p></div>
+        <div><h1 className="font-display text-3xl">BidCars bazar analizi</h1><p className="mt-2 text-sm text-zinc-400">Yalnız rəqəmli final qiyməti olan elanlar. “Final —” olanlar orta qiymətə daxil edilmir. Final bid ödənişin tamamlandığını təsdiqləmir.</p></div>
         <button onClick={() => void load()} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2.5 text-sm disabled:opacity-50"><RefreshCw size={15} className={busy ? "animate-spin" : ""}/>Yenilə</button>
       </div>
       {error ? <p className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</p> : null}
@@ -170,7 +169,8 @@ export default function MarketSalesAdminPage() {
       </div>
 
       <div className="mt-5 rounded-2xl border border-sky-500/25 bg-sky-500/[.07] p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-sky-300">Bakı təhvil ortalaması</p>{deliveryStats.count ? <><p className="mt-2 text-3xl font-semibold text-white">{deliveryStats.average.toLocaleString("az-AZ")} AZN</p><p className="mt-1 text-sm text-zinc-400">Real aralıq: {deliveryStats.low.toLocaleString("az-AZ")}–{deliveryStats.high.toLocaleString("az-AZ")} AZN · median {deliveryStats.median.toLocaleString("az-AZ")} AZN · {deliveryStats.count} satış</p></> : <p className="mt-2 text-sm text-zinc-400">Marka və modeli seçib “Filtrlə” basın; uyğun nəticələrin Bakı təhvil qiyməti avtomatik hesablanacaq.</p>}</div><button disabled={deliveryBusy || !data?.rows.length} onClick={() => void calculateDelivery(data?.rows || [])} className="rounded-xl bg-sky-400 px-5 py-3 text-sm font-semibold text-slate-950 disabled:opacity-50">{deliveryBusy ? "Bakı təhvil hesablanır…" : "Yenidən hesabla"}</button></div>
+        <div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-sky-300">Bakı təhvil ortalaması</p>{deliveryStats.count ? <><p className="mt-2 text-3xl font-semibold text-white">{deliveryStats.average.toLocaleString("az-AZ")} AZN</p><p className="mt-1 text-sm text-zinc-400">Təxmini aralıq: {deliveryStats.low.toLocaleString("az-AZ")}–{deliveryStats.high.toLocaleString("az-AZ")} AZN · median {deliveryStats.median.toLocaleString("az-AZ")} AZN · {deliveryStats.count} elan</p></> : <p className="mt-2 text-sm text-zinc-400">Final qiymət ortalamalarına baxmaq pulsuzdur. Bakı təhvil üçün ən çox 25 elanı hesabla; hər yeni uğurlu tarif hesabı aylıq limitdən istifadə edir.</p>}</div><button disabled={deliveryBusy || !data?.rows.length} onClick={() => void calculateDelivery(data?.rows || [])} className="rounded-xl bg-sky-400 px-5 py-3 text-sm font-semibold text-slate-950 disabled:opacity-50">{deliveryBusy ? "Bakı təhvil hesablanır…" : "Bakı təhvil hesabla"}</button></div>
+        <p className="mt-2 text-xs text-zinc-400">Yekun təxminən ±1–2% fərqlənə bilər; zəmanətli diapazon deyil.</p>
         {deliveryNote ? <p className="mt-3 text-xs text-zinc-500">{deliveryNote}</p> : null}
         <p className="mt-2 text-xs text-zinc-500">Yürüşü 300 000 km-dən çox olan avtomobillər nəticəyə və ortalamaya daxil edilmir.</p>
       </div>

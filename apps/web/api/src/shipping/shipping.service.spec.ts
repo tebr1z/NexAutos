@@ -55,6 +55,7 @@ describe('ShippingService', () => {
     expect(bandForPrice(0).id).toBe('a');
     expect(bandForPrice(3000).id).toBe('a');
     expect(bandForPrice(3001).id).toBe('b');
+    expect(bandForPrice(3000.50).id).toBe('b');
     expect(bandForPrice(7000).id).toBe('b');
     expect(bandForPrice(7001).id).toBe('c');
     expect(bandForPrice(150000).id).toBe('c');

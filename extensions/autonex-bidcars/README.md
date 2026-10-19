@@ -2,6 +2,28 @@
 
 Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən birbaşa oxuyur və səhifəyə Auto Nex hesab paneli əlavə edir.
 
+## 1.11.0 — hesab paketləri
+
+- Admin → İstifadəçilər → Aylıq limit və endirimlər: istifadəçi üzrə limit, limitsiz seçim, üç qiymət qrupunun endirimi və fərdi Poti–Bakı məbləği.
+- Yeni Kalkulyator müştərisi hesabları 100 hesab/ay ilə başlayır; admin istənilən vaxt dəyişir. Mövcud hesablar admin limit qoyana qədər limitsiz qalır.
+- Ay Bakı vaxtı ilə yenilənir. Uğurlu yol tarifi sorğusu bir istifadə sayılır; sonrakı DGK sorğusu uğursuz olsa belə tarif hesabı sayılmış olur. Eyni lot/qiymət/marşrut/ayar 10 dəqiqədə təkrar sayılmır. Tarif tapılmayan sorğu sayılmır.
+- Endirim ABŞ–Poti xərcinə tətbiq edilir: 50 = $50 endirim, -50 = $50 əlavə xərc. Qrup avtomobil + auction fee cəminə əsaslanır. Poti–Bakı boşdursa ümumi tarif, 0-dırsa həmin xərc çıxarılır.
+- İstifadəçi yalnız admin icazə verəndə öz endirimini və Poti–Bakı məbləğini dəyişir. Limit və icazə yalnız admin tərəfindən dəyişir.
+- Paketdə tarif JSON-ları və lokal tarif fallback-i yoxdur; giriş, limit və fərdi qiymətlər serverdə yoxlanır. Aşağıdakı əvvəlki versiyaların offline fallback davranışı artıq tətbiq edilmir.
+- Xəta bildirişi təsvir, lot linki və versiya ilə adminin istifadəçilər səhifəsinə gəlir. Şifrə/token göndərilmir.
+- Hesab təxminidir; göstərilən ±1–2% qeyd zəmanət deyil. Yeni vektor loqo SVG və 16/32/48/128 PNG ölçülərindədir.
+
+### VDS deploy ardıcıllığı
+
+Repo kökündə `git pull origin main`, sonra `npm ci --prefix apps/web/api` və `npm run build` işlədin. DB dəyişikliklərini tətbiq edin:
+
+```bash
+node apps/web/api/scripts/migrate-deploy.cjs
+pm2 list
+```
+
+Migration uğurla bitəndən sonra siyahıdakı Auto Nex API və web proseslərini adları ilə `pm2 restart PROSES_ADI --update-env` edin. Bu skript quraşdırılmış Prisma-nı istifadə edir və `.env`-ni shell `source` etmədən oxuyur; uğursuz migration zamanı xəta kodu ilə dayanır. Server yeniləndikdən sonra extension 1.11.0 paketini yükləyin və BidCars səhifəsini yeniləyin.
+
 ## 1.9.0
 
 - BidCars səhifəsində Copart / IAA / IAAI hərracını başlıqdan, badge-dən və lot mətnindən tanıyır.
@@ -86,7 +108,7 @@ Seçilən qiymət BidCars `Bid Now` / `Lot Price` ilə eynidirsə, səhifədə c
 
 Yol tarifləri avtomobilin tək alış qiymətinə yox, `avtomobil + auction fee` invoys cəminə görə üç aralıqda seçilir: `$0–3,000`, `$3,001–7,000`, `$7,001–150,000`. Məsələn, avtomobil `$7,000`, auction fee `$1,050` olarsa tarif `$8,050` əsasında üçüncü qrupdan götürülür. Köhnə `15,001+` tarifi varsa və üçüncü qrup boşdursa avtomatik üçüncü qrupa keçirilir. Paneldə yalnız əsas məbləğlər görünür; avtomobil və hesab detalları bağlı bölmələrdədir.
 
-Tarif tapılmasa panel ABŞ–Poti məbləğini istəyir. Admin hesabı ilə daxil olub **Bazaya yaz və yenidən hesabla** seçildikdə tarif konkret yard/şəhər, ştat, hərrac və qiymət aralığı üçün `shipping_rates` bazasında qalır. Növbəti eyni hesablamada yenidən soruşulmur. Şifrə saxlanmır; access və 30 günlük yenilənən refresh token yalnız extension-un lokal yaddaşında saxlanır. Access token bitəndə extension onu avtomatik yeniləyir və email/parol sahələrini təkrar göstərmir.
+Tarif tapılmasa admin `/admin/freight` bölməsində həmin yard/şəhər, ştat, hərrac və qiymət aralığı üçün tarifi əlavə edir. Şifrə saxlanmır; access və 30 günlük yenilənən refresh token yalnız extension-un lokal yaddaşında saxlanır. Access token bitəndə extension onu avtomatik yeniləyir.
 
 Production API `chrome-extension://` originlərini CORS-da qəbul etməlidir. Yazma sorğusu yalnız etibarlı admin/işçi JWT-si ilə işləyir.
 
@@ -114,4 +136,4 @@ Paneldən nəticələri JSON kimi yükləmək və yadda saxlanmış admin sessiy
 5. BidCars lot səhifəsini yeniləyin.
 6. BidCars lot səhifəsində **Auto Nex** extension ikonuna basın.
 
-İkona basılan kimi əlavə açıq BidCars səhifəsini oxuyur, Auto Nex bazasındakı yol pulunu və DGK gömrüyünü hesablayır, nəticəni həmin səhifənin üzərində göstərir. BidCars linki heç bir serverə göndərilmir və BidCars-a ayrıca bot sorğusu edilmir. Standart production API ünvanı `https://nex.autos/api/v1`-dir.
+İkona basanda panel səhifəni oxuyur. Hesabla basıldıqda lot linki və hesablama məlumatları `https://nex.autos/api/v1` serverinə göndərilir. Serverdə tarif, limit və fərdi endirim tətbiq olunur; DGK hesabı ilə nəticə səhifənin üzərində göstərilir. Çatışmayan lot məlumatları serverdə mənbədən yoxlanıla bilər.

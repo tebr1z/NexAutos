@@ -6,6 +6,7 @@ import { CheckCircle2, KeyRound, LockKeyhole, ShieldCheck, UserCog } from "lucid
 import { api, type AccessUser } from "@/lib/api";
 import { assignableRolesFor, ROLE_DETAILS, type AssignableRole, type InternalRole } from "@/lib/admin-access";
 import { useAuth } from "@/providers/auth-provider";
+import { CalculatorAccount, CalculatorReports } from "@/components/freight/calculator-account";
 
 const input = "w-full rounded-xl border border-white/10 bg-[#0d0d0f] px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500/60";
 
@@ -19,6 +20,7 @@ export default function AccessUsersPage() {
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [openPlan, setOpenPlan] = useState("");
 
   const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
   const roleOptions = useMemo(() => assignableRolesFor(user?.role), [user?.role]);
@@ -90,7 +92,7 @@ export default function AccessUsersPage() {
     {notice ? <p className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-300">{notice}</p> : null}
 
     <form onSubmit={create} className="mt-7 rounded-2xl border border-white/10 bg-[#0a0a0c] p-5">
-      <div className="mb-4 flex items-center gap-2"><UserCog size={18} className="text-sky-400" /><h2 className="font-semibold">Yeni işçi hesabı</h2></div>
+      <div className="mb-4 flex items-center gap-2"><UserCog size={18} className="text-sky-400" /><h2 className="font-semibold">Yeni istifadəçi hesabı</h2></div>
       <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_0.9fr_auto]">
         <input required minLength={2} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ad və soyad" className={input} />
         <input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="E-poçt" className={input} />
@@ -127,9 +129,11 @@ export default function AccessUsersPage() {
               <button type="button" disabled={busyId === row.id || ownAccount} onClick={() => void update(row.id, { isActive: !row.isActive })} className={`rounded-xl px-4 py-2 text-xs disabled:opacity-35 ${row.isActive ? "bg-red-500/15 text-red-300" : "bg-emerald-500/15 text-emerald-300"}`}>{row.isActive ? "Girişi bağla" : "Girişi aç"}</button>
             </div> : <div className="flex items-center gap-2 rounded-xl border border-amber-400/15 bg-amber-400/5 px-4 py-3 text-xs text-amber-200"><LockKeyhole size={15} />Bu hesab qorunur və sizin rolunuzla dəyişdirilə bilməz.</div>}
           </div>
+          {!protectedAccount || ownAccount ? <><button onClick={() => setOpenPlan(openPlan === row.id ? "" : row.id)} className="mt-4 text-sm text-sky-300">{openPlan === row.id ? "Paketi bağla" : "Aylıq limit və endirimləri idarə et"}</button>{openPlan === row.id ? <CalculatorAccount userId={row.id} /> : null}</> : null}
         </div>;
       })}
       {!rows.length ? <p className="rounded-2xl border border-white/10 p-8 text-center text-sm text-zinc-500">Hələ işçi hesabı yaradılmayıb.</p> : null}
     </div>
+    <CalculatorReports />
   </div>;
 }

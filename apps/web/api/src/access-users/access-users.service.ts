@@ -42,6 +42,7 @@ export class AccessUsersService {
         passwordHash: await bcrypt.hash(dto.password, 12),
         role: dto.role,
         isActive: true,
+        calculatorPlan: { create: { monthlyLimit: dto.role === 'FREIGHT_USER' ? 100 : null } },
       },
       select,
     });

@@ -259,6 +259,11 @@ export type MarketSalesResponse = {
   facets: Pick<MarketSale, "make" | "model" | "trim" | "fuel" | "auction" | "year" | "engineCc">[];
 };
 
+export type CalculatorProfile = {
+  monthlyLimit: number | null; used: number; remaining: number | null; month: string;
+  allowSelfPricing: boolean; discountAUsd: number; discountBUsd: number; discountCUsd: number; potiBakuUsd: number | null;
+};
+export type CalculatorReport = { id: string; message: string; pageUrl?: string; version?: string; status: string; createdAt: string; user: { name: string; email: string } };
 export type AccessUser = {
   id: string;
   name: string;
@@ -270,6 +275,10 @@ export type AccessUser = {
 };
 
 export const api = {
+  calculatorProfile: (userId?: string) => request<CalculatorProfile>(userId ? `/calculator/users/${encodeURIComponent(userId)}` : '/calculator/me'),
+  saveCalculatorProfile: (payload: Partial<CalculatorProfile>, userId?: string) => request<CalculatorProfile>(userId ? `/calculator/users/${encodeURIComponent(userId)}` : '/calculator/me', { method: 'PATCH', body: JSON.stringify(payload) }),
+  calculatorReports: () => request<CalculatorReport[]>('/calculator/reports'),
+  resolveCalculatorReport: (id: string, status: string) => request(`/calculator/reports/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   track: (code: string) =>
     request<TrackingShipment>(`/tracking/${encodeURIComponent(code)}`, {
       signal: AbortSignal.timeout(20_000),
@@ -607,6 +616,10 @@ export const api = {
       };
       invoiceUsd?: number;
       bandBasisUsd?: number;
+      discountUsd?: number;
+      baseOceanUsd?: number;
+      baseTirUsd?: number;
+      usage?: { used: number; monthlyLimit: number | null; remaining: number | null; month: string };
       year?: number;
       engineCc?: number;
       fuel?: string;

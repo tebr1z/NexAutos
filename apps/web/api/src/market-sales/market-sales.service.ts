@@ -77,6 +77,7 @@ export class MarketSalesService {
           ],
         };
     const where: Prisma.MarketSaleWhereInput = {
+      finalBidUsd: { gt: 0 },
       observedAt: { gte: since },
       AND: [mileageFilter],
       ...(query.make ? { make: { equals: query.make, mode: 'insensitive' } } : {}),
@@ -93,7 +94,7 @@ export class MarketSalesService {
       this.prisma.marketSale.findMany({ where, orderBy: [{ saleDate: 'desc' }, { observedAt: 'desc' }], take: query.limit ?? 200 }),
       this.prisma.marketSale.count({ where }),
       this.prisma.marketSale.findMany({
-        where: { observedAt: { gte: since }, AND: [mileageFilter] },
+        where: { observedAt: { gte: since }, finalBidUsd: { gt: 0 }, AND: [mileageFilter] },
         select: { make: true, model: true, trim: true, fuel: true, auction: true, year: true, engineCc: true },
       }),
     ]);

@@ -17,7 +17,7 @@ export class MarketSalesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...MANAGEMENT_ROLES)
+  @Roles(...MANAGEMENT_ROLES, 'FREIGHT_USER')
   @Get('manage')
   list(@Query() query: MarketSaleQueryDto) {
     return this.market.list(query);

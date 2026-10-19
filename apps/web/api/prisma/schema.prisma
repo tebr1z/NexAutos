@@ -83,6 +83,44 @@ model User {
   customer      Customer?
   notifications Notification[]
   messagesSent  Message[]      @relation("MessageSender")
+  calculatorPlan CalculatorPlan?
+  calculatorUses CalculatorUse[]
+  bugReports CalculatorBugReport[]
+}
+
+model CalculatorPlan {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monthlyLimit Int?
+  allowSelfPricing Boolean @default(false)
+  discountAUsd Float @default(0)
+  discountBUsd Float @default(0)
+  discountCUsd Float @default(0)
+  potiBakuUsd Float?
+  updatedAt DateTime @updatedAt
+}
+
+model CalculatorUse {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month String
+  fingerprint String
+  createdAt DateTime @default(now())
+  @@index([userId, month])
+  @@index([userId, fingerprint, createdAt])
+}
+
+model CalculatorBugReport {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message String
+  pageUrl String?
+  version String?
+  status String @default("OPEN")
+  createdAt DateTime @default(now())
+  @@index([status, createdAt])
 }
 
 model RefreshToken {

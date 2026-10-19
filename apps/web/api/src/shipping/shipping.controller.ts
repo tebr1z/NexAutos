@@ -6,10 +6,12 @@ import { MANAGEMENT_ROLES } from '../common/access-roles';
 import { ShippingQuoteDto, ShippingRatesDto } from './dto';
 import { ShippingService } from './shipping.service';
 import { ShippingAccessGuard } from './shipping-access.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CalculatorService } from '../calculator/calculator.service';
 
 @Controller('shipping')
 export class ShippingController {
-  constructor(private shipping: ShippingService) {}
+  constructor(private shipping: ShippingService, private calculator: CalculatorService) {}
 
   @SkipThrottle()
   @Get('meta')
@@ -19,11 +21,13 @@ export class ShippingController {
 
   @UseGuards(ShippingAccessGuard)
   @Post('quote')
-  quote(@Body() dto: ShippingQuoteDto) {
-    return this.shipping.quote(dto);
+  async quote(@Body() dto: ShippingQuoteDto, @CurrentUser() user?: { id: string }) {
+    const quote = await this.shipping.quote(dto);
+    return this.calculator.finalize(quote, user?.id, { url: dto.url?.split('?')[0], priceUsd: dto.priceUsd, auctionFeeUsd: quote.auctionFeeUsd, auction: quote.auction, yard: quote.yardSlug, state: quote.state, titleKind: dto.titleKind });
   }
 
-  @UseGuards(ShippingAccessGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...MANAGEMENT_ROLES)
   @SkipThrottle()
   @Get('catalog')
   catalog(@Query('auction') auction?: string, @Query('state') state?: string) {

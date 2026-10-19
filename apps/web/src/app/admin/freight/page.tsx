@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
 import { dutyUsd, fetchCustomsDuty, type CustomsDuty } from "@/lib/customs-duty";
 import { useAuth } from "@/providers/auth-provider";
+import { CalculatorAccount } from "@/components/freight/calculator-account";
 
 const inp =
   "w-full rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm text-white placeholder:text-zinc-500";
@@ -113,7 +114,7 @@ export default function ShippingRatesAdminPage() {
       const engineCc = next.engineCc || next.lot?.engineCc || 0;
       const invoiceUsd = next.invoiceUsd ?? next.priceUsd + (next.auctionFeeUsd ?? 0);
       const freightUsd = next.freightUsd;
-      if (next.missing || freightUsd == null || freightUsd <= 0) {
+      if (next.missing || freightUsd == null || freightUsd < 0) {
         setError("Əvvəl bu yard üçün ABŞ yol pulunu yadda saxlayın, sonra gömrük hesablanar.");
       } else if (!year || (engineCc <= 0 && next.dgkEngineCode !== "12")) {
         setError("Bid.cars-dan il və mühərrik oxunmadı. Lotda bu məlumat olmalıdır.");
@@ -151,6 +152,7 @@ export default function ShippingRatesAdminPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="font-display text-3xl">Yol pulu</h1>
+      <CalculatorAccount refreshKey={quote?.usage?.used ?? 0} />
       <p className="mt-2 text-sm text-zinc-400">
         Bid.cars linki və hərrac qiyməti kifayətdir. Yol pulu ştata görə yox, konkret yard-a görə saxlanır: CA Sun Valley ilə CA Los Angeles ayrıdır. Gömrük hesabla Bid.cars il / mühərrik / yanacaq və auction fee invoys ilə DGK API-yə gedir.
       </p>
@@ -217,6 +219,8 @@ export default function ShippingRatesAdminPage() {
           <p className="text-sm text-sky-300">
             Avtomobil + auction fee ${(quote.invoiceUsd ?? quote.priceUsd + (quote.auctionFeeUsd ?? 0)).toLocaleString("en-US")} → yol tarifi aralığı {bandLabel(quote.band)}
           </p>
+          {quote.discountUsd ? <p className="text-sm text-emerald-300">{quote.discountUsd > 0 ? "Xüsusi endirim" : "Fərdi tarif əlavəsi"}: ${Math.abs(quote.discountUsd).toFixed(2)}</p> : null}
+          <p className="text-xs text-zinc-400">Təxmini hesabdır; yekun məbləğ təxminən ±1–2% fərqlənə bilər. Bu diapazon zəmanət deyil.</p>
           {!quote.missing && quote.totalUsd != null ? (
             <div>
               <p className="font-display text-3xl text-white">${quote.totalUsd.toLocaleString("en-US")}</p>

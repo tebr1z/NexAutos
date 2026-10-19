@@ -220,7 +220,7 @@ export class ShippingService {
       oceanUsd: ocean,
       tirUsd: table.tirUsd,
       freightUsd,
-      totalUsd: freightUsd != null ? freightUsd + fee.totalUsd : null,
+      totalUsd: freightUsd != null ? freightUsd + auctionFeeUsd : null,
       missing: ocean == null,
       rateSource,
       cellKey: key,

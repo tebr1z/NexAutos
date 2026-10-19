@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Auto Nex – BidCars Market Analizi",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyfYVmYtuc8KCeoqOuM3D/NLIbUuUlczFV2Yw6B/3lPh51Fk4yzZJzLznlbMxtxclzV1/h6vj3KRwGXl82T22i1+JV4i40R9M/Xb7NhfGqi32sXRhEKWTr2a1SCkchv81r2czJRQGN4Rwf1zayuj3xfjLiO/8vIVz3Sn96lnpWYUCbcgYfcQM9PuaiqRJT3Ag1ZGQepsUV3OFR4ML3eedn2SFKUeY/XQha2fMvXJpVVuS1bHRaLx1hbjpE/iiaX8EU7xGrlt/UCM9TpYZqSIBC+9UaG652qFn2+3XMfvnyWqASKt1aRg/CqhH62FuGS1/q3hGuoUEM9hwK38CJOsE5QIDAQAB",
   "description": "BidCars final satışlarını 30 gün saxlayır, oxşar avtomobilləri müqayisə edir və Bakı təhvil qiymətini hesablayır.",
   "permissions": ["storage", "activeTab", "scripting"],
