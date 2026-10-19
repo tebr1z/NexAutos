@@ -138,13 +138,13 @@ Paneldən nəticələri JSON kimi yükləmək və yadda saxlanmış admin sessiy
 
 İkona basanda panel səhifəni oxuyur. Hesabla basıldıqda lot linki və hesablama məlumatları `https://nex.autos/api/v1` serverinə göndərilir. Serverdə tarif, limit və fərdi endirim tətbiq olunur; DGK hesabı ilə nəticə səhifənin üzərində göstərilir. Çatışmayan lot məlumatları serverdə mənbədən yoxlanıla bilər.
 
-## v1.12.0 — hesab müddəti və şəxsi kar marjı
+## v1.12.1 — hesab müddəti, bütün şəhərlərə fərdi düzəliş və şəxsi kar marjı
 
 - Admin → İstifadəçilər → «Son tarix, limit, endirim və yol əlavəsini idarə et»: istifadə üçün son günü seçin. Boş tarix müddətsizdir; tarix seçilən günün sonuna, Bakı vaxtına qədər keçərlidir. Aylıq say limiti ayrıca qüvvədə qalır.
 - Müddət bitəndə profil və extension «VexiraLabs ilə əlaqə qurun» göstərir; server yeni və təkrar hesablamaları rədd edir. Müddəti uzatdıqdan sonra extension-da «Oxu» basın.
 - Müştəri «Mənim paketim və endirimlərim» bölməsində endirim və **Yol pulu kar marjım** ayarını saxlayır. `10` yalnız həmin hesabın yol pulunu `$10` artırır. Bu ayarlar hesaba bağlı PostgreSQL-də saxlanır, başqa istifadəçiyə təsir etmir.
-- Üç invoys aralığı dəyişməyib: `0–3000`, `3000-dən çox–7000`, `7000-dən çox–150000`. Admin hər hesab üçün hər aralığa ayrıca müsbət əlavə məbləğ verə bilər. Müştəri bu əlavələri, Poti–Bakı ayarını, müddəti və aylıq limiti dəyişə bilməz.
-- Hesab: `max(0, əsas ABŞ–Poti − endirim) + admin əlavəsi + şəxsi kar marjı + Poti–Bakı`. Əlavələr tarif aralığını dəyişmir; aralıq avtomobil + auction fee ilə seçilir.
+- Üç invoys aralığı dəyişməyib: `0–3000`, `3000-dən çox–7000`, `7000-dən çox–150000`. Admin hər hesab üçün hər aralığa ayrıca artım və ya azalma yaza bilər: `+50`, `-100`, `0`. Düzəliş bütün şəhərlərə, Copart və IAAI tariflərinə tətbiq olunur, əsas bazanı və digər hesabları dəyişmir. Müştəri bu düzəlişləri, Poti–Bakı ayarını, müddəti və aylıq limiti dəyişə bilməz.
+- Hesab: `max(0, max(0, əsas ABŞ–Poti − şəxsi endirim) + admin düzəlişi) + şəxsi kar marjı + Poti–Bakı`. Məsələn, $1250 əsas tarif + $50 düzəliş + $200 Poti–Bakı = $1500. Düzəliş tarif aralığını dəyişmir; aralıq avtomobil + auction fee ilə seçilir. v1.12.0 migrasiyası tətbiq edilibsə, v1.12.1 üçün əlavə migrasiya yoxdur.
 - Əsas tarif siyahısı və redaktəsi yalnız ADMIN / SUPER_ADMIN üçündür.
 
 Deploy zamanı API/Web və extension birlikdə yenilənməlidir. Repo kökündə `node apps/web/api/scripts/migrate-deploy.cjs` işlədin, sonra adi build və PM2 restart edin. Skript `.env` faylını özü oxuyur; `source .env` lazım deyil. Bu buraxılışın migrasiyası mövcud hesablarda şəxsi qiymət icazəsini açır; admin onu yenidən hesab üzrə bağlaya bilər. İstifadə tarixləri avtomatik təyin olunmur. Production DB migrasiyasından əvvəl backup alın.

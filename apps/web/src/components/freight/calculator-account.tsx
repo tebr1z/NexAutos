@@ -4,17 +4,25 @@ import { useEffect, useState } from "react";
 import { api, type CalculatorProfile, type CalculatorReport } from "@/lib/api";
 
 const field = "mt-1 w-full rounded-lg border border-white/15 bg-[#101722] p-2 text-sm text-white";
+const adjustmentKeys = ['surchargeAUsd', 'surchargeBUsd', 'surchargeCUsd'] as const;
 export function CalculatorAccount({ userId, refreshKey = 0, onSaved }: { userId?: string; refreshKey?: number; onSaved?: () => void }) {
   const [profile, setProfile] = useState<CalculatorProfile | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { let active = true; api.calculatorProfile(userId).then((p) => { if (active) setProfile(p); }).catch((e) => { if (active) setMessage(e.message); }); return () => { active = false; }; }, [userId, refreshKey]);
+  const [adjustments, setAdjustments] = useState({ surchargeAUsd: "0", surchargeBUsd: "0", surchargeCUsd: "0" });
+  function loadProfile(p: CalculatorProfile) {
+    setProfile(p);
+    setAdjustments({ surchargeAUsd: String(p.surchargeAUsd), surchargeBUsd: String(p.surchargeBUsd), surchargeCUsd: String(p.surchargeCUsd) });
+  }
+  useEffect(() => { let active = true; api.calculatorProfile(userId).then((p) => { if (active) loadProfile(p); }).catch((e) => { if (active) setMessage(e.message); }); return () => { active = false; }; }, [userId, refreshKey]);
   async function save() {
     if (!profile) return;
     setBusy(true); setMessage("");
     try {
-      const { discountAUsd, discountBUsd, discountCUsd, profitMarginUsd, surchargeAUsd, surchargeBUsd, surchargeCUsd, accessUntil, potiBakuUsd, monthlyLimit, allowSelfPricing } = profile;
-      setProfile(await api.saveCalculatorProfile({ discountAUsd, discountBUsd, discountCUsd, profitMarginUsd, ...(userId ? { monthlyLimit, allowSelfPricing, accessUntil, potiBakuUsd, surchargeAUsd, surchargeBUsd, surchargeCUsd } : {}) }, userId));
+      const { discountAUsd, discountBUsd, discountCUsd, profitMarginUsd, accessUntil, potiBakuUsd, monthlyLimit, allowSelfPricing } = profile;
+      if (userId && adjustmentKeys.some((key) => !/^[+-]?\d+(?:\.\d{1,2})?$/.test(adjustments[key].trim()) || Math.abs(Number(adjustments[key])) > 10000)) throw new Error("Tarif düzəlişini −10000 ilə +10000 arasında yazın: məsələn, +50 və ya −100.");
+      const surchargeAUsd = Number(adjustments.surchargeAUsd), surchargeBUsd = Number(adjustments.surchargeBUsd), surchargeCUsd = Number(adjustments.surchargeCUsd);
+      loadProfile(await api.saveCalculatorProfile({ discountAUsd, discountBUsd, discountCUsd, profitMarginUsd, ...(userId ? { monthlyLimit, allowSelfPricing, accessUntil, potiBakuUsd, surchargeAUsd, surchargeBUsd, surchargeCUsd } : {}) }, userId));
       onSaved?.();
       setMessage("Yadda saxlanıldı. Növbəti hesablama yeni tariflə olacaq.");
     } catch (e) { setMessage(e instanceof Error ? e.message : "Saxlanılmadı."); }
@@ -34,16 +42,17 @@ export function CalculatorAccount({ userId, refreshKey = 0, onSaved }: { userId?
         <label><input type="checkbox" checked={profile.allowSelfPricing} onChange={(e) => setProfile({ ...profile, allowSelfPricing: e.target.checked })} /> İstifadəçi öz endirimini və kar marjını dəyişə bilər</label>
       </div> : null}
       {userId && <div className="mt-4 rounded-xl border border-amber-400/25 p-4">
-        <h3 className="text-sm font-semibold text-amber-200">Yol puluna admin əlavəsi — yalnız bu hesab üçün</h3>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">{([['surchargeAUsd', '0–3 000 USD'], ['surchargeBUsd', '3 000-dən çox – 7 000 USD'], ['surchargeCUsd', '7 000-dən çox – 150 000 USD']] as const).map(([key, label]) => <label key={key} className="text-xs text-zinc-400">{label} · əlavə, USD<input type="number" min={0} max={10000} step="0.01" className={field} value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: Number(e.target.value) })} /></label>)}</div>
-        <p className="mt-2 text-xs text-zinc-400">Müsbət məbləğ yol pulunu artırır. Müştəri bu admin ayarlarını dəyişə bilməz. 0 = əlavə yoxdur.</p>
+        <h3 className="text-sm font-semibold text-amber-200">Bütün şəhərlərdə yol tarifini artır / azalt — yalnız bu hesab üçün</h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">{([['surchargeAUsd', '0–3 000 USD'], ['surchargeBUsd', '3 000-dən çox – 7 000 USD'], ['surchargeCUsd', '7 000-dən çox – 150 000 USD']] as const).map(([key, label]) => <label key={key} className="text-xs text-zinc-400">{label} · düzəliş, USD<input type="text" inputMode="text" placeholder="+50 və ya -100" className={field} value={adjustments[key]} onChange={(e) => setAdjustments({ ...adjustments, [key]: e.target.value.replace(/−/g, '-') })} /></label>)}</div>
+        <p className="mt-2 text-xs text-zinc-400">+50 = hər şəhərin ABŞ–Poti tarifinə $50 əlavə; −100 = hər şəhərin tarifindən $100 azalma; 0 = dəyişiklik yoxdur. Copart və IAAI üçün tətbiq edilir, yalnız bu hesaba aiddir. Əsas baza və digər hesablar dəyişmir. Müştəri bu ayarları dəyişə bilməz.</p>
+        <p className="mt-2 text-xs text-amber-100">Məsələn: $1,250 əsas tarif + $50 düzəliş + $200 Poti–Bakı = $1,500 (şəxsi endirim və kar marjı yoxdursa).</p>
       </div>}
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {([['discountAUsd', '0–3 000 USD'], ['discountBUsd', '3 000-dən çox – 7 000 USD'], ['discountCUsd', '7 000-dən çox – 150 000 USD']] as const).map(([key, label]) => <label key={key} className="text-xs text-zinc-400">{label} · endirim, USD<input disabled={!canEdit} type="number" min={-10000} max={10000} step="0.01" className={field} value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: Number(e.target.value) })} /></label>)}
         <label className="text-xs text-zinc-400">Mənim yol pulu kar marjım, USD<input disabled={!canEdit} type="number" min={0} max={10000} step="0.01" className={field} value={profile.profitMarginUsd} onChange={(e) => setProfile({ ...profile, profitMarginUsd: Number(e.target.value) })} /></label>
         {userId && <label className="text-xs text-zinc-400">Poti–Bakı, USD (boş = ümumi tarif)<input type="number" min={0} max={10000} step="0.01" placeholder="Ümumi tarif" className={field} value={profile.potiBakuUsd ?? ""} onChange={(e) => setProfile({ ...profile, potiBakuUsd: e.target.value === "" ? null : Number(e.target.value) })} /></label>}
       </div>
-      <p className="mt-2 text-xs text-zinc-400">Qrup avtomobil + auction fee cəminə görə seçilir. Endirim ABŞ–Poti tarifindən çıxılır; admin əlavəsi və şəxsi kar marjı sonra üstünə gəlir. Kar marjına 10 yazsanız, yalnız sizin hesablamalarınızda yol pulu $10 artır. Əsas tariflər dəyişmir.</p>
+      <p className="mt-2 text-xs text-zinc-400">Qrup avtomobil + auction fee cəminə görə seçilir. Şəxsi endirimdən sonra adminin artım/azalma düzəlişi tətbiq edilir; ABŞ–Poti sıfırdan aşağı düşmür. Sonra şəxsi kar marjı və Poti–Bakı əlavə olunur. Kar marjına 10 yazsanız, yalnız sizin hesablamalarınızda yol pulu $10 artır.</p>
       {canEdit ? <button disabled={busy} onClick={() => void save()} className="mt-3 rounded-lg bg-sky-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">{busy ? "Saxlanılır…" : "Yadda saxla"}</button> : <p className="mt-3 text-xs text-zinc-400">Bu ayarları administrator təyin edir.</p>}
     </> : <p className="mt-2 text-xs">Yüklənir…</p>}
     {message ? <p role="status" className="mt-2 text-sm text-amber-200">{message}</p> : null}

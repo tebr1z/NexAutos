@@ -503,7 +503,7 @@
         <div class="row"><span>Auction fee (${escapeHtml(data.auctionFeeSource)})</span><strong>${usd(data.auctionFeeUsd)}</strong></div>
         <div class="row"><span>Avtomobil + auction</span><strong>${usd(data.invoiceUsd)}</strong></div>
         <div class="row"><span>ABŞ–Poti</span><strong>${data.quote.oceanUsd == null ? "Tarif yoxdur" : usd(data.quote.oceanUsd)}</strong></div>
-        ${data.quote.surchargeUsd ? `<p class="note">ABŞ–Poti məbləğinə daxil hesab əlavəsi: ${usd(data.quote.surchargeUsd)}</p>` : ""}
+        ${data.quote.surchargeUsd ? `<p class="note">ABŞ–Poti məbləğinə daxil hesab üzrə ${data.quote.surchargeUsd > 0 ? "artım" : "azalma"}: ${data.quote.surchargeUsd > 0 ? "+" : "−"}${usd(Math.abs(data.quote.surchargeUsd))}</p>` : ""}
         ${data.quote.profitMarginUsd ? `<p class="note">ABŞ–Poti məbləğinə daxil şəxsi kar marjı: ${usd(data.quote.profitMarginUsd)}</p>` : ""}
         <div class="row"><span>Poti–Bakı</span><strong>${usd(data.quote.tirUsd)}</strong></div>
         <div class="row"><span>Bütün yol xərci</span><strong>${data.freightUsd == null ? "—" : usd(data.freightUsd)}</strong></div>

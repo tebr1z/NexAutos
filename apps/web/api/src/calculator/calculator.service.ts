@@ -15,9 +15,10 @@ export function usageMonth(date = new Date()) {
 }
 export function adjustedFreight(ocean: number, tir: number, discount: number, override: number | null, surcharge = 0, margin = 0) {
   const discounted = Math.max(0, Math.round((ocean - discount) * 100) / 100);
-  const oceanUsd = Math.round((discounted + surcharge + margin) * 100) / 100;
+  const adjusted = Math.max(0, Math.round((discounted + surcharge) * 100) / 100);
+  const oceanUsd = Math.round((adjusted + margin) * 100) / 100;
   return { oceanUsd, tirUsd: override ?? tir, discountUsd: Math.round((ocean - discounted) * 100) / 100,
-    surchargeUsd: surcharge, profitMarginUsd: margin, freightUsd: Math.round((oceanUsd + (override ?? tir)) * 100) / 100 };
+    surchargeUsd: Math.round((adjusted - discounted) * 100) / 100, profitMarginUsd: margin, freightUsd: Math.round((oceanUsd + (override ?? tir)) * 100) / 100 };
 }
 
 @Injectable()

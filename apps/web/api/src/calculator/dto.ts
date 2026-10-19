@@ -10,9 +10,9 @@ export class PricingDto {
 export class CalculatorPlanDto extends PricingDto {
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) @Max(10000) potiBakuUsd?: number | null;
   @IsOptional() @IsDateString({ strict: true }) @Matches(/^\d{4}-\d{2}-\d{2}$/) accessUntil?: string | null;
-  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) @Max(10000) surchargeAUsd?: number;
-  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) @Max(10000) surchargeBUsd?: number;
-  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) @Max(10000) surchargeCUsd?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-10000) @Max(10000) surchargeAUsd?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-10000) @Max(10000) surchargeBUsd?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-10000) @Max(10000) surchargeCUsd?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(1000000) monthlyLimit?: number | null;
   @IsOptional() @IsBoolean() allowSelfPricing?: boolean;
 }

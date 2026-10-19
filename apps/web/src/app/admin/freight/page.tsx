@@ -225,7 +225,7 @@ export default function ShippingRatesAdminPage() {
             Avtomobil + auction fee ${(quote.invoiceUsd ?? quote.priceUsd + (quote.auctionFeeUsd ?? 0)).toLocaleString("en-US")} → yol tarifi aralığı {bandLabel(quote.band)}
           </p>
           {quote.discountUsd ? <p className="text-sm text-emerald-300">{quote.discountUsd > 0 ? "Xüsusi endirim" : "Fərdi tarif əlavəsi"}: ${Math.abs(quote.discountUsd).toFixed(2)}</p> : null}
-          {quote.surchargeUsd ? <p className="text-sm text-amber-200">Hesaba aid tarif əlavəsi: ${quote.surchargeUsd.toFixed(2)}</p> : null}
+          {quote.surchargeUsd ? <p className="text-sm text-amber-200">Hesaba aid tarif {quote.surchargeUsd > 0 ? "artımı" : "azalması"}: {quote.surchargeUsd > 0 ? "+" : "−"}${Math.abs(quote.surchargeUsd).toFixed(2)}</p> : null}
           {quote.profitMarginUsd ? <p className="text-sm text-sky-200">Şəxsi kar marjı: ${quote.profitMarginUsd.toFixed(2)}</p> : null}
           <p className="text-xs text-zinc-400">Təxmini hesabdır; yekun məbləğ təxminən ±1–2% fərqlənə bilər. Bu diapazon zəmanət deyil.</p>
           {!quote.missing && quote.totalUsd != null ? (

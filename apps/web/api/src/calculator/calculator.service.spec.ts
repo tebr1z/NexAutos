@@ -116,4 +116,31 @@ describe('Calculator account pricing and quota', () => {
     await expect(new CalculatorService(prisma).save('alice', { profitMarginUsd: 10 })).rejects.toThrow('VexiraLabs');
     expect(upsert).not.toHaveBeenCalled();
   });
+  it('applies signed account adjustments across cities and auctions without changing base tariffs', async () => {
+    const { service } = setup(0, false, { monthlyLimit: null, discountAUsd: 0, discountBUsd: 0, discountCUsd: 0, potiBakuUsd: 200, surchargeAUsd: 50, surchargeBUsd: -100 });
+    for (const [city, auction, base] of [['New York', 'COPART', 1250], ['Savannah', 'IAAI', 1800]] as const) {
+      const source = { ...quote, oceanUsd: base, band: { id: 'a' } };
+      const increased = await service.finalize(source, 'alice', { city, auction });
+      expect(increased).toMatchObject({ baseOceanUsd: base, oceanUsd: base + 50, freightUsd: base + 250, surchargeUsd: 50 });
+      const reduced = await service.finalize({ ...source, band: { id: 'b' } }, 'alice', { city, auction });
+      expect(reduced).toMatchObject({ oceanUsd: base - 100, freightUsd: base + 100, surchargeUsd: -100 });
+      expect(source.oceanUsd).toBe(base);
+    }
+    expect(adjustedFreight(50, 200, 0, null, -100, 10)).toMatchObject({ oceanUsd: 10, surchargeUsd: -50, freightUsd: 210 });
+    expect(await setup(0, false, { discountAUsd: 0, potiBakuUsd: 200 }).service.finalize({ ...quote, oceanUsd: 1250, band: { id: 'a' } }, 'bob', {})).toMatchObject({ freightUsd: 1450 });
+  });
+  it('accepts negative admin adjustments but forbids customer edits to them', async () => {
+    expect(await validate(plainToInstance(CalculatorPlanDto, { surchargeAUsd: 50, surchargeBUsd: -100, surchargeCUsd: 0 }))).toHaveLength(0);
+    expect(await validate(plainToInstance(CalculatorPlanDto, { surchargeBUsd: -10001 }))).not.toHaveLength(0);
+    const { tx } = setup(0, false, { allowSelfPricing: true });
+    const upsert = jest.fn();
+    const transaction = { ...tx, calculatorPlan: { ...tx.calculatorPlan, upsert } };
+    const prisma = { user: { findUnique: jest.fn().mockResolvedValue({ role: 'FREIGHT_USER' }) }, $transaction: (cb: (value: typeof transaction) => unknown) => cb(transaction) } as unknown as PrismaService;
+    const service = new CalculatorService(prisma);
+    await expect(service.save('alice', { surchargeBUsd: -100 })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(upsert).not.toHaveBeenCalled();
+    jest.spyOn(service, 'profile').mockResolvedValue({ ...plan, surchargeBUsd: -100, expired: false, accessMessage: null, month: '2026-10', used: 0, remaining: 1, canManageRates: false });
+    await service.save('alice', { surchargeBUsd: -100 }, { id: 'admin', role: 'ADMIN' });
+    expect(upsert).toHaveBeenCalledWith({ where: { userId: 'alice' }, create: { userId: 'alice', surchargeBUsd: -100 }, update: { surchargeBUsd: -100 } });
+  });
 });
