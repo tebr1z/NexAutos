@@ -16,8 +16,8 @@ export const ROLE_DETAILS: Record<InternalRole, { label: string; short: string; 
   },
   MANAGER: {
     label: "Menecer",
-    short: "Əməliyyat və tariflər",
-    description: "Maşınlar, kataloq, müqavilə, sığorta, bazar analizi və yol tarifləri.",
+    short: "Əməliyyat və hesablama",
+    description: "Maşınlar, kataloq, müqavilə, sığorta, bazar analizi və yol hesablaması. Əsas tarifləri yalnız admin dəyişir.",
   },
   STAFF: {
     label: "Əməkdaş",

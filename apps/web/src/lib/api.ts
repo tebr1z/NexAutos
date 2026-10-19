@@ -260,6 +260,8 @@ export type MarketSalesResponse = {
 };
 
 export type CalculatorProfile = {
+  accessUntil: string | null; expired: boolean; accessMessage: string | null;
+  profitMarginUsd: number; surchargeAUsd: number; surchargeBUsd: number; surchargeCUsd: number;
   monthlyLimit: number | null; used: number; remaining: number | null; month: string;
   allowSelfPricing: boolean; discountAUsd: number; discountBUsd: number; discountCUsd: number; potiBakuUsd: number | null;
 };
@@ -620,6 +622,8 @@ export const api = {
       baseOceanUsd?: number;
       baseTirUsd?: number;
       usage?: { used: number; monthlyLimit: number | null; remaining: number | null; month: string };
+      surchargeUsd?: number;
+      profitMarginUsd?: number;
       year?: number;
       engineCc?: number;
       fuel?: string;

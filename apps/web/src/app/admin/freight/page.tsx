@@ -23,7 +23,7 @@ function moneyAzn(n: number) {
 
 export default function ShippingRatesAdminPage() {
   const { user } = useAuth();
-  const canEditRates = ["SUPER_ADMIN", "ADMIN", "MANAGER"].includes(user?.role ?? "");
+  const canEditRates = ["SUPER_ADMIN", "ADMIN"].includes(user?.role ?? "");
   const [catalogRevision, setCatalogRevision] = useState(0);
   const [url, setUrl] = useState("");
   const [price, setPrice] = useState("4500");
@@ -53,7 +53,6 @@ export default function ShippingRatesAdminPage() {
       auction: auction || undefined,
       titleKind,
     });
-    setTirUsd(String(next.tirUsd ?? 200));
     setQuote(next);
     return next;
   }
@@ -94,9 +93,8 @@ export default function ShippingRatesAdminPage() {
         tirUsd: Number(tirUsd) || 0,
         cells: { [quote.cellKey]: ocean },
       });
-      const total = ocean + (Number(tirUsd) || 0) + (quote.auctionFeeUsd ?? 0);
       setCatalogRevision((value) => value + 1);
-      setQuote({ ...quote, oceanUsd: ocean, totalUsd: total, freightUsd: ocean + (Number(tirUsd) || 0), missing: false, tirUsd: Number(tirUsd) || 0 });
+      await loadQuote();
       setNotice(
         `${quote.auction} · ${quote.yard || quote.lot?.location}, ${quote.state} · ${bandLabel(quote.band)} üçün $${ocean.toLocaleString("en-US")} yadda saxlanıldı. Eyni yard bir daha soruşulmayacaq.`,
       );
@@ -112,7 +110,7 @@ export default function ShippingRatesAdminPage() {
     setError("");
     setDuty(null);
     try {
-      const next = quote ?? (await loadQuote());
+      const next = await loadQuote();
       const year = next.year || next.lot?.year || 0;
       const engineCc = next.engineCc || next.lot?.engineCc || 0;
       const invoiceUsd = next.invoiceUsd ?? next.priceUsd + (next.auctionFeeUsd ?? 0);
@@ -159,7 +157,7 @@ export default function ShippingRatesAdminPage() {
       {canEditRates && <AdminRateCatalog refreshKey={catalogRevision} />}
       <details open={!canEditRates} className="mt-6 max-w-3xl">
       <summary className="cursor-pointer rounded-xl border border-white/10 p-4 font-medium">Lot üzrə kalkulyator və Poti–Bakı ayarı</summary>
-      <CalculatorAccount refreshKey={quote?.usage?.used ?? 0} />
+      <CalculatorAccount refreshKey={quote?.usage?.used ?? 0} onSaved={() => { setQuote(null); setDuty(null); }} />
       <p className="mt-2 text-sm text-zinc-400">
         Bid.cars linki və hərrac qiyməti kifayətdir. Yol pulu ştata görə yox, konkret yard-a görə saxlanır: CA Sun Valley ilə CA Los Angeles ayrıdır. Gömrük hesabla Bid.cars il / mühərrik / yanacaq və auction fee invoys ilə DGK API-yə gedir.
       </p>
@@ -227,6 +225,8 @@ export default function ShippingRatesAdminPage() {
             Avtomobil + auction fee ${(quote.invoiceUsd ?? quote.priceUsd + (quote.auctionFeeUsd ?? 0)).toLocaleString("en-US")} → yol tarifi aralığı {bandLabel(quote.band)}
           </p>
           {quote.discountUsd ? <p className="text-sm text-emerald-300">{quote.discountUsd > 0 ? "Xüsusi endirim" : "Fərdi tarif əlavəsi"}: ${Math.abs(quote.discountUsd).toFixed(2)}</p> : null}
+          {quote.surchargeUsd ? <p className="text-sm text-amber-200">Hesaba aid tarif əlavəsi: ${quote.surchargeUsd.toFixed(2)}</p> : null}
+          {quote.profitMarginUsd ? <p className="text-sm text-sky-200">Şəxsi kar marjı: ${quote.profitMarginUsd.toFixed(2)}</p> : null}
           <p className="text-xs text-zinc-400">Təxmini hesabdır; yekun məbləğ təxminən ±1–2% fərqlənə bilər. Bu diapazon zəmanət deyil.</p>
           {!quote.missing && quote.totalUsd != null ? (
             <div>

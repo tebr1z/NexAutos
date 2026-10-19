@@ -92,7 +92,12 @@ model CalculatorPlan {
   userId String @id
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   monthlyLimit Int?
-  allowSelfPricing Boolean @default(false)
+  allowSelfPricing Boolean @default(true)
+  accessUntil String? @db.VarChar(10)
+  profitMarginUsd Float @default(0)
+  surchargeAUsd Float @default(0)
+  surchargeBUsd Float @default(0)
+  surchargeCUsd Float @default(0)
   discountAUsd Float @default(0)
   discountBUsd Float @default(0)
   discountCUsd Float @default(0)

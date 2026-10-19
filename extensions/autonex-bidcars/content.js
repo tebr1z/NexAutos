@@ -99,6 +99,7 @@
           </div>
           <div class="auth-user" id="authUser" hidden><div><div class="auth-title">Giriş edildi</div><p class="auth-copy" id="authEmail"></p></div><button id="logoutButton" type="button">Çıxış</button></div>
           <p class="status" id="authStatus"></p>
+          <p class="status" id="accessStatus" hidden></p>
         </section>
         <div id="calculatorContent" hidden>
         <section class="advanced" id="advancedControls" hidden>
@@ -130,14 +131,14 @@
           <p class="status" id="rateStatus"></p>
         </section>
         <p class="note" id="usageInfo"></p>
-        <details class="compact"><summary>Mənim paketim və endirimlərim</summary><div class="detail-body">
+        <details class="compact"><summary>Mənim paketim · endirim və kar marjı</summary><div class="detail-body">
           <p class="note" id="planInfo">Paket yüklənir…</p>
           <div id="personalPricing" hidden>
             <label>0–3000 USD · endirim<input id="discountA" type="number" min="-10000" max="10000" step="0.01"></label>
             <label>3000-dən çox – 7000 USD · endirim<input id="discountB" type="number" min="-10000" max="10000" step="0.01"></label>
             <label>7000-dən çox – 150000 USD · endirim<input id="discountC" type="number" min="-10000" max="10000" step="0.01"></label>
-            <label>Poti–Bakı, USD<input id="personalTir" type="number" min="0" max="10000" step="0.01" placeholder="Ümumi tarif"></label>
-            <p class="note">50 = $50 endirim; −50 = $50 əlavə xərc. Poti–Bakı: boş = ümumi tarif, 0 = çıxarılsın. Qrup maşın + auction fee cəminə görə seçilir.</p>
+            <label>Yol pulu kar marjım, USD<input id="profitMargin" type="number" min="0" max="10000" step="0.01"></label>
+            <p class="note">Endirim əsas ABŞ–Poti tarifindən çıxılır. Kar marjına 10 yazsanız, yalnız sizin hesablamalarınızda yol puluna $10 əlavə olunur. Admin əlavələri və Poti–Bakı dəyişmir.</p>
             <button class="ghost" id="savePersonal" type="button">Ayarları yadda saxla</button>
           </div>
           <a href="https://nex.autos/admin/market" target="_blank" rel="noreferrer" style="color:#67e8f9">Final qiymətlər · Bazar analizi ↗</a>
@@ -155,7 +156,7 @@
     ["authBox", "authGuest", "authUser", "authEmail", "loginEmail", "loginPassword", "loginButton", "logoutButton", "authStatus", "calculatorContent", "priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "toggleAdvanced", "advancedControls", "rateEditor", "rateHint", "rateUsd", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
   );
   const manual = new Set();
-  for (const id of ["usageInfo", "planInfo", "personalPricing", "discountA", "discountB", "discountC", "personalTir", "savePersonal", "bugMessage", "sendBug", "bugStatus"]) refs[id] = shadow.getElementById(id);
+  for (const id of ["usageInfo", "planInfo", "personalPricing", "discountA", "discountB", "discountC", "profitMargin", "accessStatus", "savePersonal", "bugMessage", "sendBug", "bugStatus"]) refs[id] = shadow.getElementById(id);
   let lastUrl = location.href;
   let lastAutoSignature = "";
   let calculating = false;
@@ -176,20 +177,26 @@
   async function loadProfile() {
     profile = await send({ type: "ANX_API", path: "/calculator/me" });
     showUsage(profile);
+    refs.accessStatus.hidden = false;
+    refs.accessStatus.className = profile.expired ? "status error" : "auth-copy";
+    refs.accessStatus.textContent = profile.expired ? profile.accessMessage : profile.accessUntil ? `Son istifadə günü: ${profile.accessUntil} (Bakı vaxtı)` : "İstifadə müddəti: məhdudiyyətsiz";
+    refs.calculate.disabled = Boolean(profile.expired) || calculating;
+    if (profile.expired) { lastCalculation = null; refs.result.hidden = true; refs.rateEditor.hidden = true; }
     refs.planInfo.textContent = profile.allowSelfPricing ? "Endirimləri dəyişib yadda saxlaya bilərsiniz." : "Fərdi tarifləriniz administrator tərəfindən idarə edilir.";
-    refs.personalPricing.hidden = !profile.allowSelfPricing;
+    refs.personalPricing.hidden = !profile.allowSelfPricing || profile.expired;
     refs.discountA.value = profile.discountAUsd;
     refs.discountB.value = profile.discountBUsd;
     refs.discountC.value = profile.discountCUsd;
-    refs.personalTir.value = profile.potiBakuUsd ?? "";
+    refs.profitMargin.value = profile.profitMarginUsd ?? 0;
   }
   async function savePersonal() {
     refs.savePersonal.disabled = true;
     try {
-      await send({ type: "ANX_API", path: "/calculator/me", method: "PATCH", body: { discountAUsd: Number(refs.discountA.value), discountBUsd: Number(refs.discountB.value), discountCUsd: Number(refs.discountC.value), potiBakuUsd: refs.personalTir.value === "" ? null : Number(refs.personalTir.value) } });
+      await send({ type: "ANX_API", path: "/calculator/me", method: "PATCH", body: { discountAUsd: Number(refs.discountA.value), discountBUsd: Number(refs.discountB.value), discountCUsd: Number(refs.discountC.value), profitMarginUsd: Number(refs.profitMargin.value) } });
       await loadProfile();
       refs.planInfo.textContent = "Yadda saxlanıldı. Yeni tariflə hesablamaq üçün Hesabla basın.";
       lastCalculation = null; refs.result.hidden = true;
+      await calculate(false);
     } catch (error) { refs.planInfo.textContent = error.message; }
     finally { refs.savePersonal.disabled = false; }
   }
@@ -221,6 +228,7 @@
     refs.authBox.classList.toggle("signed-in", authenticated);
     refs.authStatus.hidden = authenticated;
     refs.authEmail.textContent = email;
+    if (!authenticated) { profile = null; refs.accessStatus.hidden = true; }
     refs.calculate.disabled = !authenticated;
     if (!authenticated) refs.calculate.textContent = "Hesablamaq üçün giriş edin";
     else if (!calculating) refs.calculate.textContent = "Auto Nex ilə hesabla";
@@ -495,6 +503,8 @@
         <div class="row"><span>Auction fee (${escapeHtml(data.auctionFeeSource)})</span><strong>${usd(data.auctionFeeUsd)}</strong></div>
         <div class="row"><span>Avtomobil + auction</span><strong>${usd(data.invoiceUsd)}</strong></div>
         <div class="row"><span>ABŞ–Poti</span><strong>${data.quote.oceanUsd == null ? "Tarif yoxdur" : usd(data.quote.oceanUsd)}</strong></div>
+        ${data.quote.surchargeUsd ? `<p class="note">ABŞ–Poti məbləğinə daxil hesab əlavəsi: ${usd(data.quote.surchargeUsd)}</p>` : ""}
+        ${data.quote.profitMarginUsd ? `<p class="note">ABŞ–Poti məbləğinə daxil şəxsi kar marjı: ${usd(data.quote.profitMarginUsd)}</p>` : ""}
         <div class="row"><span>Poti–Bakı</span><strong>${usd(data.quote.tirUsd)}</strong></div>
         <div class="row"><span>Bütün yol xərci</span><strong>${data.freightUsd == null ? "—" : usd(data.freightUsd)}</strong></div>
         ${data.totalWithoutCustomsUsd == null ? "" : `<div class="row"><span>Gömrükdən əvvəl</span><strong>${usd(data.totalWithoutCustomsUsd)}</strong></div>`}
@@ -575,6 +585,8 @@
     refs.result.hidden = true;
 
     try {
+      await loadProfile();
+      if (profile.expired) throw new Error(profile.accessMessage || "Kalkulyatordan istifadə müddətiniz bitib. VexiraLabs ilə əlaqə qurun.");
       const pageFee = parser.selectAuctionFee({
         priceUsd,
         bidCarsFeeUsd: latestData?.auctionFeeUsd,
@@ -677,7 +689,7 @@
         : message;
     } finally {
       calculating = false;
-      refs.calculate.disabled = false;
+      refs.calculate.disabled = Boolean(profile?.expired);
       refs.calculate.textContent = "Auto Nex ilə hesabla";
       if (recalculateAfterCurrent) {
         recalculateAfterCurrent = false;

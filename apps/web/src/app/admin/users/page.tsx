@@ -129,7 +129,7 @@ export default function AccessUsersPage() {
               <button type="button" disabled={busyId === row.id || ownAccount} onClick={() => void update(row.id, { isActive: !row.isActive })} className={`rounded-xl px-4 py-2 text-xs disabled:opacity-35 ${row.isActive ? "bg-red-500/15 text-red-300" : "bg-emerald-500/15 text-emerald-300"}`}>{row.isActive ? "Girişi bağla" : "Girişi aç"}</button>
             </div> : <div className="flex items-center gap-2 rounded-xl border border-amber-400/15 bg-amber-400/5 px-4 py-3 text-xs text-amber-200"><LockKeyhole size={15} />Bu hesab qorunur və sizin rolunuzla dəyişdirilə bilməz.</div>}
           </div>
-          {!protectedAccount || ownAccount ? <><button onClick={() => setOpenPlan(openPlan === row.id ? "" : row.id)} className="mt-4 text-sm text-sky-300">{openPlan === row.id ? "Paketi bağla" : "Aylıq limit və endirimləri idarə et"}</button>{openPlan === row.id ? <CalculatorAccount userId={row.id} /> : null}</> : null}
+          {!protectedAccount || ownAccount ? <><button onClick={() => setOpenPlan(openPlan === row.id ? "" : row.id)} className="mt-4 text-sm text-sky-300">{openPlan === row.id ? "Paketi bağla" : "Son tarix, limit, endirim və yol əlavəsini idarə et"}</button>{openPlan === row.id ? <CalculatorAccount userId={row.id} /> : null}</> : null}
         </div>;
       })}
       {!rows.length ? <p className="rounded-2xl border border-white/10 p-8 text-center text-sm text-zinc-500">Hələ işçi hesabı yaradılmayıb.</p> : null}
