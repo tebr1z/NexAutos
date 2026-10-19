@@ -13,7 +13,7 @@ const usd = (value: number) => `$${value.toLocaleString("en-US", { maximumFracti
 
 export function AdminRateCatalog({ refreshKey = 0 }: { refreshKey?: number }) {
   const [data, setData] = useState<Overview | null>(null);
-  const [auction, setAuction] = useState("COPART");
+  const [auction, setAuction] = useState("ALL");
   const [state, setState] = useState("");
   const [search, setSearch] = useState("");
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -33,8 +33,10 @@ export function AdminRateCatalog({ refreshKey = 0 }: { refreshKey?: number }) {
     return () => { active = false; };
   }, [reload, refreshKey]);
 
-  const groups = data?.groups.filter((group) => group.auction === auction) ?? [];
+  const allGroups = data?.groups ?? [];
+  const groups = allGroups.filter((group) => auction === "ALL" || group.auction === auction);
   const missing = groups.filter((group) => group.missing);
+  const stateOptions = allGroups.filter((group, index, rows) => rows.findIndex((row) => row.state === group.state) === index);
   const term = search.trim().toLowerCase();
   const visible = groups.filter((group) => !state || group.state === state).map((group) => ({
     ...group,
@@ -72,19 +74,19 @@ export function AdminRateCatalog({ refreshKey = 0 }: { refreshKey?: number }) {
   return <section className="mt-6 space-y-4" aria-label="ABŞ yol tarifləri">
     <div className="flex flex-wrap items-end gap-3">
       <label className="text-xs text-zinc-400">Hərrac
-        <select className={input} value={auction} onChange={(e) => setAuction(e.target.value)}><option value="COPART">Copart</option><option value="IAAI">IAAI</option></select>
+        <select className={input} value={auction} onChange={(e) => setAuction(e.target.value)}><option value="ALL">Copart + IAAI — hamısı</option><option value="COPART">Yalnız Copart</option><option value="IAAI">Yalnız IAAI</option></select>
       </label>
       <label className="text-xs text-zinc-400">Ştat
         <select className={input} value={state} onChange={(e) => setState(e.target.value)}>
           <option value="">Bütün ABŞ — 50 ştat + DC</option>
-          {groups.map((group) => <option key={group.state} value={group.state}>{group.stateName} ({group.state}){group.missing ? " — tarif yoxdur" : ""}</option>)}
+          {stateOptions.map((group) => <option key={group.state} value={group.state}>{group.stateName} ({group.state})</option>)}
         </select>
       </label>
       <label className="min-w-40 flex-1 text-xs text-zinc-400">Ştat / şəhər / yard axtar
         <input className={input} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Məsələn: Savannah" />
       </label>
       <button className={button} disabled={loading || busy} onClick={() => setReload((value) => value + 1)}>Yenilə</button>
-      <button className={button} disabled={!data || loading || busy} onClick={() => edit(groups.find((group) => group.state === state) ?? groups[0])}>+ Tarif əlavə et</button>
+      <button className={button} title={auction === "ALL" ? "Əvvəl Copart və ya IAAI seçin" : undefined} disabled={!data || loading || busy || auction === "ALL"} onClick={() => edit(groups.find((group) => group.state === state) ?? groups[0])}>+ Tarif əlavə et</button>
     </div>
     <p className="text-xs text-zinc-400">ABŞ–Poti tarifləri USD ilədir. Aralıq avtomobil + auction fee cəminə görə seçilir. Poti–Bakı ayrıca əlavə olunur{data ? ` (əsas tarif ${usd(data.tirUsd)})` : ""}.</p>
     {loading && <p role="status" className="text-sm text-zinc-400">Tariflər yüklənir…</p>}
@@ -121,31 +123,39 @@ export function AdminRateCatalog({ refreshKey = 0 }: { refreshKey?: number }) {
       </fieldset>
     </form>}
 
-    {data && <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+    {data && <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
       <div className="min-w-0 space-y-3">
-        <p className="text-sm text-zinc-300">{auction} · {groups.filter((group) => !group.missing).length} ştat/DC-də tarif var · {missing.length} tarif yoxdur</p>
-        {visible.map((group) => <div key={group.state} className="overflow-hidden rounded-2xl border border-white/10">
+        <div className="grid gap-2 sm:grid-cols-2">{(["COPART", "IAAI"] as const).map((kind) => {
+          const auctionGroups = allGroups.filter((group) => group.auction === kind);
+          const ready = auctionGroups.filter((group) => !group.missing).length;
+          return <button key={kind} type="button" onClick={() => setAuction(kind)} className={`rounded-xl border p-3 text-left text-sm ${auction === kind ? "border-sky-400 bg-sky-400/10" : "border-white/10 bg-white/[.03]"}`}>
+            <span className="font-semibold">{kind === "COPART" ? "Copart" : "IAAI"}</span>
+            <span className="mt-1 block text-xs text-zinc-400">{ready} ştat/DC-də tarif var · {auctionGroups.length - ready} ştatda yoxdur</span>
+          </button>;
+        })}</div>
+        <p className="text-xs text-zinc-400">{auction === "ALL" ? "Bütün ştatlar aşağıda Copart və IAAI olaraq ayrı kartlarda göstərilir." : `${auction} tarifləri göstərilir.`} Şəhər/yard sətrində üç invoys aralığının hamısını görə və düzəldə bilərsiniz.</p>
+        <div className={`grid items-start gap-3 ${auction === "ALL" ? "2xl:grid-cols-2" : "grid-cols-1"}`}>{visible.map((group) => <div key={`${group.state}:${group.auction}`} className="overflow-hidden rounded-2xl border border-white/10">
           <div className="flex items-center justify-between gap-3 bg-white/5 px-4 py-3">
-            <h3 className="font-medium">{group.stateName} <span className="text-zinc-500">{group.state}</span></h3>
-            <button className="text-xs text-sky-300" disabled={busy} onClick={() => edit(groups.find((item) => item.state === group.state)!)}>+ Yard əlavə et</button>
+            <h3 className="font-medium">{group.stateName} <span className="text-zinc-500">{group.state}</span> <span className={`ml-2 rounded-full px-2 py-1 text-[10px] ${group.auction === "COPART" ? "bg-blue-500/20 text-blue-200" : "bg-red-500/20 text-red-200"}`}>{group.auction}</span></h3>
+            <button className="text-xs text-sky-300" disabled={busy} onClick={() => edit(group)}>+ Yard əlavə et</button>
           </div>
           <div className="overflow-x-auto"><table className="w-full text-left text-sm">
             <thead className="text-xs text-zinc-500"><tr><th className="p-3">Şəhər / yard</th>{data.bands.map((band) => <th key={band.id} className="whitespace-nowrap p-3">{band.min.toLocaleString("en-US")}–{band.max.toLocaleString("en-US")}</th>)}<th className="p-3">Dəyiş</th></tr></thead>
             <tbody>{group.rows.map((row) => <tr key={row.key} className="border-t border-white/10">
               <td className="p-3">{row.yard}</td>{data.bands.map((band) => <td key={band.id} className={`whitespace-nowrap p-3 ${row.rates[band.id] == null ? "text-amber-300" : "text-zinc-200"}`}>{row.rates[band.id] == null ? "Yoxdur" : usd(row.rates[band.id]!)}</td>)}
-              <td className="p-3"><button className="text-sky-300" disabled={busy} onClick={() => edit(groups.find((item) => item.state === group.state)!, row)}>Düzəlt</button></td>
+              <td className="p-3"><button className="text-sky-300" disabled={busy} onClick={() => edit(group, row)}>Düzəlt</button></td>
             </tr>)}</tbody>
           </table></div>
-        </div>)}
+        </div>)}</div>
         {!visible.length && <p className="rounded-xl border border-white/10 p-5 text-sm text-zinc-400">Bu seçim üzrə tarif yoxdur. Sağdakı siyahıdan və ya «Tarif əlavə et» ilə əlavə edin.</p>}
       </div>
       <aside className="space-y-3 rounded-2xl border border-amber-400/20 bg-amber-950/10 p-4">
         <h3 className="font-medium text-amber-200">Tarifi olmayan ştatlar · {missing.length}</h3>
-        <p className="text-xs text-zinc-400">{auction} üçün bazada heç bir müsbət tarif yoxdur. Bu, həmin ştatda hərrac məntəqəsi olduğunu təsdiqləmir.</p>
-        <div className="flex flex-wrap gap-2">{missing.map((group) => <button key={group.state} disabled={busy} className={`${button} text-amber-200`} title={group.stateName} onClick={() => { setState(group.state); setSearch(""); edit(group); }}>{group.stateName} ({group.state}) +</button>)}</div>
+        <p className="text-xs text-zinc-400">Seçilmiş görünüşdə bazada heç bir müsbət tarif olmayan ştat və hərraclar. Bu, həmin ştatda hərrac məntəqəsi olduğunu təsdiqləmir.</p>
+        <div className="flex flex-wrap gap-2">{missing.map((group) => <button key={`${group.state}:${group.auction}`} disabled={busy} className={`${button} text-amber-200`} title={`${group.stateName} · ${group.auction}`} onClick={() => { setState(group.state); setSearch(""); edit(group); }}>{group.state} · {group.auction} +</button>)}</div>
         {!missing.length && <p className="text-sm text-emerald-300">Bütün ştatlarda ən azı bir tarif var.</p>}
         <h4 className="border-t border-white/10 pt-3 text-sm">Natamam aralıqları olan ştatlar</h4>
-        {groups.filter((group) => !group.missing && group.incomplete > 0).map((group) => <button key={group.state} className="block text-left text-xs text-amber-200" onClick={() => { setState(group.state); setSearch(""); }}>{group.stateName} — {group.incomplete} natamam tarif</button>)}
+        {groups.filter((group) => !group.missing && group.incomplete > 0).map((group) => <button key={`${group.state}:${group.auction}`} className="block text-left text-xs text-amber-200" onClick={() => { setState(group.state); setAuction(group.auction); setSearch(""); }}>{group.stateName} · {group.auction} — {group.incomplete} natamam tarif</button>)}
         <p className="text-xs text-zinc-500">Bir yardın tarifi bütün ştatın əhatə olunduğu demək deyil. Naməlum yardlar avtomatik aşkar edilmir.</p>
       </aside>
     </div>}
