@@ -158,6 +158,13 @@ export class ShippingService {
   }
 
   async saveRates(dto: ShippingRatesDto) {
+    for (const [key, value] of Object.entries(dto.cells)) {
+      const match = key.match(/^([A-Z]{2}):(COPART|IAAI):(?:[a-z0-9]+(?:-[a-z0-9]+)*:)?[abc]$/);
+      if (!match || !knownState(match[1]) || (value !== null &&
+        (typeof value !== 'number' || !Number.isFinite(value) || value <= 0))) {
+        throw new BadRequestException('Tarif üçün düzgün ştat, hərrac, aralıq və müsbət USD məbləği daxil edin.');
+      }
+    }
     const current = await this.rates();
     const next: Stored = {
       tirUsd: dto.tirUsd ?? current.tirUsd,
@@ -171,6 +178,40 @@ export class ShippingService {
       create: { key: KEY, value: next },
     });
     return next;
+  }
+
+  async overview() {
+    const table = await this.rates();
+    const groups = US_STATES.flatMap((state) => AUCTIONS.map((auction) => {
+      const prefix = `${state.code}:${auction}`;
+      const slugs = new Set<string>();
+      for (const key of [...Object.keys(table.cells), ...Object.keys(table.yards)]) {
+        if (!key.startsWith(`${prefix}:`)) continue;
+        const parts = key.slice(prefix.length + 1).split(':');
+        if (parts.length === 2 && /^[abc]$/.test(parts[1])) slugs.add(parts[0]);
+        if (key in table.yards && parts.length === 1) slugs.add(parts[0]);
+      }
+      const ratesFor = (key: string) => Object.fromEntries(BANDS.map(({ id }) => {
+        const value = table.cells[`${key}:${id}`];
+        return [id, typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null];
+      })) as Record<'a' | 'b' | 'c', number | null>;
+      const fallback = ratesFor(prefix);
+      const rows = [...slugs].sort().map((slug) => ({
+        key: `${prefix}:${slug}`,
+        yard: table.yards[`${prefix}:${slug}`] || yardNameFromSlug(slug),
+        slug,
+        rates: ratesFor(`${prefix}:${slug}`),
+      }));
+      if (Object.values(fallback).some((rate) => rate !== null)) {
+        rows.unshift({ key: prefix, yard: 'Ştat üzrə ümumi tarif', slug: '', rates: fallback });
+      }
+      return {
+        state: state.code, stateName: state.name, auction, rows,
+        missing: !rows.some((row) => Object.values(row.rates).some((rate) => rate !== null)),
+        incomplete: rows.filter((row) => Object.values(row.rates).some((rate) => rate === null)).length,
+      };
+    }));
+    return { bands: BANDS, tirUsd: table.tirUsd, groups };
   }
 
   async quote(dto: ShippingQuoteDto) {

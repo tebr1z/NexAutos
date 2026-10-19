@@ -43,6 +43,14 @@ export class ShippingController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...MANAGEMENT_ROLES)
+  @SkipThrottle()
+  @Get('overview')
+  overview() {
+    return this.shipping.overview();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...MANAGEMENT_ROLES)
   @Put('rates')
   save(@Body() dto: ShippingRatesDto) {
     return this.shipping.saveRates(dto);

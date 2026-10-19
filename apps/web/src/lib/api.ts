@@ -660,7 +660,16 @@ export const api = {
   },
   shippingRates: () =>
     request<{ tirUsd: number; cells: Record<string, number | null> }>("/shipping/rates"),
-  saveShippingRates: (payload: { tirUsd: number; cells: Record<string, number | null> }) =>
+  shippingOverview: () => request<{
+    bands: { id: "a" | "b" | "c"; min: number; max: number }[];
+    tirUsd: number;
+    groups: {
+      state: string; stateName: string; auction: "COPART" | "IAAI";
+      missing: boolean; incomplete: number;
+      rows: { key: string; yard: string; slug: string; rates: Record<"a" | "b" | "c", number | null> }[];
+    }[];
+  }>("/shipping/overview"),
+  saveShippingRates: (payload: { tirUsd?: number; cells: Record<string, number | null> }) =>
     request<{ tirUsd: number; cells: Record<string, number | null> }>("/shipping/rates", {
       method: "PUT",
       body: JSON.stringify(payload),

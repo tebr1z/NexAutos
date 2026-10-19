@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { dutyUsd, fetchCustomsDuty, type CustomsDuty } from "@/lib/customs-duty";
 import { useAuth } from "@/providers/auth-provider";
 import { CalculatorAccount } from "@/components/freight/calculator-account";
+import { AdminRateCatalog } from "@/components/freight/admin-rate-catalog";
 
 const inp =
   "w-full rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm text-white placeholder:text-zinc-500";
@@ -22,7 +23,8 @@ function moneyAzn(n: number) {
 
 export default function ShippingRatesAdminPage() {
   const { user } = useAuth();
-  const canEditRates = user?.role !== "FREIGHT_USER";
+  const canEditRates = ["SUPER_ADMIN", "ADMIN", "MANAGER"].includes(user?.role ?? "");
+  const [catalogRevision, setCatalogRevision] = useState(0);
   const [url, setUrl] = useState("");
   const [price, setPrice] = useState("4500");
   const [auction, setAuction] = useState("");
@@ -93,6 +95,7 @@ export default function ShippingRatesAdminPage() {
         cells: { [quote.cellKey]: ocean },
       });
       const total = ocean + (Number(tirUsd) || 0) + (quote.auctionFeeUsd ?? 0);
+      setCatalogRevision((value) => value + 1);
       setQuote({ ...quote, oceanUsd: ocean, totalUsd: total, freightUsd: ocean + (Number(tirUsd) || 0), missing: false, tirUsd: Number(tirUsd) || 0 });
       setNotice(
         `${quote.auction} · ${quote.yard || quote.lot?.location}, ${quote.state} · ${bandLabel(quote.band)} üçün $${ocean.toLocaleString("en-US")} yadda saxlanıldı. Eyni yard bir daha soruşulmayacaq.`,
@@ -142,6 +145,7 @@ export default function ShippingRatesAdminPage() {
     setBusy(true);
     try {
       await api.saveShippingRates({ tirUsd: Number(tirUsd) || 0, cells: {} });
+      setCatalogRevision((value) => value + 1);
       setNotice("Gürcüstan–Bakı TIR yadda saxlanıldı.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "TIR yazılmadı.");
@@ -150,8 +154,11 @@ export default function ShippingRatesAdminPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-7xl">
       <h1 className="font-display text-3xl">Yol pulu</h1>
+      {canEditRates && <AdminRateCatalog refreshKey={catalogRevision} />}
+      <details open={!canEditRates} className="mt-6 max-w-3xl">
+      <summary className="cursor-pointer rounded-xl border border-white/10 p-4 font-medium">Lot üzrə kalkulyator və Poti–Bakı ayarı</summary>
       <CalculatorAccount refreshKey={quote?.usage?.used ?? 0} />
       <p className="mt-2 text-sm text-zinc-400">
         Bid.cars linki və hərrac qiyməti kifayətdir. Yol pulu ştata görə yox, konkret yard-a görə saxlanır: CA Sun Valley ilə CA Los Angeles ayrıdır. Gömrük hesabla Bid.cars il / mühərrik / yanacaq və auction fee invoys ilə DGK API-yə gedir.
@@ -280,6 +287,7 @@ export default function ShippingRatesAdminPage() {
           )}
         </div>
       ) : null}
+      </details>
     </div>
   );
 }

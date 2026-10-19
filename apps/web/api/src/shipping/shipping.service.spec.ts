@@ -65,7 +65,7 @@ describe('ShippingService', () => {
     expect(result.oceanUsd).toBe(490);
   });
 
-  it('returns a public yard catalog filtered by auction and state', async () => {
+  it('returns a yard catalog filtered by auction and state', async () => {
     const result = await service(
       {
         'GA:IAAI:savannah:a': 1240,
@@ -84,6 +84,45 @@ describe('ShippingService', () => {
       rates: { a: 1240, b: 1290, c: 1440 },
     });
     expect(result.tirUsd).toBe(200);
+  });
+
+  it('shows all states separately per auction, including missing and partial tariffs', async () => {
+    const result = await service({
+      'GA:IAAI:savannah:a': 1500,
+      'FL:COPART:a': 1600, 'FL:COPART:b': 1650, 'FL:COPART:c': 1800,
+      'CA:IAAI:los-angeles:a': null,
+    }, { 'CA:IAAI:los-angeles': 'Los Angeles' }).overview();
+    expect(result.groups).toHaveLength(102);
+    expect(result.groups.find((row) => row.state === 'GA' && row.auction === 'IAAI')).toMatchObject({ missing: false, incomplete: 1 });
+    expect(result.groups.find((row) => row.state === 'GA' && row.auction === 'COPART')).toMatchObject({ missing: true });
+    expect(result.groups.find((row) => row.state === 'FL' && row.auction === 'COPART')).toMatchObject({
+      missing: false, incomplete: 0, rows: [{ key: 'FL:COPART', slug: '', rates: { a: 1600, b: 1650, c: 1800 } }],
+    });
+    expect(result.groups.find((row) => row.state === 'CA' && row.auction === 'IAAI')).toMatchObject({
+      missing: true, rows: [{ yard: 'Los Angeles' }],
+    });
+  });
+
+  it('rejects invalid manual tariff keys and values', async () => {
+    for (const cells of [{ 'ZZ:IAAI:a': 100 }, { 'GA:OTHER:a': 100 }, { 'GA:IAAI:d': 100 }, { 'GA:IAAI:a': -1 }, { 'GA:IAAI:a': NaN }]) {
+      await expect(service({}).saveRates({ cells })).rejects.toThrow('Tarif üçün');
+    }
+  });
+
+  it('persists manual tariffs without resetting other auctions or Poti–Baku', async () => {
+    const prisma = { setting: {
+      findUnique: jest.fn().mockResolvedValue({ value: { tirUsd: 250, cells: { 'GA:COPART:a': 1900 }, yards: {}, seedVersion: 'test' } }),
+      upsert: jest.fn(),
+    } };
+    const shipping = new ShippingService(prisma as unknown as PrismaService);
+    const saved = await shipping.saveRates({ cells: { 'GA:IAAI:savannah:a': 1500, 'GA:IAAI:savannah:b': 1550, 'GA:IAAI:savannah:c': 1700 } });
+    expect(saved.tirUsd).toBe(250);
+    expect(saved.cells['GA:COPART:a']).toBe(1900);
+    prisma.setting.findUnique.mockResolvedValue({ value: saved });
+    const quoted = await shipping.quote({ ...quote, priceUsd: 7000, auctionFeeUsd: 1050 });
+    expect(quoted.oceanUsd).toBe(1700);
+    expect(quoted.freightUsd).toBe(1950);
+    expect(prisma.setting.upsert).toHaveBeenCalled();
   });
 
   it('matches a BidCars directional yard to the seeded base yard', async () => {
