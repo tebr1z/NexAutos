@@ -10,21 +10,27 @@
   const shadow = host.attachShadow({ mode: "open" });
   shadow.innerHTML = `
     <style>
-      :host { display:block; color:#e5e7eb; font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+      :host { display:block; color:#e5e7eb; font:12px/1.35 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
       :host([hidden]) { display:none !important; }
       .body [hidden] { display:none !important; }
       * { box-sizing:border-box; }
       .card { overflow:hidden; border:1px solid #273449; border-radius:15px; background:#0b1220; box-shadow:0 18px 45px rgba(3,7,18,.42); }
-      .head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 10px; background:linear-gradient(135deg,#071426,#11223c); border-bottom:1px solid #273449; }
-      .brand { display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-.02em; }
-      .mark { display:grid; place-items:center; width:27px; height:27px; border-radius:8px; color:white; background:#0d1e36; border:1px solid #315991; }
+      .head { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:7px 8px; background:linear-gradient(135deg,#071426,#11223c); border-bottom:1px solid #273449; }
+      .brand { display:flex; align-items:center; min-width:0; gap:6px; font-weight:800; letter-spacing:-.02em; }
+      .brand > div { min-width:0; }
+      #brandTitle { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
+      .head > div:last-child { display:flex; flex-shrink:0; gap:4px; }
+      .mark { display:grid; place-items:center; flex-shrink:0; width:24px; height:24px; border-radius:7px; color:white; background:#0d1e36; border:1px solid #315991; }
       .mark svg { width:22px; height:22px; }
-      .sub { color:#8da2bd; font-size:10px; margin-top:1px; font-weight:500; }
+      .sub { overflow:hidden; color:#8da2bd; font-size:9px; margin-top:1px; font-weight:500; text-overflow:ellipsis; white-space:nowrap; }
       button { font:inherit; }
-      .ghost { border:1px solid #334155; border-radius:8px; background:#172033; color:#dbeafe; padding:6px 8px; cursor:pointer; }
-      .body { padding:9px 10px 10px; }
+      .ghost { border:1px solid #334155; border-radius:7px; background:#172033; color:#dbeafe; padding:5px 7px; cursor:pointer; }
+      .body { padding:7px 8px 8px; }
       .auth-box { margin-bottom:8px; padding:9px; border:1px solid #2b4668; border-radius:10px; background:#0d1b30; }
-      .auth-box.signed-in { padding:6px 8px; }
+      .auth-box.signed-in { padding:4px 6px; margin-bottom:5px; }
+      .auth-box.signed-in .auth-title { display:none; }
+      .auth-box.signed-in .auth-copy { margin:0; overflow-wrap:anywhere; }
+      .auth-box.signed-in #accessStatus { min-height:0; margin-top:3px; font-size:9px; }
       .auth-title { color:#f8fafc; font-size:12px; font-weight:800; }
       .auth-copy { margin:2px 0 0; color:#8da2bd; font-size:9px; line-height:1.35; }
       .auth-copy a { color:#60a5fa; text-decoration:underline; }
@@ -33,25 +39,26 @@
       .auth-actions button { border:0; border-radius:9px; background:#2563eb; color:white; padding:8px 11px; font-size:11px; font-weight:800; cursor:pointer; }
       .auth-user { display:flex; align-items:center; justify-content:space-between; gap:8px; }
       .auth-user button { border:1px solid #3b4e69; border-radius:7px; background:#172033; color:#dbeafe; padding:5px 8px; font-size:9px; cursor:pointer; }
-      .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+      .grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
       label { display:block; color:#8da2bd; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
-      input,select { width:100%; margin-top:5px; border:1px solid #334155; border-radius:9px; background:#111827; color:#f8fafc; padding:9px 10px; outline:none; font:600 13px/1.2 inherit; }
+      input,select { width:100%; min-width:0; margin-top:4px; border:1px solid #334155; border-radius:7px; background:#111827; color:#f8fafc; padding:7px 8px; outline:none; font-family:inherit; font-size:12px; font-weight:600; line-height:1.3; }
       input:focus,select:focus { border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.15); }
       .wide { grid-column:1/-1; }
-      details.compact { margin-top:10px; border:1px solid #273449; border-radius:10px; background:#0f172a; }
-      details.compact > summary { padding:10px 12px; color:#a9bdd6; font-size:11px; font-weight:800; cursor:pointer; list-style:none; }
+      details.compact { margin-top:6px; border:1px solid #273449; border-radius:8px; background:#0f172a; }
+      details.compact > summary { padding:7px 8px; color:#a9bdd6; font-size:10px; font-weight:800; cursor:pointer; list-style:none; }
       details.compact > summary::after { content:"＋"; float:right; color:#60a5fa; }
       details.compact[open] > summary::after { content:"－"; }
       details.compact > .grid, details.compact > .detail-body { padding:0 12px 12px; }
-      .actions { display:flex; gap:8px; margin-top:12px; }
-      .primary { flex:1; border:0; border-radius:9px; background:#16a34a; color:white; padding:9px 10px; font-weight:800; cursor:pointer; }
+      .actions { display:flex; gap:6px; margin-top:6px; }
+      .primary { flex:1; border:0; border-radius:8px; background:#16a34a; color:white; padding:8px; font-size:12px; font-weight:800; cursor:pointer; }
       .primary:disabled { opacity:.55; cursor:wait; }
-      .status { min-height:18px; margin:10px 0 0; color:#93a4bb; font-size:11px; line-height:1.45; }
+      .status { min-height:0; margin:6px 0 0; color:#93a4bb; font-size:10px; line-height:1.35; }
+      .status:empty, .note:empty { display:none; }
       .status.error { color:#fca5a5; }
-      .result { margin-top:9px; border-top:1px solid #273449; padding-top:7px; }
-      .price-line { padding:6px; border:1px solid #273449; border-radius:8px; background:#0f172a; }
+      .result { margin-top:6px; border-top:1px solid #273449; padding-top:6px; }
+      .price-line { padding:5px; border:1px solid #273449; border-radius:7px; background:#0f172a; }
       .price-line span { display:block; margin:0 2px 5px; color:#8da2bd; font-size:9px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
-      .compact-source { margin:0; padding:7px 9px; font-size:12px; }
+      .compact-source { margin:0; padding:6px 7px; font-size:11px; }
       .compact-manual { margin-top:6px; padding:7px 9px; font-size:12px; }
       .fee-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:4px; }
       .fee-box { min-width:0; padding:9px 7px; border:1px solid #273449; border-radius:10px; background:#0f172a; text-align:center; }
@@ -60,30 +67,30 @@
       .result-details .fee-strip { gap:5px; margin-bottom:7px; }
       .result-details .fee-box { padding:6px 4px; }
       .result-details .fee-box strong { font-size:12px; }
-      .row { display:flex; justify-content:space-between; gap:14px; padding:7px 0; border-bottom:1px solid rgba(51,65,85,.6); font-size:12px; }
+      .row { display:flex; justify-content:space-between; gap:8px; padding:5px 0; border-bottom:1px solid rgba(51,65,85,.6); font-size:11px; }
       .row span:first-child { color:#94a3b8; }
       .row strong { color:#f8fafc; text-align:right; }
       .total { margin-top:11px; padding:12px; border-radius:11px; background:rgba(37,99,235,.16); border:1px solid rgba(59,130,246,.32); }
       .total small { color:#93c5fd; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
       .total div { margin-top:3px; color:#fff; font-size:24px; font-weight:900; }
-      .azn-total { margin-top:6px; padding:8px; border:1px solid rgba(59,130,246,.38); border-radius:9px; background:linear-gradient(135deg,rgba(37,99,235,.25),rgba(29,78,216,.1)); text-align:center; }
+      .azn-total { margin-top:5px; padding:7px; border:1px solid rgba(59,130,246,.38); border-radius:8px; background:linear-gradient(135deg,rgba(37,99,235,.25),rgba(29,78,216,.1)); text-align:center; }
       .azn-total small { color:#93c5fd; font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
-      .azn-total strong { display:block; margin-top:2px; color:#fff; font-size:20px; line-height:1.05; }
-      .dyp-button { width:100%; margin-top:8px; border:1px solid #475569; border-radius:9px; background:#172033; color:#dbeafe; padding:9px 10px; cursor:pointer; font-size:11px; font-weight:800; }
+      .azn-total strong { display:block; margin-top:2px; color:#fff; font-size:19px; line-height:1.1; }
+      .dyp-button { width:100%; margin-top:5px; border:1px solid #475569; border-radius:7px; background:#172033; color:#dbeafe; padding:7px; cursor:pointer; font-size:10px; font-weight:800; }
       .dyp-button.active { border-color:#16a34a; background:rgba(22,163,74,.17); color:#bbf7d0; }
       .dyp-button:disabled { opacity:.45; cursor:not-allowed; }
       .result-details { margin-top:8px !important; }
-      .advanced { margin-top:10px; padding:12px; border:1px solid #273449; border-radius:11px; background:#0f172a; }
+      .advanced { margin-top:7px; padding:8px; border:1px solid #273449; border-radius:9px; background:#0f172a; }
       .advanced .grid + .grid { margin-top:10px; padding-top:10px; border-top:1px solid #273449; }
-      .details-toggle { width:100%; margin-top:8px; }
-      .note { margin-top:9px; color:#7890ad; font-size:10px; line-height:1.45; }
+      .details-toggle { width:100%; margin-top:5px; }
+      .note { margin:6px 0 0; color:#7890ad; font-size:9px; line-height:1.35; }
       .rate-editor { margin-top:14px; padding:14px; border:1px solid #854d0e; border-radius:13px; background:rgba(120,53,15,.22); }
       .rate-editor h4 { margin:0 0 4px; color:#fde68a; font-size:13px; }
       .rate-editor p { margin:0 0 9px; color:#d6b98b; font-size:10px; line-height:1.45; }
       .rate-editor button { width:100%; margin-top:10px; border:0; border-radius:9px; background:#d97706; color:white; padding:10px; font-weight:800; cursor:pointer; }
       .rate-editor button:disabled { opacity:.55; cursor:wait; }
-      .dock { position:fixed; z-index:2147483646; right:12px; top:12px; width:min(330px,calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; margin:0; scrollbar-width:thin; scrollbar-color:#334155 transparent; }
-      @media (max-width:700px) { .dock { right:10px; top:10px; width:calc(100vw - 20px); max-height:calc(100vh - 20px); } }
+      .dock { position:fixed; z-index:2147483646; right:10px; top:10px; width:min(300px,calc(100vw - 20px)); max-height:calc(100vh - 20px); overflow:auto; margin:0; scrollbar-width:thin; scrollbar-color:#334155 transparent; }
+      @media (max-width:700px) { .dock { right:8px; top:8px; width:min(300px,calc(100vw - 16px)); max-height:calc(100dvh - 16px); } }
     </style>
     <section class="card">
       <header class="head">
@@ -466,7 +473,7 @@
     refs.result.innerHTML = `
       <div class="price-line"><span>Hesablama qiyməti</span><select class="compact-source" id="compactPriceSource" aria-label="Hesablama qiyməti mənbəyi">${compactOptions}</select>${refs.priceSource.value === "manual" ? `<input class="compact-manual" id="compactPrice" type="number" min="1" step="50" value="${Number(refs.price.value) || ""}" aria-label="Əl ilə hesablama qiyməti">` : ""}</div>
       <div class="azn-total"><small>Yekun məbləğ${includeDyp ? " · DYP daxil" : ""}</small><strong>${finalAzn == null ? "—" : azn(finalAzn)}</strong></div>
-      ${data.quote.discountUsd ? `<p class="note" style="color:#67e8f9">${data.quote.discountUsd > 0 ? "Xüsusi endirim" : "Fərdi tarif əlavəsi"}: ${usd(Math.abs(data.quote.discountUsd))} · ${data.quote.band?.id === "a" ? "0–3000" : data.quote.band?.id === "b" ? "3000-dən çox – 7000" : "7000-dən çox – 150000"} USD qrupu</p>` : ""}
+      ${data.quote.discountUsd > 0 ? `<p class="note" style="color:#67e8f9">Xüsusi endirim: ${usd(data.quote.discountUsd)}</p>` : ""}
       <button class="dyp-button${includeDyp ? " active" : ""}" id="toggleDyp" type="button" ${finalAzn == null ? "disabled" : ""}>${includeDyp ? "✓ DYP xərci əlavə edildi — 800 AZN" : "+ DYP xərclərini əlavə et — 800 AZN"}</button>
       <section class="result-details" ${showDetails ? "" : "hidden"}><div class="detail-body">
         <div class="fee-strip">
@@ -478,9 +485,6 @@
         <div class="row"><span>Auction fee (${escapeHtml(data.auctionFeeSource)})</span><strong>${usd(data.auctionFeeUsd)}</strong></div>
         <div class="row"><span>Avtomobil + auction</span><strong>${usd(data.invoiceUsd)}</strong></div>
         <div class="row"><span>ABŞ–Poti</span><strong>${data.quote.oceanUsd == null ? "Tarif yoxdur" : usd(data.quote.oceanUsd)}</strong></div>
-        ${data.quote.globalSurchargeUsd ? `<p class="note">Yol puluna daxil ümumi əlavə: ${usd(data.quote.globalSurchargeUsd)}</p>` : ""}
-        ${data.quote.surchargeUsd ? `<p class="note">ABŞ–Poti məbləğinə daxil hesab üzrə ${data.quote.surchargeUsd > 0 ? "artım" : "azalma"}: ${data.quote.surchargeUsd > 0 ? "+" : "−"}${usd(Math.abs(data.quote.surchargeUsd))}</p>` : ""}
-        ${data.quote.profitMarginUsd ? `<p class="note">ABŞ–Poti məbləğinə daxil şəxsi kar marjı: ${usd(data.quote.profitMarginUsd)}</p>` : ""}
         <div class="row"><span>Poti–Bakı</span><strong>${usd(data.quote.tirUsd)}</strong></div>
         <div class="row"><span>Bütün yol xərci</span><strong>${data.freightUsd == null ? "—" : usd(data.freightUsd)}</strong></div>
         ${data.totalWithoutCustomsUsd == null ? "" : `<div class="row"><span>Gömrükdən əvvəl</span><strong>${usd(data.totalWithoutCustomsUsd)}</strong></div>`}

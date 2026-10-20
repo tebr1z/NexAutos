@@ -170,3 +170,10 @@ Deploy zamanı API/Web və extension birlikdə yenilənməlidir. Repo kökündə
 - Endirim və kar marjı yalnız webdən idarə olunur. Müştəri həmin sahədən çıxdıqda ayar saxlanır və açıq web hesabı yenilənir; extension-da yenidən Hesabla basın.
 - Faiz fərqi qeydi kalkulyator və bazar analizindən çıxarılıb.
 - API və web yenilənib build edilməlidir; PM2 proseslərini yenidən başladın. Sonra extension-u bu paketlə yeniləyin və BidCars səhifəsini təzələyin.
+
+## v1.13.3 — daha yığcam panel
+
+- Panel 300px enə endirilib, başlıq, giriş sətri, düymələr və hesab sətirləri yığcamlaşdırılıb.
+- Hesab üzrə artım/azalma, ümumi əlavə və şəxsi kar marjı nəticədə ayrıca yazı kimi göstərilmir. Server bu məbləğləri yol puluna daxil etməyə davam edir; idarəetmə web paneldədir.
+- Müsbət xüsusi endirim qısa şəkildə göstərilir. Hesablama qiyməti seçimi, yekun AZN, DYP düyməsi və Ətraflı bölməsi saxlanılıb.
+- Bu versiya yalnız extension yeniləməsidir; əlavə API/web deploy tələb etmir.
