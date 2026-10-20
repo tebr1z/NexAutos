@@ -19,38 +19,57 @@ const API_ROUTES = new Set([
   "/customs/auto-duty?lang=az",
 ]);
 
-function normalizeApiBase(value) {
-  const raw = String(value || DEFAULTS.apiBase).trim().replace(/\/+$/, "");
-  const parsed = new URL(raw);
-  if (!/^https?:$/.test(parsed.protocol)) throw new Error("API ünvanı http və ya https olmalıdır.");
-  return raw;
+async function settings() {
+  const current = await chrome.storage.sync.get({ autoCalculate: DEFAULTS.autoCalculate });
+  return { apiBase: DEFAULTS.apiBase, autoCalculate: current.autoCalculate === true };
 }
 
-async function settings() {
-  return chrome.storage.sync.get(DEFAULTS);
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithTimeout(url, init, timeoutMs = 25000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function apiRequest(path, init = {}) {
   if (!API_ROUTES.has(path) && !/^\/vins\/[A-HJ-NPR-Z0-9]{17}$/.test(path)) {
     throw new Error("Bu API əməliyyatına icazə yoxdur.");
   }
-  const current = await settings();
-  const base = normalizeApiBase(current.apiBase);
+  const base = DEFAULTS.apiBase;
   let response;
-  try {
-    response = await fetch(`${base}${path}`, {
-      method: init.method || "GET",
-      headers: {
-        Accept: "application/json",
-        ...(init.body ? { "Content-Type": "application/json" } : {}),
-        ...(init.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      },
-      body: init.body ? JSON.stringify(init.body) : undefined,
-      cache: "no-store",
-      credentials: "omit",
-    });
-  } catch {
-    throw new Error("nex.autos API-yə qoşulmaq alınmadı. Production backend-də Chrome extension icazəsi aktiv olmalıdır.");
+  const request = {
+    method: init.method || "GET",
+    headers: {
+      Accept: "application/json",
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...(init.token ? { Authorization: `Bearer ${init.token}` } : {}),
+    },
+    body: init.body ? JSON.stringify(init.body) : undefined,
+    cache: "no-store",
+    credentials: "omit",
+  };
+  let lastNetworkError;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      response = await fetchWithTimeout(`${base}${path}`, request);
+      if (![502, 503, 504].includes(response.status) || attempt === 1) break;
+    } catch (error) {
+      lastNetworkError = error;
+      if (attempt === 1) break;
+    }
+    await delay(450);
+  }
+  if (!response) {
+    const timedOut = lastNetworkError?.name === "AbortError";
+    const detail = timedOut ? "sorğunun vaxtı bitdi" : "şəbəkə bağlantısı alınmadı";
+    throw new Error(`nex.autos API-yə qoşulmaq alınmadı (${detail}). İnterneti yoxlayıb yenidən Hesabla basın.`);
   }
   const body = await response.json().catch(() => null);
   if (!response.ok) {
@@ -73,9 +92,12 @@ async function refreshSession() {
     });
     await chrome.storage.local.set({ authToken: data.accessToken, refreshToken: data.refreshToken });
     return data.accessToken;
-  } catch {
-    await chrome.storage.local.remove(["authToken", "refreshToken"]);
-    throw new Error("Sessiya bitib. Admin hesabı ilə yenidən daxil olun.");
+  } catch (error) {
+    if ([400, 401, 403].includes(error?.status)) {
+      await chrome.storage.local.remove(["authToken", "refreshToken", "authEmail"]);
+      throw new Error("Sessiya bitib. Hesabınızla yenidən daxil olun.");
+    }
+    throw error;
   }
 }
 
@@ -93,11 +115,14 @@ async function staffRequest(path, init = {}) {
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
-  const current = await chrome.storage.sync.get(DEFAULTS);
   await chrome.storage.sync.set({
-    apiBase: current.apiBase || DEFAULTS.apiBase,
+    apiBase: DEFAULTS.apiBase,
     autoCalculate: false,
   });
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  void chrome.storage.sync.set({ apiBase: DEFAULTS.apiBase });
 });
 
 function isBidCarsUrl(value) {
@@ -189,8 +214,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return { ok: true, data: { ...(await settings()), authenticated: Boolean(auth.authToken || auth.refreshToken), authEmail: auth.authEmail } };
     }
     if (message.type === "ANX_SAVE_SETTINGS") {
-      const apiBase = normalizeApiBase(message.apiBase);
-      const next = { apiBase, autoCalculate: message.autoCalculate !== false };
+      const next = { apiBase: DEFAULTS.apiBase, autoCalculate: message.autoCalculate !== false };
       await chrome.storage.sync.set(next);
       return { ok: true, data: next };
     }

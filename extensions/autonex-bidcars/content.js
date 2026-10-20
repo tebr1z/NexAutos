@@ -131,18 +131,6 @@
           <p class="status" id="rateStatus"></p>
         </section>
         <p class="note" id="usageInfo"></p>
-        <details class="compact"><summary>Mənim paketim · endirim və kar marjı</summary><div class="detail-body">
-          <p class="note" id="planInfo">Paket yüklənir…</p>
-          <div id="personalPricing" hidden>
-            <label>0–3000 USD · endirim<input id="discountA" type="number" min="-10000" max="10000" step="0.01"></label>
-            <label>3000-dən çox – 7000 USD · endirim<input id="discountB" type="number" min="-10000" max="10000" step="0.01"></label>
-            <label>7000-dən çox – 150000 USD · endirim<input id="discountC" type="number" min="-10000" max="10000" step="0.01"></label>
-            <label>Yol pulu kar marjım, USD<input id="profitMargin" type="number" min="0" max="10000" step="0.01"></label>
-            <p class="note">Endirim əsas ABŞ–Poti tarifindən çıxılır. Kar marjına 10 yazsanız, yalnız sizin hesablamalarınızda yol puluna $10 əlavə olunur. Admin əlavələri və Poti–Bakı dəyişmir.</p>
-            <button class="ghost" id="savePersonal" type="button">Ayarları yadda saxla</button>
-          </div>
-          <a href="https://nex.autos/admin/market" target="_blank" rel="noreferrer" style="color:#67e8f9">Final qiymətlər · Bazar analizi ↗</a>
-        </div></details>
         <details class="compact"><summary>Xəta bildir</summary><div class="detail-body">
           <label>Xətanın təsviri<textarea id="bugMessage" rows="3" maxlength="2000" style="width:100%;background:#111827;color:white;border:1px solid #334155;border-radius:8px;padding:8px" placeholder="Nə baş verdi? Şifrə və şəxsi məlumat yazmayın."></textarea></label>
           <p class="note">Təsvir, bu lotun linki və extension versiyası adminə göndərilir.</p>
@@ -156,7 +144,7 @@
     ["brandTitle", "authBox", "authGuest", "authUser", "authEmail", "loginEmail", "loginPassword", "loginButton", "logoutButton", "authStatus", "calculatorContent", "priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "toggleAdvanced", "advancedControls", "rateEditor", "rateHint", "rateUsd", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
   );
   const manual = new Set();
-  for (const id of ["usageInfo", "planInfo", "personalPricing", "discountA", "discountB", "discountC", "profitMargin", "accessStatus", "savePersonal", "bugMessage", "sendBug", "bugStatus"]) refs[id] = shadow.getElementById(id);
+  for (const id of ["usageInfo", "accessStatus", "bugMessage", "sendBug", "bugStatus"]) refs[id] = shadow.getElementById(id);
   let lastUrl = location.href;
   let lastAutoSignature = "";
   let calculating = false;
@@ -187,23 +175,6 @@
     refs.accessStatus.textContent = profile.expired ? profile.accessMessage : profile.accessUntil ? `Son istifadə günü: ${profile.accessUntil} (Bakı vaxtı)` : "İstifadə müddəti: məhdudiyyətsiz";
     refs.calculate.disabled = Boolean(profile.expired) || calculating;
     if (profile.expired) { lastCalculation = null; refs.result.hidden = true; refs.rateEditor.hidden = true; }
-    refs.planInfo.textContent = profile.allowSelfPricing ? "Endirimləri dəyişib yadda saxlaya bilərsiniz." : "Fərdi tarifləriniz administrator tərəfindən idarə edilir.";
-    refs.personalPricing.hidden = !profile.allowSelfPricing || profile.expired;
-    refs.discountA.value = profile.discountAUsd;
-    refs.discountB.value = profile.discountBUsd;
-    refs.discountC.value = profile.discountCUsd;
-    refs.profitMargin.value = profile.profitMarginUsd ?? 0;
-  }
-  async function savePersonal() {
-    refs.savePersonal.disabled = true;
-    try {
-      await send({ type: "ANX_API", path: "/calculator/me", method: "PATCH", body: { discountAUsd: Number(refs.discountA.value), discountBUsd: Number(refs.discountB.value), discountCUsd: Number(refs.discountC.value), profitMarginUsd: Number(refs.profitMargin.value) } });
-      await loadProfile();
-      refs.planInfo.textContent = "Yadda saxlanıldı. Yeni tariflə hesablamaq üçün Hesabla basın.";
-      lastCalculation = null; refs.result.hidden = true;
-      await calculate(false);
-    } catch (error) { refs.planInfo.textContent = error.message; }
-    finally { refs.savePersonal.disabled = false; }
   }
   async function reportBug() {
     refs.sendBug.disabled = true;
@@ -782,7 +753,6 @@
     host.hidden = true;
   });
   refs.calculate.addEventListener("click", () => void calculate(false));
-  refs.savePersonal.addEventListener("click", () => void savePersonal());
   refs.sendBug.addEventListener("click", () => void reportBug());
   refs.loginButton.addEventListener("click", () => void login());
   refs.loginPassword.addEventListener("keydown", (event) => { if (event.key === "Enter") void login(); });

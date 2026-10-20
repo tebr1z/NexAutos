@@ -155,3 +155,10 @@ Deploy zamanı API/Web və extension birlikdə yenilənməlidir. Repo kökündə
 - Ad PostgreSQL-də həmin kalkulyator hesabına bağlı saxlanır. Eyni extension paketi ilə daxil olan hər müştəri yalnız öz adını görür; ayrıca ZIP hazırlamaq lazım deyil.
 - Mobil test tətbiqi `apps/mobile` qovluğundadır. O, extension kodundan, Chrome yaddaşından və extension sessiyasından asılı deyil; yalnız eyni API-yə ayrıca hesabla daxil olur.
 - Bu versiya üçün `20261020010000_calculator_brand_name` migrasiyasını production bazaya tətbiq etmək lazımdır.
+
+## v1.13.1 — webdən idarəetmə və sabit bağlantı
+
+- Extension-dan `Mənim paketim · endirim və kar marjı` bölməsi çıxarılıb. İstifadəçiyə tətbiq olunan endirim, əlavə xərc və kar marjı yalnız `nex.autos` web panelində idarə edilir.
+- Bütün quraşdırmalar həmişə `https://nex.autos/api/v1` production API-sinə qoşulur. Köhnə Chrome yaddaşında qalmış localhost, lokal şəbəkə və ya əvvəlki server ünvanı artıq başqa kompüterdə hesablamanı poza bilməz.
+- Müvəqqəti internet, `502`, `503` və `504` xətalarında sorğu bir dəfə avtomatik təkrarlanır. Şəbəkə problemi zamanı refresh token silinmir; yalnız server sessiyanı həqiqətən etibarsız saydıqda yenidən giriş tələb olunur.
+- Yol pulu kompüterdən və extension daxilindəki JSON-dan götürülmür. API PostgreSQL-dəki `shipping_rates` cədvəl ayarından ştat + yard + Copart/IAAI + avtomobil/auction fee invoys aralığına uyğun tarifi seçir, sonra hesaba aid web ayarlarını tətbiq edir.
