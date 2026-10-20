@@ -125,6 +125,7 @@ export class OrdersController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...OPERATIONS_ROLES)
+  @SkipThrottle()
   @Post('orders/:id/photos')
   addPhoto(@Param('id') id: string, @Body() dto: OrderPhotoDto) {
     return this.orders.addPhoto(id, dto);
@@ -132,6 +133,7 @@ export class OrdersController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...OPERATIONS_ROLES)
+  @SkipThrottle()
   @Put('orders/:id/photos')
   prunePhotos(@Param('id') id: string, @Body() dto: PrunePhotosDto) {
     return this.orders.prunePhotos(id, dto.keepIds ?? [], dto.keepUrls ?? []);

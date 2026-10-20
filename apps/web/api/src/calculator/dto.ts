@@ -17,6 +17,11 @@ export class CalculatorPlanDto extends PricingDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(1000000) monthlyLimit?: number | null;
   @IsOptional() @IsBoolean() allowSelfPricing?: boolean;
 }
+export class GlobalPricingDto {
+  @Type(() => Number) @IsNumber() @Min(0) @Max(10000) surchargeAUsd: number;
+  @Type(() => Number) @IsNumber() @Min(0) @Max(10000) surchargeBUsd: number;
+  @Type(() => Number) @IsNumber() @Min(0) @Max(10000) surchargeCUsd: number;
+}
 export class BugReportDto {
   @IsString() @MinLength(5) @MaxLength(2000) message: string;
   @IsOptional() @IsString() @MaxLength(1000) pageUrl?: string;

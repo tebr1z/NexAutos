@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/providers/i18n-provider";
 import { ShippingNotice } from "@/components/layout/shipping-notice";
-import { ArrowRight, Box, MapPin, Search, ShieldCheck } from "lucide-react";
+import { MapPin, Search } from "lucide-react";
 
 export function TrackForm() {
   const { t } = useI18n();
@@ -12,40 +12,37 @@ export function TrackForm() {
   const [code, setCode] = useState("");
 
   return (
-    <div className="mx-auto max-w-5xl px-5 pb-24 pt-32 md:px-8 md:pt-40">
+    <div className="mx-auto max-w-3xl px-4 pb-16 pt-28 sm:px-6 md:pt-36">
       <div className="text-center">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-royal/10 text-royal"><MapPin size={22} /></span>
-        <p className="mt-6 text-[11px] uppercase tracking-[0.4em] text-muted">{t.pages.trackKicker}</p>
-        <h1 className="font-display mt-3 text-4xl md:text-6xl">{t.track.title}</h1>
-        <p className="mx-auto mt-4 max-w-2xl text-muted">{t.track.subtitle}</p>
+        <h1 className="font-display mt-5 text-3xl md:text-5xl">{t.track.title}</h1>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted">{t.track.subtitle}</p>
       </div>
       <form
-        className="glass mx-auto mt-10 flex max-w-2xl flex-col gap-3 rounded-3xl p-3 sm:flex-row"
+        className="mx-auto mt-7 flex max-w-xl flex-col gap-3 rounded-3xl border border-line bg-card p-4 sm:p-6"
         onSubmit={(e) => {
           e.preventDefault();
-          if (code.trim()) router.push(`/track/${code.trim().toUpperCase()}`);
+          if (code.trim()) router.push(`/track/${encodeURIComponent(code.trim().toUpperCase())}`);
         }}
       >
+        <label htmlFor="tracking-code" className="text-sm font-medium">{t.track.placeholder}</label>
         <input
+          id="tracking-code"
+          required
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
           value={code}
           onChange={(e) => setCode(e.target.value)}
           placeholder={t.track.placeholder}
-          className="min-w-0 flex-1 bg-transparent px-4 py-3 font-mono uppercase outline-none"
+          className="min-w-0 rounded-xl border border-line bg-bg px-4 py-4 font-mono text-base uppercase outline-none focus:border-royal focus:ring-2 focus:ring-royal/15"
         />
-        <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-fg px-6 py-3 text-sm font-medium text-bg">
+        <button type="submit" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-royal px-6 py-4 text-base font-medium text-white">
           <Search size={16} /> {t.track.search}
         </button>
       </form>
-      <div className="mt-10 grid gap-4 sm:grid-cols-3">
-        <Feature icon={ShieldCheck} title={t.track.featSafe} text={t.track.featSafeD} />
-        <Feature icon={Box} title={t.track.featStages} text={t.track.featStagesD} />
-        <Feature icon={ArrowRight} title={t.track.featLive} text={t.track.featLiveD} />
-      </div>
-      <ShippingNotice className="mx-auto mt-10 max-w-2xl" />
+      <p className="mx-auto mt-4 max-w-xl text-center text-xs leading-5 text-muted">{t.track.featSafeD}</p>
+      <details className="mx-auto mt-7 max-w-xl rounded-2xl border border-line p-4"><summary className="cursor-pointer text-sm text-muted">{t.track.featStages}</summary><ShippingNotice className="mt-3" /></details>
     </div>
   );
-}
-
-function Feature({ icon: Icon, title, text }: { icon: typeof Search; title: string; text: string }) {
-  return <div className="rounded-3xl border border-line bg-card p-5"><Icon size={18} className="text-royal" /><h2 className="mt-4 text-sm font-medium">{title}</h2><p className="mt-2 text-xs leading-5 text-muted">{text}</p></div>;
 }

@@ -6,6 +6,7 @@ import { dutyUsd, fetchCustomsDuty, type CustomsDuty } from "@/lib/customs-duty"
 import { useAuth } from "@/providers/auth-provider";
 import { CalculatorAccount } from "@/components/freight/calculator-account";
 import { AdminRateCatalog } from "@/components/freight/admin-rate-catalog";
+import { GlobalPricing } from "@/components/freight/global-pricing";
 
 const inp =
   "w-full rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm text-white placeholder:text-zinc-500";
@@ -154,10 +155,11 @@ export default function ShippingRatesAdminPage() {
   return (
     <div className="mx-auto max-w-7xl">
       <h1 className="font-display text-3xl">Yol pulu</h1>
+      {canEditRates && <GlobalPricing onSaved={() => { setQuote(null); setDuty(null); }} />}
       {canEditRates && <AdminRateCatalog refreshKey={catalogRevision} />}
       <details open={!canEditRates} className="mt-6 max-w-3xl">
       <summary className="cursor-pointer rounded-xl border border-white/10 p-4 font-medium">Lot üzrə kalkulyator və Poti–Bakı ayarı</summary>
-      <CalculatorAccount refreshKey={quote?.usage?.used ?? 0} onSaved={() => { setQuote(null); setDuty(null); }} />
+      <CalculatorAccount refreshKey={quote?.usage?.used ?? 0} onSaved={() => { setDuty(null); if (quote) void loadQuote().catch((error) => setError(error.message)); }} />
       <p className="mt-2 text-sm text-zinc-400">
         Bid.cars linki və hərrac qiyməti kifayətdir. Yol pulu ştata görə yox, konkret yard-a görə saxlanır: CA Sun Valley ilə CA Los Angeles ayrıdır. Gömrük hesabla Bid.cars il / mühərrik / yanacaq və auction fee invoys ilə DGK API-yə gedir.
       </p>
@@ -227,7 +229,7 @@ export default function ShippingRatesAdminPage() {
           {quote.discountUsd ? <p className="text-sm text-emerald-300">{quote.discountUsd > 0 ? "Xüsusi endirim" : "Fərdi tarif əlavəsi"}: ${Math.abs(quote.discountUsd).toFixed(2)}</p> : null}
           {quote.surchargeUsd ? <p className="text-sm text-amber-200">Hesaba aid tarif {quote.surchargeUsd > 0 ? "artımı" : "azalması"}: {quote.surchargeUsd > 0 ? "+" : "−"}${Math.abs(quote.surchargeUsd).toFixed(2)}</p> : null}
           {quote.profitMarginUsd ? <p className="text-sm text-sky-200">Şəxsi kar marjı: ${quote.profitMarginUsd.toFixed(2)}</p> : null}
-          <p className="text-xs text-zinc-400">Təxmini hesabdır; yekun məbləğ təxminən ±1–2% fərqlənə bilər. Bu diapazon zəmanət deyil.</p>
+          {quote.globalSurchargeUsd ? <p className="text-sm text-amber-200">Ümumi yol əlavəsi: ${quote.globalSurchargeUsd.toFixed(2)} (yol puluna daxildir)</p> : null}
           {!quote.missing && quote.totalUsd != null ? (
             <div>
               <p className="font-display text-3xl text-white">${quote.totalUsd.toLocaleString("en-US")}</p>

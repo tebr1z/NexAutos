@@ -11,7 +11,7 @@ Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən 
 - İstifadəçi yalnız admin icazə verəndə öz endirimini və Poti–Bakı məbləğini dəyişir. Limit və icazə yalnız admin tərəfindən dəyişir.
 - Paketdə tarif JSON-ları və lokal tarif fallback-i yoxdur; giriş, limit və fərdi qiymətlər serverdə yoxlanır. Aşağıdakı əvvəlki versiyaların offline fallback davranışı artıq tətbiq edilmir.
 - Xəta bildirişi təsvir, lot linki və versiya ilə adminin istifadəçilər səhifəsinə gəlir. Şifrə/token göndərilmir.
-- Hesab təxminidir; göstərilən ±1–2% qeyd zəmanət deyil. Yeni vektor loqo SVG və 16/32/48/128 PNG ölçülərindədir.
+- Yeni vektor loqo SVG və 16/32/48/128 PNG ölçülərindədir.
 
 ### VDS deploy ardıcıllığı
 
@@ -162,3 +162,11 @@ Deploy zamanı API/Web və extension birlikdə yenilənməlidir. Repo kökündə
 - Bütün quraşdırmalar həmişə `https://nex.autos/api/v1` production API-sinə qoşulur. Köhnə Chrome yaddaşında qalmış localhost, lokal şəbəkə və ya əvvəlki server ünvanı artıq başqa kompüterdə hesablamanı poza bilməz.
 - Müvəqqəti internet, `502`, `503` və `504` xətalarında sorğu bir dəfə avtomatik təkrarlanır. Şəbəkə problemi zamanı refresh token silinmir; yalnız server sessiyanı həqiqətən etibarsız saydıqda yenidən giriş tələb olunur.
 - Yol pulu kompüterdən və extension daxilindəki JSON-dan götürülmür. API PostgreSQL-dəki `shipping_rates` cədvəl ayarından ştat + yard + Copart/IAAI + avtomobil/auction fee invoys aralığına uyğun tarifi seçir, sonra hesaba aid web ayarlarını tətbiq edir.
+
+## v1.13.2 — ümumi yol əlavəsi
+
+- Admin → Yol pulu: bütün hesablara və şəhərlərə üç invoys aralığı üzrə əlavə ABŞ–Poti məbləği təyin edilir. Ayarlar PostgreSQL `Setting` daxilində `calculator_global_pricing` açarında saxlanır; ayrıca migrasiya tələb olunmur.
+- Hesab: `əsas ABŞ–Poti + ümumi əlavə − şəxsi endirim + fərdi düzəliş + şəxsi kar marjı + Poti–Bakı`. Məbləğ sıfırdan aşağı düşmür. Bütün hesablar növbəti hesablamada yeni əlavəni alır, o cümlədən sonradan yaradılan hesablar.
+- Endirim və kar marjı yalnız webdən idarə olunur. Müştəri həmin sahədən çıxdıqda ayar saxlanır və açıq web hesabı yenilənir; extension-da yenidən Hesabla basın.
+- Faiz fərqi qeydi kalkulyator və bazar analizindən çıxarılıb.
+- API və web yenilənib build edilməlidir; PM2 proseslərini yenidən başladın. Sonra extension-u bu paketlə yeniləyin və BidCars səhifəsini təzələyin.

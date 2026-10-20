@@ -239,11 +239,16 @@ export function TrackingDetail({ code }: { code: string }) {
   const currentLabel = items[cursor]?.label ?? data.currentStatus;
   const route = [data.originPort, ...stops.map((s) => s.place), data.destinationPort].filter(Boolean).join(" → ");
   const location = [data.currentPort, data.currentCountry].filter(Boolean).join(", ");
-  const vessel = [data.vesselName, data.vesselImo ? `IMO ${data.vesselImo}` : ""].filter(Boolean).join(" · ");
 
   return (
-    <div className="mx-auto max-w-7xl px-5 pt-32 pb-24 md:px-8 md:pt-36">
-      <div className="flex flex-wrap items-end justify-between gap-6">
+    <div className="mx-auto max-w-7xl px-4 pt-28 pb-16 sm:px-6 md:px-8 md:pt-36">
+      <nav className="mb-5 flex gap-2 overflow-x-auto pb-1 text-sm" aria-label={t.track.title}>
+        <a href="#shipment-status" className="shrink-0 rounded-full bg-royal px-4 py-3 font-medium text-white">{t.track.status}</a>
+        {data.photos?.length ? <a href="#shipment-photos" className="shrink-0 rounded-full border border-line px-4 py-3">{t.track.photos} · {data.photos.length}</a> : null}
+        <a href="#shipment-route" className="shrink-0 rounded-full border border-line px-4 py-3">{t.track.progress}</a>
+        {(data.invoice || data.documents.length > 0) ? <a href="#shipment-documents" className="shrink-0 rounded-full border border-line px-4 py-3">{t.track.documents}</a> : null}
+      </nav>
+      <div className="flex flex-wrap items-end justify-between gap-5">
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <p className="font-mono text-sm text-royal">{data.trackingCode}</p>
@@ -258,7 +263,7 @@ export function TrackingDetail({ code }: { code: string }) {
               </span>
             ) : null}
           </div>
-          <h1 className="font-display mt-2 text-4xl md:text-5xl">
+          <h1 className="font-display mt-3 text-2xl leading-tight sm:text-4xl md:text-5xl">
             {[data.year, data.make, data.model].filter(Boolean).join(" ") || t.track.yourCar}
             {data.hasInsurance || data.insurance?.status ? (
               <Link href={`/insurance/${data.trackingCode}`} className="ml-3 text-sm font-normal text-royal">
@@ -266,7 +271,7 @@ export function TrackingDetail({ code }: { code: string }) {
               </Link>
             ) : null}
           </h1>
-          <p className="mt-2 font-mono text-sm text-muted">VIN {data.vin}</p>
+          <p className="mt-2 break-all font-mono text-xs text-muted sm:text-sm">VIN {data.vin}</p>
         </div>
         <div className="glass hidden items-center gap-4 rounded-2xl p-3 sm:flex">
           <div className="pl-2 text-right"><p className="text-xs text-muted">{t.track.openPhone}</p><p className="mt-1 text-sm">{t.track.scanQr}</p></div>
@@ -274,7 +279,8 @@ export function TrackingDetail({ code }: { code: string }) {
         </div>
       </div>
 
-      <div className="mt-10 rounded-3xl border border-line bg-card p-5 sm:p-7">
+      <section id="shipment-status" className="mt-6 scroll-mt-28 rounded-3xl border border-royal/25 bg-card p-5 sm:p-7">
+        <div className="mb-5 flex items-start gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-royal/10 text-royal"><CarFront size={23} /></span><div className="min-w-0"><p className="text-xs text-muted">{t.track.status}</p><h2 className="mt-1 text-xl font-semibold text-royal">{currentLabel}</h2><p className="mt-1 text-sm text-muted">{location || t.track.pending}</p></div></div>
         <div className="mb-2 flex justify-between text-sm">
           <span className="text-muted">{t.track.progressLabel}</span>
           <span className="font-medium text-royal">{Math.round(progress)}%</span>
@@ -282,42 +288,31 @@ export function TrackingDetail({ code }: { code: string }) {
         <div className="h-2 overflow-hidden rounded-full bg-fg/10">
           <div className="h-full royal-gradient" style={{ width: `${progress}%` }} />
         </div>
-        <div className="mt-4 flex items-center gap-2 text-sm"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-royal text-white"><Navigation size={13} /></span><span>{currentLabel}</span></div>
-      </div>
-
-      <div className="mt-5 rounded-3xl border border-royal/25 bg-royal/5 p-5 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:p-6">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.32em] text-royal">{t.track.eta}</p>
-          <p className="font-display mt-2 text-2xl sm:text-3xl">{arrivalText(data, t.track.pending, locale)}</p>
-          {data.currentStatus !== "DELIVERED" ? (
-            <p className="mt-2 max-w-xl text-xs leading-5 text-muted">{t.track.etaHint}</p>
-          ) : null}
+        <div className="mt-5 grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
+          <div><p className="flex items-center gap-2 text-xs text-muted"><CalendarClock size={16} />{t.track.eta}</p><p className="mt-2 text-xl font-semibold">{arrivalText(data, t.track.pending, locale)}</p>{data.currentStatus !== 'DELIVERED' && <p className="mt-2 text-xs leading-5 text-muted">{t.track.etaHint}</p>}</div>
+          <div><p className="text-xs text-muted">{t.track.destination}</p><p className="mt-2 font-medium">{data.destinationPort || t.track.pending}</p>{items[cursor + 1] && <p className="mt-2 flex items-center gap-2 text-sm text-muted"><ArrowRight size={15} className="shrink-0" />{items[cursor + 1].label}</p>}</div>
         </div>
-        <CalendarClock className="mt-4 hidden h-10 w-10 text-royal sm:mt-0 sm:block" />
+      </section>
+
+      <div id="shipment-photos" className="scroll-mt-28">
+        <PhotoCatalog photos={data.photos ?? []} />
       </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <InfoCard icon={MapPin} label={t.track.location} value={location || t.track.pending} />
-        <InfoCard icon={Ship} label={t.track.vessel} value={data.vesselName || t.track.unset} />
-        <InfoCard icon={Ship} label={t.track.imo} value={data.vesselImo || t.track.unset} mono />
-        <InfoCard icon={Container} label={t.track.container} value={data.containerNumber || t.track.unset} detail={data.carrierName} mono />
-        <InfoCard icon={CalendarClock} label={t.track.eta} value={arrivalText(data, t.track.pending, locale)} />
-      </div>
-
-      <ShippingNotice className="mt-6" />
-
-      {(route || location || vessel || data.containerNumber || data.eta) && (
-        <div className="mt-8 rounded-3xl border border-line bg-card p-6">
+        <div id="shipment-route" className="mt-6 scroll-mt-28 rounded-3xl border border-line bg-card p-5 sm:p-6">
           <div className="flex items-center gap-3"><Navigation size={19} className="text-royal" /><div><h2 className="font-medium">{t.track.routeTitle}</h2><p className="mt-1 text-xs text-muted">{t.track.routeSub}</p></div></div>
           {route ? <p className="mt-6 flex flex-wrap items-center gap-2 text-sm">{[data.originPort, ...stops.map((s) => s.place), data.destinationPort].filter(Boolean).map((place, index, all) => <span key={`${place}-${index}`} className="contents"><span className="rounded-full bg-bg px-3 py-2">{place}</span>{index < all.length - 1 && <ArrowRight size={14} className="text-muted" />}</span>)}</p> : <p className="mt-5 text-sm text-muted">{t.track.routePending}</p>}
           {aisPending && <p className="mt-3 text-sm text-muted">{t.track.aisPending}</p>}
         </div>
-      )}
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,.95fr)]">
-        <section className="rounded-3xl border border-line bg-card p-6 sm:p-8">
-          <div className="flex items-center gap-3"><CarFront size={20} className="text-royal" /><div><h2 className="text-xl font-medium">{t.track.stagesTitle}</h2><p className="mt-1 text-xs text-muted">{t.track.stagesSub}</p></div></div>
-      <ol className="mt-8 space-y-0">
+      <div className="mt-6 grid items-start gap-5 lg:grid-cols-2">
+        <section className="min-w-0 rounded-3xl border border-line bg-card p-5 sm:p-6">
+          <h2 className="flex items-center gap-3 font-semibold"><CarFront size={20} className="text-royal" />{t.track.stagesTitle}</h2>
+          <ol className="mt-5 space-y-3">{items.slice(Math.max(0, cursor - 1), cursor + 2).map((item) => {
+            const index = items.indexOf(item);
+            return <li key={item.id} className={`flex items-center gap-3 rounded-xl p-3 text-sm ${index === cursor ? 'bg-royal/10 font-semibold text-royal' : 'bg-bg text-muted'}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-current">{index < cursor ? <Check size={15} /> : index === cursor ? <Navigation size={14} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}</span>{item.label}</li>;
+          })}</ol>
+          <details className="mt-5 border-t border-line pt-4"><summary className="cursor-pointer py-2 text-sm font-medium text-royal">{t.track.stagesSub}</summary>
+      <ol className="mt-5 space-y-0">
         {items.map((item, i) => {
           const event = item.kind === "step" ? data.events.find((e) => e.status === item.key) : undefined;
           const when = item.kind === "transit" ? item.occurredAt : event?.occurredAt;
@@ -339,23 +334,21 @@ export function TrackingDetail({ code }: { code: string }) {
           );
         })}
       </ol>
+          </details>
         </section>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <section className="overflow-hidden rounded-3xl border border-line bg-card">
-            <div className="flex items-center justify-between p-5"><div><h2 className="font-medium">{t.track.liveTitle}</h2><p className="mt-1 text-xs text-muted">{data.vesselImo ? [data.vesselName, `IMO ${data.vesselImo}`, t.track.aisMap].filter(Boolean).join(" · ") : location || vessel || t.track.livePending}</p></div><MapPin size={20} className="text-royal" /></div>
-            {data.lat != null && data.lng != null ? <iframe title={data.vesselName ?? t.track.location} className="h-[320px] w-full border-0" src={`https://www.openstreetmap.org/export/embed.html?bbox=${data.lng - 2.2}%2C${data.lat - 1.3}%2C${data.lng + 2.2}%2C${data.lat + 1.3}&layer=mapnik&marker=${data.lat}%2C${data.lng}`} /> : <div className="flex h-52 items-center justify-center bg-bg text-sm text-muted">{t.track.coordsPending}</div>}
+            <div className="flex items-center justify-between p-5"><div><h2 className="font-medium">{t.track.liveTitle}</h2><p className="mt-1 text-xs text-muted">{location || t.track.livePending}</p></div><MapPin size={20} className="text-royal" /></div>
+            {data.lat != null && data.lng != null ? <iframe loading="lazy" title={data.vesselName ?? t.track.location} className="h-[240px] w-full border-0 sm:h-[300px]" src={`https://www.openstreetmap.org/export/embed.html?bbox=${data.lng - 2.2}%2C${data.lat - 1.3}%2C${data.lng + 2.2}%2C${data.lat + 1.3}&layer=mapnik&marker=${data.lat}%2C${data.lng}`} /> : <p className="px-5 pb-5 text-sm text-muted">{t.track.coordsPending}</p>}
+            {(data.vesselName || data.containerNumber || data.vesselImo) && <details className="border-t border-line p-5"><summary className="cursor-pointer text-sm text-royal">{t.track.vessel} · {t.track.container}</summary><div className="mt-4 space-y-3 text-sm">{data.vesselName && <p className="flex items-center gap-2 break-words"><Ship size={16} className="shrink-0 text-muted" />{data.vesselName}</p>}{data.containerNumber && <p className="flex items-center gap-2 break-all font-mono"><Container size={16} className="shrink-0 text-muted" />{data.containerNumber}</p>}{data.vesselImo && <p className="text-xs text-muted">IMO {data.vesselImo}</p>}{data.carrierName && <p className="text-muted">{data.carrierName}</p>}</div></details>}
           </section>
 
-          {(data.invoice || data.documents.length > 0) && <section className="rounded-3xl border border-line bg-card p-6"><div className="flex items-center gap-3"><FileText size={19} className="text-royal" /><h2 className="font-medium">{t.track.docsTitle}</h2></div>{data.invoice && <div className="mt-5 rounded-2xl bg-bg p-4 text-sm"><div className="flex justify-between gap-4"><span className="text-muted">{t.track.invoice} {data.invoice.number}</span><span className="font-medium">${data.invoice.amountUsd.toLocaleString()}</span></div><p className="mt-2 text-xs text-royal">{data.invoice.status}</p></div>}<div className="mt-3 space-y-2">{data.documents.map((doc) => <a key={doc.url} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-line px-4 py-3 text-sm transition hover:bg-bg"><span>{doc.title}</span><Download size={15} className="text-muted" /></a>)}</div></section>}
+          {(data.invoice || data.documents.length > 0) && <section id="shipment-documents" className="scroll-mt-28 rounded-3xl border border-line bg-card p-5"><div className="flex items-center gap-3"><FileText size={19} className="text-royal" /><h2 className="font-medium">{t.track.docsTitle}</h2></div>{data.invoice && <div className="mt-5 rounded-2xl bg-bg p-4 text-sm"><div className="flex flex-wrap justify-between gap-3"><span className="break-all text-muted">{t.track.invoice} {data.invoice.number}</span><span className="font-medium">${data.invoice.amountUsd.toLocaleString()}</span></div><p className="mt-2 text-xs text-royal">{data.invoice.status}</p></div>}<div className="mt-3 space-y-2">{data.documents.map((doc) => <a key={doc.url} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-4 text-sm transition hover:bg-bg"><span className="min-w-0 break-words">{doc.title}</span><Download size={17} className="shrink-0 text-muted" /></a>)}</div></section>}
         </div>
       </div>
 
-      <PhotoCatalog photos={data.photos ?? []} />
+      <details className="mt-6 rounded-2xl border border-line p-4"><summary className="cursor-pointer text-sm text-muted">{t.track.etaHint}</summary><ShippingNotice className="mt-4" /></details>
     </div>
   );
-}
-
-function InfoCard({ icon: Icon, label, value, detail, mono = false }: { icon: typeof MapPin; label: string; value: string; detail?: string; mono?: boolean }) {
-  return <div className="rounded-3xl border border-line bg-card p-5"><div className="flex items-center gap-2 text-xs text-muted"><Icon size={16} className="text-royal" />{label}</div><p className={`mt-4 text-sm font-medium ${mono ? "font-mono" : ""}`}>{value}</p>{detail && <p className="mt-1 truncate text-xs text-muted">{detail}</p>}</div>;
 }

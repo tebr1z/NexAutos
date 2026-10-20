@@ -16,7 +16,7 @@ export function CalculatorAccount({ userId, refreshKey = 0, onSaved }: { userId?
   }
   useEffect(() => { let active = true; api.calculatorProfile(userId).then((p) => { if (active) loadProfile(p); }).catch((e) => { if (active) setMessage(e.message); }); return () => { active = false; }; }, [userId, refreshKey]);
   async function save() {
-    if (!profile) return;
+    if (!profile || busy) return;
     setBusy(true); setMessage("");
     try {
       const { brandName, discountAUsd, discountBUsd, discountCUsd, profitMarginUsd, accessUntil, potiBakuUsd, monthlyLimit, allowSelfPricing } = profile;
@@ -53,11 +53,11 @@ export function CalculatorAccount({ userId, refreshKey = 0, onSaved }: { userId?
         <p className="mt-2 text-xs text-amber-100">Məsələn: $1,250 əsas tarif + $50 düzəliş + $200 Poti–Bakı = $1,500 (şəxsi endirim və kar marjı yoxdursa).</p>
       </div>}
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {([['discountAUsd', '0–3 000 USD'], ['discountBUsd', '3 000-dən çox – 7 000 USD'], ['discountCUsd', '7 000-dən çox – 150 000 USD']] as const).map(([key, label]) => <label key={key} className="text-xs text-zinc-400">{label} · endirim, USD<input disabled={!canEditPricing} type="number" min={-10000} max={10000} step="0.01" className={field} value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: Number(e.target.value) })} /></label>)}
-        <label className="text-xs text-zinc-400">Mənim yol pulu kar marjım, USD<input disabled={!canEditPricing} type="number" min={0} max={10000} step="0.01" className={field} value={profile.profitMarginUsd} onChange={(e) => setProfile({ ...profile, profitMarginUsd: Number(e.target.value) })} /></label>
+        {([['discountAUsd', '0–3 000 USD'], ['discountBUsd', '3 000-dən çox – 7 000 USD'], ['discountCUsd', '7 000-dən çox – 150 000 USD']] as const).map(([key, label]) => <label key={key} className="text-xs text-zinc-400">{label} · yol pulundan endirim, USD<input disabled={!canEditPricing || busy} type="number" min={-10000} max={10000} step="0.01" className={field} value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: Number(e.target.value) })} onBlur={() => { if (!userId && canEditPricing) void save(); }} /></label>)}
+        <label className="text-xs text-zinc-400">Mənim yol pulu kar marjım, USD<input disabled={!canEditPricing || busy} type="number" min={0} max={10000} step="0.01" className={field} value={profile.profitMarginUsd} onChange={(e) => setProfile({ ...profile, profitMarginUsd: Number(e.target.value) })} onBlur={() => { if (!userId && canEditPricing) void save(); }} /><span className="mt-1 block text-sky-300">Yol puluna +${Number(profile.profitMarginUsd || 0).toFixed(2)} əlavə olunur.</span></label>
         {userId && <label className="text-xs text-zinc-400">Poti–Bakı, USD (boş = ümumi tarif)<input type="number" min={0} max={10000} step="0.01" placeholder="Ümumi tarif" className={field} value={profile.potiBakuUsd ?? ""} onChange={(e) => setProfile({ ...profile, potiBakuUsd: e.target.value === "" ? null : Number(e.target.value) })} /></label>}
       </div>
-      <p className="mt-2 text-xs text-zinc-400">Qrup avtomobil + auction fee cəminə görə seçilir. Şəxsi endirimdən sonra adminin artım/azalma düzəlişi tətbiq edilir; ABŞ–Poti sıfırdan aşağı düşmür. Sonra şəxsi kar marjı və Poti–Bakı əlavə olunur. Kar marjına 10 yazsanız, yalnız sizin hesablamalarınızda yol pulu $10 artır.</p>
+      <p className="mt-2 text-xs text-zinc-400">Qrup avtomobil + auction fee cəminə görə seçilir. Baza tarifinə ümumi yol əlavəsi gəlir, şəxsi endirim çıxılır, fərdi düzəliş, kar marjı və Poti–Bakı əlavə olunur. Kar marjına 10 yazsanız, yol pulunuz $10 artır. {!userId && canEditPricing ? 'Endirim və kar marjı sahəsindən çıxdıqda avtomatik saxlanılır.' : ''}</p>
       {canEditBrand ? <button disabled={busy} onClick={() => void save()} className="mt-3 rounded-lg bg-sky-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">{busy ? "Saxlanılır…" : "Yadda saxla"}</button> : null}
       {!canEditPricing ? <p className="mt-3 text-xs text-zinc-400">{profile.expired ? "Hesab aktivləşdirildikdən sonra extension adınızı dəyişə bilərsiniz." : "Endirim və kar marjını administrator təyin edir; extension adınızı isə özünüz dəyişə bilərsiniz."}</p> : null}
     </> : <p className="mt-2 text-xs">Yüklənir…</p>}

@@ -278,6 +278,8 @@ export type AccessUser = {
 };
 
 export const api = {
+  globalCalculatorPricing: () => request<{ surchargeAUsd: number; surchargeBUsd: number; surchargeCUsd: number }>('/calculator/global-pricing'),
+  saveGlobalCalculatorPricing: (payload: { surchargeAUsd: number; surchargeBUsd: number; surchargeCUsd: number }) => request<{ surchargeAUsd: number; surchargeBUsd: number; surchargeCUsd: number }>('/calculator/global-pricing', { method: 'PATCH', body: JSON.stringify(payload) }),
   calculatorProfile: (userId?: string) => request<CalculatorProfile>(userId ? `/calculator/users/${encodeURIComponent(userId)}` : '/calculator/me'),
   saveCalculatorProfile: (payload: Partial<CalculatorProfile>, userId?: string) => request<CalculatorProfile>(userId ? `/calculator/users/${encodeURIComponent(userId)}` : '/calculator/me', { method: 'PATCH', body: JSON.stringify(payload) }),
   calculatorReports: () => request<CalculatorReport[]>('/calculator/reports'),
@@ -411,7 +413,7 @@ export const api = {
       body: JSON.stringify({ keepIds, keepUrls }),
     }),
   addOrderPhoto: (id: string, payload: { url: string; category?: string; caption?: string }) =>
-    request<TrackingShipment>(`/orders/${id}/photos`, {
+    request<TrackingShipment & { uploadedPhotoId: string }>(`/orders/${id}/photos`, {
       method: "POST",
       body: JSON.stringify({
         url: payload.url,
@@ -624,6 +626,7 @@ export const api = {
       baseTirUsd?: number;
       usage?: { used: number; monthlyLimit: number | null; remaining: number | null; month: string };
       surchargeUsd?: number;
+      globalSurchargeUsd?: number;
       profitMarginUsd?: number;
       year?: number;
       engineCc?: number;

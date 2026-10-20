@@ -91,7 +91,7 @@ export function PhotoCatalog({ photos }: { photos: TrackingPhoto[] }) {
               className="h-[52vw] max-h-[22rem] min-h-[14rem] w-full shrink-0 snap-center overflow-hidden rounded-2xl border border-line bg-bg"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photo.url} alt={photo.caption ?? ""} className="h-full w-full object-cover" />
+              <img src={photo.url} alt={photo.caption ?? ""} loading="lazy" decoding="async" className="h-full w-full object-cover" />
             </button>
           ))}
         </div>

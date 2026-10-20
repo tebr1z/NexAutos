@@ -78,7 +78,6 @@ function photoRows(photos?: { url?: string; category?: string; caption?: string 
   if (!photos?.length) return [];
   return photos
     .filter((row) => typeof row.url === "string" && (row.url.startsWith("data:image/") || /^https?:\/\//i.test(row.url)))
-    .slice(0, 40)
     .map((row) => ({
       url: row.url as string,
       caption: row.caption?.trim() || null,
@@ -889,13 +888,13 @@ export class OrdersService {
     if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
     const rows = photoRows([dto]);
     if (!rows.length) throw new BadRequestException('Şəkil JPEG və ya PNG olmalıdır.');
-    const count = await this.prisma.orderPhoto.count({ where: { orderId } });
-    if (count >= 40) throw new BadRequestException('Maksimum 40 şəkil.');
     const parsed = decodeDataUrl(rows[0].url);
+    let uploadedPhotoId: string;
     if ((await this.cloud.isEnabled()) && parsed) {
       const created = await this.prisma.orderPhoto.create({
         data: { orderId, url: 'pending', caption: rows[0].caption, category: rows[0].category },
       });
+      uploadedPhotoId = created.id;
       try {
         const url = await this.cloud.put(existing.vin, created.id, rows[0].url);
         await this.prisma.orderPhoto.update({ where: { id: created.id }, data: { url } });
@@ -907,10 +906,11 @@ export class OrdersService {
         });
       }
     } else {
-      await this.prisma.orderPhoto.create({ data: { orderId, ...rows[0] } });
+      const created = await this.prisma.orderPhoto.create({ data: { orderId, ...rows[0] } });
+      uploadedPhotoId = created.id;
     }
     const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: ORDER_INCLUDE });
-    return mapOrder(order);
+    return { ...mapOrder(order), uploadedPhotoId };
   }
 
   async prunePhotos(orderId: string, keepIds: string[] = [], keepUrls: string[] = []) {

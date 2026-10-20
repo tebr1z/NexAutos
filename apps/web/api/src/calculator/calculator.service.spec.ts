@@ -13,7 +13,7 @@ function setup(used = 0, recent = false, customPlan: Partial<typeof plan> = {}) 
     calculatorPlan: { findUnique: jest.fn().mockResolvedValue({ ...plan, ...customPlan }) },
     calculatorUse: { count: jest.fn().mockResolvedValue(used), findFirst: jest.fn().mockResolvedValue(recent ? { id: 'prior' } : null), create: jest.fn().mockResolvedValue({}) },
   };
-  const prisma = { $transaction: jest.fn((cb) => cb(tx)) } as unknown as PrismaService;
+  const prisma = { setting: { findUnique: jest.fn().mockResolvedValue(null) }, $transaction: jest.fn((cb) => cb(tx)) } as unknown as PrismaService;
   return { service: new CalculatorService(prisma), tx };
 }
 describe('Calculator account pricing and quota', () => {
@@ -111,7 +111,7 @@ describe('Calculator account pricing and quota', () => {
     };
     const { tx } = setup();
     tx.calculatorPlan.findUnique.mockImplementation(async ({ where }: { where: { userId: string } }) => plans[where.userId]);
-    const service = new CalculatorService({ $transaction: (cb: (value: typeof tx) => unknown) => cb(tx) } as unknown as PrismaService);
+    const service = new CalculatorService({ setting: { findUnique: jest.fn().mockResolvedValue(null) }, $transaction: (cb: (value: typeof tx) => unknown) => cb(tx) } as unknown as PrismaService);
     const alice = await service.finalize(quote, 'alice', {});
     const bob = await service.finalize(quote, 'bob', {});
     expect(alice.freightUsd! - bob.freightUsd!).toBe(10);
@@ -151,5 +151,26 @@ describe('Calculator account pricing and quota', () => {
     jest.spyOn(service, 'profile').mockResolvedValue({ ...plan, surchargeBUsd: -100, expired: false, accessMessage: null, month: '2026-10', used: 0, remaining: 1, canManageRates: false });
     await service.save('alice', { surchargeBUsd: -100 }, { id: 'admin', role: 'ADMIN' });
     expect(upsert).toHaveBeenCalledWith({ where: { userId: 'alice' }, create: { userId: 'alice', surchargeBUsd: -100 }, update: { surchargeBUsd: -100 } });
+  });
+  it('applies global additions to every account and city before personal discounts and margins', async () => {
+    const { tx } = setup(0, false, { monthlyLimit: null, potiBakuUsd: 200, discountAUsd: 30, discountBUsd: 30, discountCUsd: 30, profitMarginUsd: 10 });
+    const setting = { findUnique: jest.fn().mockResolvedValue({ value: { surchargeAUsd: 50, surchargeBUsd: 100, surchargeCUsd: 200 } }) };
+    const service = new CalculatorService({ setting, $transaction: (cb: (value: typeof tx) => unknown) => cb(tx) } as unknown as PrismaService);
+    for (const userId of ['alice', 'bob']) {
+      for (const [id, extra] of [['a', 50], ['b', 100], ['c', 200]] as const) {
+        for (const [city, auction, base] of [['New York', 'COPART', 1250], ['Savannah', 'IAAI', 1800]] as const) {
+          const result = await service.finalize({ ...quote, oceanUsd: base, band: { id } }, userId, { city, auction });
+          expect(result).toMatchObject({ baseOceanUsd: base, globalSurchargeUsd: extra, oceanUsd: base + extra - 30 + 10, freightUsd: base + extra - 30 + 10 + 200, profitMarginUsd: 10 });
+        }
+      }
+    }
+  });
+  it('stores global prices independently without rewriting individual account plans', async () => {
+    const setting = { upsert: jest.fn().mockResolvedValue({}) };
+    const prisma = { setting, calculatorPlan: { upsert: jest.fn() } };
+    const value = { surchargeAUsd: 50, surchargeBUsd: 100, surchargeCUsd: 200 };
+    expect(await new CalculatorService(prisma as unknown as PrismaService).saveGlobalPricing(value)).toEqual(value);
+    expect(setting.upsert).toHaveBeenCalledWith({ where: { key: 'calculator_global_pricing' }, create: { key: 'calculator_global_pricing', value }, update: { value } });
+    expect(prisma.calculatorPlan.upsert).not.toHaveBeenCalled();
   });
 });

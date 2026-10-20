@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FULL_ACCESS_ROLES, INTERNAL_ROLES } from '../common/access-roles';
-import { BugReportDto, CalculatorPlanDto, PricingDto } from './dto';
+import { BugReportDto, CalculatorPlanDto, GlobalPricingDto, PricingDto } from './dto';
 
 const defaults = { monthlyLimit: null as number | null, allowSelfPricing: true, brandName: null as string | null, accessUntil: null as string | null, profitMarginUsd: 0, surchargeAUsd: 0, surchargeBUsd: 0, surchargeCUsd: 0, discountAUsd: 0, discountBUsd: 0, discountCUsd: 0, potiBakuUsd: null as number | null };
 const EXPIRED_MESSAGE = 'Kalkulyatordan istifadə müddətiniz bitib. VexiraLabs ilə əlaqə qurun.';
@@ -24,6 +24,21 @@ export function adjustedFreight(ocean: number, tir: number, discount: number, ov
 @Injectable()
 export class CalculatorService {
   constructor(private prisma: PrismaService) {}
+
+  async globalPricing(): Promise<GlobalPricingDto> {
+    const row = await this.prisma.setting.findUnique({ where: { key: 'calculator_global_pricing' } });
+    const value = (row?.value ?? {}) as Partial<GlobalPricingDto>;
+    return Object.fromEntries((['surchargeAUsd', 'surchargeBUsd', 'surchargeCUsd'] as const).map((key) => {
+      const amount = Number(value[key]);
+      return [key, Number.isFinite(amount) && amount >= 0 ? amount : 0];
+    })) as unknown as GlobalPricingDto;
+  }
+
+  async saveGlobalPricing(dto: GlobalPricingDto) {
+    const value = { surchargeAUsd: dto.surchargeAUsd, surchargeBUsd: dto.surchargeBUsd, surchargeCUsd: dto.surchargeCUsd };
+    await this.prisma.setting.upsert({ where: { key: 'calculator_global_pricing' }, create: { key: 'calculator_global_pricing', value }, update: { value } });
+    return value;
+  }
 
   async profile(userId: string) {
     const month = usageMonth();
@@ -69,13 +84,15 @@ export class CalculatorService {
 
   async finalize<T extends { oceanUsd: number | null; tirUsd: number; auctionFeeUsd: number; priceUsd: number; band: { id: string }; missing: boolean }>(quote: T, userId: string | undefined, input: unknown) {
     if (!userId) return { ...quote, pricingApplied: true }; // authenticated internal collector
+    const global = await this.globalPricing();
+    const globalSurchargeUsd = quote.band.id === 'a' ? global.surchargeAUsd : quote.band.id === 'b' ? global.surchargeBUsd : global.surchargeCUsd;
     return this.prisma.$transaction(async (tx) => {
       // Serialize concurrent requests and admin edits for the same account.
       await tx.$queryRaw`SELECT true AS locked FROM pg_advisory_xact_lock(hashtext(${userId}))`;
       const plan = { ...defaults, ...await tx.calculatorPlan.findUnique({ where: { userId } }) };
       if (accessExpired(plan.accessUntil)) throw new ForbiddenException(EXPIRED_MESSAGE);
       const month = usageMonth();
-      const fingerprint = createHash('sha256').update(JSON.stringify([input, plan])).digest('hex');
+      const fingerprint = createHash('sha256').update(JSON.stringify([input, plan, global])).digest('hex');
       const recent = await tx.calculatorUse.findFirst({ where: { userId, month, fingerprint, createdAt: { gte: new Date(Date.now() - 600000) } } });
       let used = await tx.calculatorUse.count({ where: { userId, month } });
       if (!recent && plan.monthlyLimit != null && used >= plan.monthlyLimit) throw new ForbiddenException('Aylıq hesablama limitiniz bitib. VexiraLabs ilə əlaqə qurun.');
@@ -85,8 +102,8 @@ export class CalculatorService {
       }
       const discount = quote.band.id === 'a' ? plan.discountAUsd : quote.band.id === 'b' ? plan.discountBUsd : plan.discountCUsd;
       const surcharge = quote.band.id === 'a' ? plan.surchargeAUsd : quote.band.id === 'b' ? plan.surchargeBUsd : plan.surchargeCUsd;
-      const pricing = quote.oceanUsd == null ? null : adjustedFreight(quote.oceanUsd, quote.tirUsd, discount, plan.potiBakuUsd, surcharge, plan.profitMarginUsd);
-      return { ...quote, ...pricing, baseOceanUsd: quote.oceanUsd, baseTirUsd: quote.tirUsd,
+      const pricing = quote.oceanUsd == null ? null : adjustedFreight(quote.oceanUsd + globalSurchargeUsd, quote.tirUsd, discount, plan.potiBakuUsd, surcharge, plan.profitMarginUsd);
+      return { ...quote, ...pricing, globalSurchargeUsd, baseOceanUsd: quote.oceanUsd, baseTirUsd: quote.tirUsd,
         totalUsd: pricing ? pricing.freightUsd + quote.auctionFeeUsd : null,
         pricingApplied: true, usage: { month, used, monthlyLimit: plan.monthlyLimit, remaining: plan.monthlyLimit == null ? null : Math.max(0, plan.monthlyLimit - used) } };
     });

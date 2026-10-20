@@ -5,13 +5,15 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { FULL_ACCESS_ROLES, INTERNAL_ROLES } from '../common/access-roles';
 import { CalculatorService } from './calculator.service';
-import { BugReportDto, BugStatusDto, CalculatorPlanDto, PricingDto } from './dto';
+import { BugReportDto, BugStatusDto, CalculatorPlanDto, GlobalPricingDto, PricingDto } from './dto';
 
 @Controller('calculator')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(...INTERNAL_ROLES)
 export class CalculatorController {
   constructor(private calculator: CalculatorService) {}
+  @Get('global-pricing') @Roles(...FULL_ACCESS_ROLES) globalPricing() { return this.calculator.globalPricing(); }
+  @Patch('global-pricing') @Roles(...FULL_ACCESS_ROLES) saveGlobalPricing(@Body() dto: GlobalPricingDto) { return this.calculator.saveGlobalPricing(dto); }
   @Get('me') profile(@CurrentUser() user: { id: string }) { return this.calculator.profile(user.id); }
   @Patch('me') save(@CurrentUser() user: { id: string }, @Body() dto: PricingDto) { return this.calculator.save(user.id, dto); }
   @Post('reports') report(@CurrentUser() user: { id: string }, @Body() dto: BugReportDto) { return this.calculator.report(user.id, dto); }

@@ -106,17 +106,14 @@ async function pushOrderPhotos(orderId: string, photos: TrackingShipment["photos
     }
     try {
       const url = await fitDataUrl(photo.url);
-      const before = new Set(keepIds);
-      last = await api.addOrderPhoto(orderId, {
+      const uploaded = await api.addOrderPhoto(orderId, {
         url,
         category: photo.category,
         caption: photo.caption,
       });
-      const added = last.photos?.find((row) => {
-        const id = row.id || row.url.match(/\/media\/photos\/([^/?#]+)/)?.[1];
-        return Boolean(id && !before.has(id));
-      });
-      const id = added?.id || added?.url.match(/\/media\/photos\/([^/?#]+)/)?.[1];
+      last = uploaded;
+      const added = uploaded.photos?.find((row) => row.id === uploaded.uploadedPhotoId);
+      const id = uploaded.uploadedPhotoId;
       if (id) keepIds.push(id);
       if (added?.url) keepUrls.push(added.url);
     } catch (err) {
@@ -124,6 +121,9 @@ async function pushOrderPhotos(orderId: string, photos: TrackingShipment["photos
     }
   }
 
+  if (failed.length) {
+    throw new Error(`${failed.length} şəkil yüklənmədi. Uğurlu şəkillər serverdə saxlanıldı. ${failed[0]}`);
+  }
   if (keepIds.length === 0 && keepUrls.length === 0) {
     throw new Error(failed[0] || "Şəkillər Cloudflare R2-yə yazılmadı. Yenidən Yadda saxla basın.");
   }

@@ -466,7 +466,6 @@
     refs.result.innerHTML = `
       <div class="price-line"><span>Hesablama qiyməti</span><select class="compact-source" id="compactPriceSource" aria-label="Hesablama qiyməti mənbəyi">${compactOptions}</select>${refs.priceSource.value === "manual" ? `<input class="compact-manual" id="compactPrice" type="number" min="1" step="50" value="${Number(refs.price.value) || ""}" aria-label="Əl ilə hesablama qiyməti">` : ""}</div>
       <div class="azn-total"><small>Yekun məbləğ${includeDyp ? " · DYP daxil" : ""}</small><strong>${finalAzn == null ? "—" : azn(finalAzn)}</strong></div>
-      <p class="note" style="text-align:center">Təxmini məbləğ · ±1–2% fərqlənə bilər; zəmanətli diapazon deyil.</p>
       ${data.quote.discountUsd ? `<p class="note" style="color:#67e8f9">${data.quote.discountUsd > 0 ? "Xüsusi endirim" : "Fərdi tarif əlavəsi"}: ${usd(Math.abs(data.quote.discountUsd))} · ${data.quote.band?.id === "a" ? "0–3000" : data.quote.band?.id === "b" ? "3000-dən çox – 7000" : "7000-dən çox – 150000"} USD qrupu</p>` : ""}
       <button class="dyp-button${includeDyp ? " active" : ""}" id="toggleDyp" type="button" ${finalAzn == null ? "disabled" : ""}>${includeDyp ? "✓ DYP xərci əlavə edildi — 800 AZN" : "+ DYP xərclərini əlavə et — 800 AZN"}</button>
       <section class="result-details" ${showDetails ? "" : "hidden"}><div class="detail-body">
@@ -479,6 +478,7 @@
         <div class="row"><span>Auction fee (${escapeHtml(data.auctionFeeSource)})</span><strong>${usd(data.auctionFeeUsd)}</strong></div>
         <div class="row"><span>Avtomobil + auction</span><strong>${usd(data.invoiceUsd)}</strong></div>
         <div class="row"><span>ABŞ–Poti</span><strong>${data.quote.oceanUsd == null ? "Tarif yoxdur" : usd(data.quote.oceanUsd)}</strong></div>
+        ${data.quote.globalSurchargeUsd ? `<p class="note">Yol puluna daxil ümumi əlavə: ${usd(data.quote.globalSurchargeUsd)}</p>` : ""}
         ${data.quote.surchargeUsd ? `<p class="note">ABŞ–Poti məbləğinə daxil hesab üzrə ${data.quote.surchargeUsd > 0 ? "artım" : "azalma"}: ${data.quote.surchargeUsd > 0 ? "+" : "−"}${usd(Math.abs(data.quote.surchargeUsd))}</p>` : ""}
         ${data.quote.profitMarginUsd ? `<p class="note">ABŞ–Poti məbləğinə daxil şəxsi kar marjı: ${usd(data.quote.profitMarginUsd)}</p>` : ""}
         <div class="row"><span>Poti–Bakı</span><strong>${usd(data.quote.tirUsd)}</strong></div>

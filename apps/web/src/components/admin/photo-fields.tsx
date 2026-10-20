@@ -7,12 +7,7 @@ import {
   type PhotosByCategory,
 } from "@/lib/photo-categories";
 import { compressImageFile } from "@/lib/fit-image";
-
-async function readPhotos(files: FileList | null) {
-  if (!files?.length) return [] as string[];
-  const picked = [...files].slice(0, 12);
-  return Promise.all(picked.map((file) => compressImageFile(file)));
-}
+import { useState } from "react";
 
 export function PhotoFields({
   value,
@@ -21,21 +16,35 @@ export function PhotoFields({
   value: PhotosByCategory;
   onChange: (next: PhotosByCategory) => void;
 }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
   return (
     <div className="space-y-3">
       <p className="text-xs text-zinc-500">
-        Kateqoriya üzrə şəkil yükləyin. Yadda saxlayandan sonra müştəri track səhifəsində görünməlidir.
+        Şəkil sayı və fayl ölçüsü məhdudiyyəti yoxdur. Şəkillər telefon üçün optimallaşdırılır. Hazır olanda sifarişi yadda saxlayın.
       </p>
+      {message && <p role="status" className="text-sm text-sky-300">{message}</p>}
       <div className="grid gap-3 sm:grid-cols-2">
         {PHOTO_CATEGORIES.map((category) => (
           <CategoryDropzone
             key={category}
             category={category}
             urls={value[category]}
+            disabled={busy}
             onAdd={async (files) => {
-              const next = await readPhotos(files);
-              if (!next.length) return;
-              onChange({ ...value, [category]: [...value[category], ...next] });
+              if (!files?.length || busy) return;
+              const picked = Array.from(files);
+              const next: string[] = [];
+              const failed: string[] = [];
+              setBusy(true);
+              for (const [index, file] of picked.entries()) {
+                setMessage(`Şəkillər hazırlanır: ${index + 1} / ${picked.length}`);
+                try { next.push(await compressImageFile(file)); }
+                catch { failed.push(file.name); }
+              }
+              if (next.length) onChange({ ...value, [category]: [...value[category], ...next] });
+              setMessage(`${next.length} şəkil əlavə edildi.${failed.length ? ` Oxunmadı: ${failed.join(', ')}` : ''}`);
+              setBusy(false);
             }}
             onRemove={(url) =>
               onChange({ ...value, [category]: value[category].filter((item) => item !== url) })
@@ -52,11 +61,13 @@ function CategoryDropzone({
   urls,
   onAdd,
   onRemove,
+  disabled,
 }: {
   category: PhotoCategory;
   urls: string[];
   onAdd: (files: FileList | null) => void;
   onRemove: (url: string) => void;
+  disabled: boolean;
 }) {
   return (
     <div className="rounded-xl border border-white/10 p-3">
@@ -69,6 +80,7 @@ function CategoryDropzone({
           type="file"
           accept="image/*"
           multiple
+          disabled={disabled}
           className="hidden"
           onChange={(e) => {
             onAdd(e.target.files);
@@ -78,10 +90,11 @@ function CategoryDropzone({
       </label>
       {urls.length > 0 && (
         <div className="mt-2 grid grid-cols-4 gap-1">
-          {urls.map((src) => (
+          {urls.map((src, index) => (
             <button
-              key={src.slice(0, 48)}
+              key={`${index}-${src.slice(-48)}`}
               type="button"
+              disabled={disabled}
               onClick={() => onRemove(src)}
               className="relative aspect-square overflow-hidden rounded-md"
               title="Sil"

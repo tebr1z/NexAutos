@@ -40,7 +40,6 @@ export async function POST(req: Request) {
     if (upload) {
       const buf = Buffer.from(await upload.arrayBuffer());
       if (!buf.length) return Response.json({ message: "Boş şəkil." }, { status: 400 });
-      if (buf.length > 250_000) return Response.json({ message: "Şəkil çox böyükdür — yenidən yükləyin." }, { status: 413 });
       const mime = upload.type?.startsWith("image/") ? upload.type : "image/jpeg";
       dataUrl = `data:${mime};base64,${buf.toString("base64")}`;
     }

@@ -6,10 +6,23 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { jwtSecret } from './auth/jwt-secret';
 import { PrismaExceptionFilter } from './common/prisma-exception.filter';
+import passport from 'passport';
+import { FULL_ACCESS_ROLES, OPERATIONS_ROLES } from './common/access-roles';
 
 async function bootstrap() {
   jwtSecret();
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+  // Authenticate photo uploads before granting administrators an unlimited body.
+  app.use('/api/v1/orders', (req, res, next) => {
+    if (req.method !== 'POST' || !/^\/[^/]+\/photos\/?$/.test(req.path)) return next();
+    passport.authenticate('jwt', { session: false }, (error, user) => {
+      if (error) return next(error);
+      if (!user) return res.status(401).json({ message: 'Daxil olun.' });
+      if (!OPERATIONS_ROLES.includes(user.role)) return res.status(403).json({ message: 'İcazə yoxdur.' });
+      req.user = user;
+      return json({ limit: FULL_ACCESS_ROLES.includes(user.role) ? Infinity : '20mb' })(req, res, next);
+    })(req, res, next);
+  });
   app.use(json({ limit: '20mb' }));
   app.use(urlencoded({ extended: true, limit: '20mb' }));
   app.setGlobalPrefix('api/v1');
