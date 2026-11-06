@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, KeyRound, LockKeyhole, ShieldCheck, UserCog, Search, Users, UserPlus, ChevronDown, SlidersHorizontal, RefreshCw } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { CheckCircle2, KeyRound, LockKeyhole, ShieldCheck, UserCog, Search, Users, UserPlus, X, SlidersHorizontal, RefreshCw } from "lucide-react";
 import { api, type AccessUser } from "@/lib/api";
 import { assignableRolesFor, ROLE_DETAILS, type AssignableRole, type InternalRole } from "@/lib/admin-access";
 import { useAuth } from "@/providers/auth-provider";
-import { CalculatorAccount, CalculatorReports } from "@/components/freight/calculator-account";
+import { CalculatorAccount } from "@/components/freight/calculator-account";
 import { RadarPlanEditor } from "@/components/lot-radar/radar-plan-editor";
 
 const input = "w-full rounded-xl border border-white/10 bg-[#0d0d0f] px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500/60";
@@ -21,13 +22,19 @@ export default function AccessUsersPage() {
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [openPlan, setOpenPlan] = useState("");
+  const [openPlan, setOpenPlan] = useState(false);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const selectedUserIdRef = useRef(selectedUserId);
+
+  function selectUser(id: string) {
+    selectedUserIdRef.current = id;
+    setSelectedUserId(id); setOpenPlan(false); setError(""); setNotice("");
+  }
 
   const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
   const roleOptions = useMemo(() => assignableRolesFor(user?.role), [user?.role]);
@@ -69,17 +76,24 @@ export default function AccessUsersPage() {
       setRows((current) => current.map((row) => row.id === id ? updated : row));
       setSelectedRoles((current) => ({ ...current, [id]: updated.role as AssignableRole }));
       if (payload.password) setPasswords((current) => ({ ...current, [id]: "" }));
-      if (payload.role) setNotice(`Giriş səviyyəsi “${ROLE_DETAILS[updated.role].label}” olaraq dəyişdirildi; köhnə sessiyalar bağlandı.`);
-      else if (payload.password) setNotice("Yeni şifrə yadda saxlanıldı; köhnə sessiyalar bağlandı.");
-      else setNotice(updated.isActive ? "İstifadəçi girişi aktiv edildi." : "İstifadəçi girişi dayandırıldı.");
+      if (selectedUserIdRef.current === id) {
+        if (payload.role) setNotice(`Giriş səviyyəsi “${ROLE_DETAILS[updated.role].label}” olaraq dəyişdirildi; köhnə sessiyalar bağlandı.`);
+        else if (payload.password) setNotice("Yeni şifrə yadda saxlanıldı; köhnə sessiyalar bağlandı.");
+        else setNotice(updated.isActive ? "İstifadəçi girişi aktiv edildi." : "İstifadəçi girişi dayandırıldı.");
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Dəyişiklik saxlanılmadı.");
-    } finally { setBusyId(""); }
+      if (selectedUserIdRef.current === id) setError(err instanceof Error ? err.message : "Dəyişiklik saxlanılmadı.");
+    } finally { setBusyId((current) => current === id ? "" : current); }
   }
 
   if (authLoading || !isAdmin || !user) return <p className="text-sm text-zinc-500">Yüklənir…</p>;
 
   const filtered = rows.filter(row => (!roleFilter || row.role === roleFilter) && (!statusFilter || String(row.isActive) === statusFilter) && `${row.name} ${row.email}`.toLocaleLowerCase("az-AZ").includes(query.toLocaleLowerCase("az-AZ")));
+  const selectedUser = rows.find(row => row.id === selectedUserId);
+  const protectedAccount = selectedUser?.role === "SUPER_ADMIN" || (user.role !== "SUPER_ADMIN" && selectedUser?.role === "ADMIN");
+  const ownAccount = selectedUser?.id === user.id;
+  const chosenRole = selectedUser ? selectedRoles[selectedUser.id] || (selectedUser.role === "SUPER_ADMIN" ? "ADMIN" : selectedUser.role as AssignableRole) : "CUSTOMER";
+  const allowedForTarget = roleOptions.includes(chosenRole);
 
   return <div className="mx-auto max-w-6xl">
     <div className="flex flex-wrap items-end justify-between gap-4">
@@ -126,10 +140,7 @@ export default function AccessUsersPage() {
 
     <div className="mt-6 space-y-3">
       {filtered.map((row) => {
-        const protectedAccount = row.role === "SUPER_ADMIN" || (user.role !== "SUPER_ADMIN" && row.role === "ADMIN");
         const ownAccount = row.id === user.id;
-        const chosenRole = selectedRoles[row.id] || (row.role === "SUPER_ADMIN" ? "ADMIN" : row.role as AssignableRole);
-        const allowedForTarget = roleOptions.includes(chosenRole);
         return <div key={row.id} className="rounded-2xl border border-white/10 bg-[#0a0a0c] p-5">
           <div className="grid gap-5 xl:grid-cols-[1fr_auto] xl:items-center">
             <div>
@@ -140,26 +151,41 @@ export default function AccessUsersPage() {
               <p className="mt-2 text-xs text-zinc-600">{row.lastLoginAt ? `Son giriş: ${new Date(row.lastLoginAt).toLocaleString("az-AZ")}` : "Hələ daxil olmayıb"}</p>
             </div>
 
-            <button type="button" aria-expanded={expanded === row.id} onClick={() => setExpanded(expanded === row.id ? "" : row.id)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-xs text-sky-300"><UserCog size={16} />Hesabı idarə et<ChevronDown size={15} className={expanded === row.id ? "rotate-180" : ""} /></button>
+            <button type="button" aria-haspopup="dialog" aria-label={`${row.name} (${row.email}) hesabını idarə et`} onClick={() => selectUser(row.id)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-xs text-sky-300"><UserCog size={16} />Hesabı idarə et</button>
           </div>
-          {expanded === row.id && <div className="mt-5 border-t border-white/10 pt-5">
-            {!protectedAccount ? <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[1fr_auto_1fr_auto_auto]">
-              <select disabled={ownAccount} value={chosenRole} onChange={(e) => setSelectedRoles({ ...selectedRoles, [row.id]: e.target.value as AssignableRole })} className={input}>
-                {roleOptions.map((role) => <option key={role} value={role}>{ROLE_DETAILS[role].label}</option>)}
-                {!allowedForTarget ? <option value={row.role}>{ROLE_DETAILS[row.role].label}</option> : null}
-              </select>
-              <button type="button" disabled={busyId === row.id || ownAccount || chosenRole === row.role} onClick={() => void update(row.id, { role: chosenRole })} className="rounded-xl border border-sky-400/25 px-4 py-2 text-xs text-sky-300 disabled:opacity-35"><CheckCircle2 className="mr-1.5 inline" size={14} />Rolu saxla</button>
-              <input minLength={8} type="password" value={passwords[row.id] || ""} onChange={(e) => setPasswords({ ...passwords, [row.id]: e.target.value })} placeholder="Yeni şifrə" className={input} />
-              <button type="button" disabled={busyId === row.id || (passwords[row.id] || "").length < 8} onClick={() => void update(row.id, { password: passwords[row.id] })} className="rounded-xl border border-white/15 px-4 py-2 text-xs disabled:opacity-35"><KeyRound className="mr-1.5 inline" size={14} />Şifrə</button>
-              <button type="button" disabled={busyId === row.id || ownAccount} onClick={() => void update(row.id, { isActive: !row.isActive })} className={`rounded-xl px-4 py-2 text-xs disabled:opacity-35 ${row.isActive ? "bg-red-500/15 text-red-300" : "bg-emerald-500/15 text-emerald-300"}`}>{row.isActive ? "Girişi bağla" : "Girişi aç"}</button>
-            </div> : <div className="flex items-center gap-2 rounded-xl border border-amber-400/15 bg-amber-400/5 px-4 py-3 text-xs text-amber-200"><LockKeyhole size={15} />Bu hesab qorunur və sizin rolunuzla dəyişdirilə bilməz.</div>}
-          </div>}
-          {expanded === row.id && (!protectedAccount || ownAccount) && <RadarPlanEditor userId={row.id} canEditPhone={!protectedAccount} />}
-          {expanded === row.id && (!protectedAccount || ownAccount) ? <><button onClick={() => setOpenPlan(openPlan === row.id ? "" : row.id)} className="mt-4 rounded-lg bg-sky-400/10 px-4 py-2.5 text-sm text-sky-300">{openPlan === row.id ? "Paketi bağla" : "Son tarix, limit, endirim və yol əlavəsi"}</button>{openPlan === row.id ? <CalculatorAccount userId={row.id} /> : null}</> : null}
         </div>;
       })}
       {!filtered.length ? <p className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-zinc-500">{loading ? "Hesablar yüklənir…" : rows.length ? "Axtarışa uyğun istifadəçi tapılmadı." : "Hələ hesab yaradılmayıb."}</p> : null}
     </div>
-    <CalculatorReports />
+    <Dialog.Root open={!!selectedUser} onOpenChange={(open) => { if (!open) selectUser(""); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-sky-400/25 bg-[#0a0a0c] p-5 text-white shadow-2xl sm:p-7">
+          {selectedUser && <>
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-5">
+              <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-widest text-sky-400">İdarə edilən hesab</p><Dialog.Title className="mt-2 break-words text-2xl font-semibold">{selectedUser.name}</Dialog.Title><Dialog.Description className="mt-2 break-all text-sm text-sky-200">{selectedUser.email}</Dialog.Description><p className="mt-2 text-xs text-zinc-400">{ROLE_DETAILS[selectedUser.role].label} · {selectedUser.isActive ? "Aktiv" : "Girişi bağlı"}{ownAccount ? " · Öz hesabınız" : ""}</p></div>
+              <Dialog.Close aria-label="Hesab idarəetməsini bağla" className="rounded-xl border border-white/10 p-2.5 text-zinc-400 hover:text-white"><X size={18} /></Dialog.Close>
+            </div>
+            <p className="mt-4 break-all text-xs text-zinc-500">Dəyişikliklər yalnız {selectedUser.email} hesabına tətbiq edilir.</p>
+            {error ? <p role="alert" className="mt-4 text-sm text-red-300">{error}</p> : null}
+            {notice ? <p role="status" className="mt-4 text-sm text-emerald-300">{notice}</p> : null}
+            <div className="mt-5">
+              {!protectedAccount ? <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[1fr_auto_1fr_auto_auto]">
+                <select aria-label="Seçilmiş hesabın rolu" disabled={ownAccount || busyId !== ""} value={chosenRole} onChange={(e) => setSelectedRoles({ ...selectedRoles, [selectedUser.id]: e.target.value as AssignableRole })} className={input}>
+                  {roleOptions.map((role) => <option key={role} value={role}>{ROLE_DETAILS[role].label}</option>)}
+                  {!allowedForTarget ? <option value={selectedUser.role}>{ROLE_DETAILS[selectedUser.role].label}</option> : null}
+                </select>
+                <button type="button" disabled={busyId !== "" || ownAccount || chosenRole === selectedUser.role} onClick={() => void update(selectedUser.id, { role: chosenRole })} className="rounded-xl border border-sky-400/25 px-4 py-2 text-xs text-sky-300 disabled:opacity-35"><CheckCircle2 className="mr-1.5 inline" size={14} />Rolu saxla</button>
+                <input aria-label="Seçilmiş hesabın yeni şifrəsi" autoComplete="new-password" disabled={busyId !== ""} minLength={8} type="password" value={passwords[selectedUser.id] || ""} onChange={(e) => setPasswords({ ...passwords, [selectedUser.id]: e.target.value })} placeholder="Yeni şifrə" className={input} />
+                <button type="button" disabled={busyId !== "" || (passwords[selectedUser.id] || "").length < 8} onClick={() => void update(selectedUser.id, { password: passwords[selectedUser.id] })} className="rounded-xl border border-white/15 px-4 py-2 text-xs disabled:opacity-35"><KeyRound className="mr-1.5 inline" size={14} />Şifrə</button>
+                <button type="button" disabled={busyId !== "" || ownAccount} onClick={() => void update(selectedUser.id, { isActive: !selectedUser.isActive })} className={`rounded-xl px-4 py-2 text-xs disabled:opacity-35 ${selectedUser.isActive ? "bg-red-500/15 text-red-300" : "bg-emerald-500/15 text-emerald-300"}`}>{selectedUser.isActive ? "Girişi bağla" : "Girişi aç"}</button>
+              </div> : <div className="flex items-center gap-2 rounded-xl border border-amber-400/15 bg-amber-400/5 px-4 py-3 text-xs text-amber-200"><LockKeyhole size={15} />Bu hesab qorunur və sizin rolunuzla dəyişdirilə bilməz.</div>}
+            </div>
+            {(!protectedAccount || ownAccount) && <RadarPlanEditor key={`radar-${selectedUser.id}`} userId={selectedUser.id} canEditPhone={!protectedAccount} onSaved={(plan) => setRows(current => current.map(row => row.id === selectedUser.id ? { ...row, phone: plan.phone, radarPlan: { enabled: plan.enabled, watchLimit: plan.watchLimit, monthlyAlertLimit: plan.monthlyAlertLimit } } : row))} />}
+            {selectedUser.role !== "CUSTOMER" && (!protectedAccount || ownAccount) && <><button type="button" onClick={() => setOpenPlan(!openPlan)} className="mt-4 rounded-lg bg-sky-400/10 px-4 py-2.5 text-sm text-sky-300">{openPlan ? "Paketi bağla" : "Hesablama paketi · son tarix, limit, endirim və yol əlavəsi"}</button>{openPlan && <CalculatorAccount key={`calculator-${selectedUser.id}`} mode="admin" userId={selectedUser.id} />}</>}
+          </>}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   </div>;
 }

@@ -1,37 +1,65 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, type CalculatorProfile, type CalculatorReport } from "@/lib/api";
 
 const field = "mt-1 w-full rounded-lg border border-white/15 bg-[#101722] p-2 text-sm text-white";
 const adjustmentKeys = ['surchargeAUsd', 'surchargeBUsd', 'surchargeCUsd'] as const;
-export function CalculatorAccount({ userId, refreshKey = 0, onSaved }: { userId?: string; refreshKey?: number; onSaved?: () => void }) {
-  const [profile, setProfile] = useState<CalculatorProfile | null>(null);
+export function CalculatorAccount({ userId: requestedUserId, mode, refreshKey = 0, onSaved }: { userId?: string; mode?: "self" | "admin"; refreshKey?: number; onSaved?: () => void }) {
+  const isAdmin = mode === "admin" || requestedUserId !== undefined;
+  const userId = isAdmin ? requestedUserId?.trim() : undefined;
+  const validTarget = !isAdmin || !!userId;
+  const targetKey = isAdmin ? `admin:${userId ?? ""}` : "self";
+  const [loaded, setLoaded] = useState<{ targetKey: string; profile: CalculatorProfile } | null>(null);
+  const profile = loaded?.targetKey === targetKey ? loaded.profile : null;
+  function setProfile(next: CalculatorProfile) { setLoaded({ targetKey, profile: next }); }
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [adjustments, setAdjustments] = useState({ surchargeAUsd: "0", surchargeBUsd: "0", surchargeCUsd: "0" });
+  const generation = useRef(0);
+  const currentTarget = useRef(targetKey);
+  useLayoutEffect(() => { currentTarget.current = targetKey; }, [targetKey]);
   function loadProfile(p: CalculatorProfile) {
     setProfile(p);
     setAdjustments({ surchargeAUsd: String(p.surchargeAUsd), surchargeBUsd: String(p.surchargeBUsd), surchargeCUsd: String(p.surchargeCUsd) });
   }
-  useEffect(() => { let active = true; api.calculatorProfile(userId).then((p) => { if (active) loadProfile(p); }).catch((e) => { if (active) setMessage(e.message); }); return () => { active = false; }; }, [userId, refreshKey]);
+  useEffect(() => {
+    const request = ++generation.current;
+    const isCurrent = () => generation.current === request && currentTarget.current === targetKey;
+    setLoaded(null); setMessage(""); setBusy(false); setLoading(true);
+    setAdjustments({ surchargeAUsd: "0", surchargeBUsd: "0", surchargeCUsd: "0" });
+    if (!validTarget) { setMessage("İdarə ediləcək hesab seçilməyib."); setLoading(false); }
+    else void api.calculatorProfile(userId).then((p) => {
+      if (isCurrent()) {
+        setLoaded({ targetKey, profile: p });
+        setAdjustments({ surchargeAUsd: String(p.surchargeAUsd), surchargeBUsd: String(p.surchargeBUsd), surchargeCUsd: String(p.surchargeCUsd) });
+      }
+    }).catch((e) => { if (isCurrent()) setMessage(e instanceof Error ? e.message : "Paket yüklənmədi."); }).finally(() => { if (isCurrent()) setLoading(false); });
+    return () => { generation.current = request + 1; };
+  }, [userId, targetKey, refreshKey, validTarget]);
   async function save() {
-    if (!profile || busy) return;
+    if (!profile || busy || !validTarget) return;
+    const request = generation.current;
+    const isCurrent = () => generation.current === request && currentTarget.current === targetKey;
     setBusy(true); setMessage("");
     try {
       const { brandName, discountAUsd, discountBUsd, discountCUsd, profitMarginUsd, accessUntil, potiBakuUsd, monthlyLimit, allowSelfPricing } = profile;
       if (userId && adjustmentKeys.some((key) => !/^[+-]?\d+(?:\.\d{1,2})?$/.test(adjustments[key].trim()) || Math.abs(Number(adjustments[key])) > 10000)) throw new Error("Tarif düzəlişini −10000 ilə +10000 arasında yazın: məsələn, +50 və ya −100.");
       const surchargeAUsd = Number(adjustments.surchargeAUsd), surchargeBUsd = Number(adjustments.surchargeBUsd), surchargeCUsd = Number(adjustments.surchargeCUsd);
-      loadProfile(await api.saveCalculatorProfile({ brandName, ...((userId || allowSelfPricing) ? { discountAUsd, discountBUsd, discountCUsd, profitMarginUsd } : {}), ...(userId ? { monthlyLimit, allowSelfPricing, accessUntil, potiBakuUsd, surchargeAUsd, surchargeBUsd, surchargeCUsd } : {}) }, userId));
-      onSaved?.();
-      setMessage("Yadda saxlanıldı. Növbəti hesablama yeni tariflə olacaq.");
-    } catch (e) { setMessage(e instanceof Error ? e.message : "Saxlanılmadı."); }
-    finally { setBusy(false); }
+      const saved = await api.saveCalculatorProfile({ brandName, ...((userId || allowSelfPricing) ? { discountAUsd, discountBUsd, discountCUsd, profitMarginUsd } : {}), ...(userId ? { monthlyLimit, allowSelfPricing, accessUntil, potiBakuUsd, surchargeAUsd, surchargeBUsd, surchargeCUsd } : {}) }, userId);
+      if (isCurrent()) {
+        loadProfile(saved);
+        onSaved?.();
+        setMessage("Yadda saxlanıldı. Növbəti hesablama yeni tariflə olacaq.");
+      }
+    } catch (e) { if (isCurrent()) setMessage(e instanceof Error ? e.message : "Saxlanılmadı."); }
+    finally { if (isCurrent()) setBusy(false); }
   }
   const canEditBrand = !!userId || (!!profile && !profile.expired);
   const canEditPricing = !!userId || (!!profile?.allowSelfPricing && !profile.expired);
   return <section className="my-4 rounded-xl border border-sky-400/20 bg-sky-400/[.04] p-4">
-    <h2 className="text-sm font-semibold">{userId ? "Hesablama paketi və fərdi tarif" : "Mənim hesablama paketim"}</h2>
+    <h2 className="text-sm font-semibold">{isAdmin ? "Seçilmiş hesabın hesablama paketi və fərdi tarifi" : "Mənim hesablama paketim"}</h2>
     {profile ? <>
       <p className="mt-2 text-sm text-sky-200">{profile.month} · {profile.used} hesab istifadə olunub · {profile.monthlyLimit == null ? "Limitsiz" : `${profile.remaining} / ${profile.monthlyLimit} qalıb`}</p>
       <p className={`mt-2 text-sm ${profile.expired ? "text-red-300" : "text-emerald-300"}`} role="status">{profile.expired ? profile.accessMessage : profile.accessUntil ? `İstifadə ${profile.accessUntil} tarixinin sonunadək aktivdir (Bakı vaxtı).` : "İstifadə üçün son tarix təyin edilməyib."}</p>
@@ -60,7 +88,7 @@ export function CalculatorAccount({ userId, refreshKey = 0, onSaved }: { userId?
       <p className="mt-2 text-xs text-zinc-400">Qrup avtomobil + auction fee cəminə görə seçilir. Baza tarifinə ümumi yol əlavəsi gəlir, şəxsi endirim çıxılır, fərdi düzəliş, kar marjı və Poti–Bakı əlavə olunur. Kar marjına 10 yazsanız, yol pulunuz $10 artır. {!userId && canEditPricing ? 'Endirim və kar marjı sahəsindən çıxdıqda avtomatik saxlanılır.' : ''}</p>
       {canEditBrand ? <button disabled={busy} onClick={() => void save()} className="mt-3 rounded-lg bg-sky-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">{busy ? "Saxlanılır…" : "Yadda saxla"}</button> : null}
       {!canEditPricing ? <p className="mt-3 text-xs text-zinc-400">{profile.expired ? "Hesab aktivləşdirildikdən sonra extension adınızı dəyişə bilərsiniz." : "Endirim və kar marjını administrator təyin edir; extension adınızı isə özünüz dəyişə bilərsiniz."}</p> : null}
-    </> : <p className="mt-2 text-xs">Yüklənir…</p>}
+    </> : <p className="mt-2 text-xs">{loading ? "Yüklənir…" : "Hesablama paketi açıla bilmədi."}</p>}
     {message ? <p role="status" className="mt-2 text-sm text-amber-200">{message}</p> : null}
   </section>;
 }

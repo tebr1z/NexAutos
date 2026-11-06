@@ -7,7 +7,7 @@ import { Logo } from "@/components/brand/logo";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 import { adminHomeForRole, canAccessAdminPath, ROLE_DETAILS, type InternalRole } from "@/lib/admin-access";
-import { Archive, CarFront, Database, FileSignature, Images, LogOut, MessageSquareText, Settings, Shield, Ship, Users } from "lucide-react";
+import { Archive, Bug, CarFront, Database, FileSignature, Images, LogOut, MessageSquareText, Settings, Shield, Ship, Users } from "lucide-react";
 
 const LINKS = [
   { href: "/admin", label: "Maşınlar", icon: CarFront },
@@ -20,6 +20,7 @@ const LINKS = [
   { href: "/admin/inquiries", label: "Müraciətlər", icon: MessageSquareText },
   { href: "/admin/settings", label: "Ayarlar", icon: Settings },
   { href: "/admin/users", label: "İstifadəçilər", icon: Users },
+  { href: "/admin/extension-errors", label: "Extension xətaları", icon: Bug },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

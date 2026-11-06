@@ -1,6 +1,7 @@
 import { browserApiBase, nestApiBase } from "./nest-url";
 import type { TrackingShipment, VinRecord, AuthUser } from "./types";
 import type { RadarMatch, RadarPlan, RadarSearch, RadarState } from "./lot-radar";
+import { calculatorAccountPath, radarAccountPath, requiredAccountId } from "./account-target";
 
 export type CatalogCar = {
   id: string;
@@ -273,7 +274,7 @@ export type CalculatorProfile = {
   monthlyLimit: number | null; used: number; remaining: number | null; month: string;
   allowSelfPricing: boolean; discountAUsd: number; discountBUsd: number; discountCUsd: number; potiBakuUsd: number | null;
 };
-export type CalculatorReport = { id: string; message: string; pageUrl?: string; version?: string; status: string; createdAt: string; user: { name: string; email: string } };
+export type CalculatorReport = { id: string; message: string; pageUrl?: string; version?: string; status: "OPEN" | "RESOLVED"; createdAt: string; user: { name: string; email: string } };
 export type AccessUser = {
   id: string;
   name: string;
@@ -292,14 +293,14 @@ export const api = {
   createRadarWatch: (payload: RadarSearch) => request('/lot-radar', { method: 'POST', body: JSON.stringify(payload) }),
   toggleRadarWatch: (id: string, enabled: boolean) => request(`/lot-radar/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
   deleteRadarWatch: (id: string) => request(`/lot-radar/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  radarPlan: (id: string) => request<RadarPlan>(`/lot-radar/admin/users/${encodeURIComponent(id)}`),
-  saveRadarPlan: (id: string, payload: Pick<RadarPlan, 'enabled' | 'watchLimit' | 'monthlyAlertLimit'>) => request<RadarPlan>(`/lot-radar/admin/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  radarPlan: (id: string) => request<RadarPlan>(radarAccountPath(id)),
+  saveRadarPlan: (id: string, payload: Pick<RadarPlan, 'enabled' | 'watchLimit' | 'monthlyAlertLimit'>) => request<RadarPlan>(radarAccountPath(id), { method: 'PATCH', body: JSON.stringify(payload) }),
   globalCalculatorPricing: () => request<{ surchargeAUsd: number; surchargeBUsd: number; surchargeCUsd: number }>('/calculator/global-pricing'),
   saveGlobalCalculatorPricing: (payload: { surchargeAUsd: number; surchargeBUsd: number; surchargeCUsd: number }) => request<{ surchargeAUsd: number; surchargeBUsd: number; surchargeCUsd: number }>('/calculator/global-pricing', { method: 'PATCH', body: JSON.stringify(payload) }),
-  calculatorProfile: (userId?: string) => request<CalculatorProfile>(userId ? `/calculator/users/${encodeURIComponent(userId)}` : '/calculator/me'),
-  saveCalculatorProfile: (payload: Partial<CalculatorProfile>, userId?: string) => request<CalculatorProfile>(userId ? `/calculator/users/${encodeURIComponent(userId)}` : '/calculator/me', { method: 'PATCH', body: JSON.stringify(payload) }),
-  calculatorReports: () => request<CalculatorReport[]>('/calculator/reports'),
-  resolveCalculatorReport: (id: string, status: string) => request(`/calculator/reports/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  calculatorProfile: (userId?: string) => request<CalculatorProfile>(calculatorAccountPath(userId)),
+  saveCalculatorProfile: (payload: Partial<CalculatorProfile>, userId?: string) => request<CalculatorProfile>(calculatorAccountPath(userId), { method: 'PATCH', body: JSON.stringify(payload) }),
+  calculatorReports: (signal?: AbortSignal) => request<CalculatorReport[]>('/calculator/reports', { signal }),
+  resolveCalculatorReport: (id: string, status: "OPEN" | "RESOLVED") => request(`/calculator/reports/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   track: (code: string) =>
     request<TrackingShipment>(`/tracking/${encodeURIComponent(code)}`, {
       signal: AbortSignal.timeout(20_000),
@@ -320,7 +321,7 @@ export const api = {
   createAccessUser: (payload: { name: string; email: string; password: string; role: AccessUser["role"]; phone?: string; radarWatchLimit?: number; radarMonthlyAlertLimit?: number }) =>
     request<AccessUser>("/access-users", { method: "POST", body: JSON.stringify(payload) }),
   updateAccessUser: (id: string, payload: { name?: string; password?: string; isActive?: boolean; role?: AccessUser["role"]; phone?: string }) =>
-    request<AccessUser>(`/access-users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    request<AccessUser>(`/access-users/${encodeURIComponent(requiredAccountId(id))}`, { method: "PATCH", body: JSON.stringify(payload) }),
   stats: () =>
     request<{
       totalOrders: number;
