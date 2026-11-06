@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Auto Nex – Lot Radar",
-  "version": "1.1.0",
-  "description": "BidCars-da seçdiyiniz avtomobilləri izləyin; yeni lotları extension, e-poçt və WhatsApp ilə öyrənin.",
+  "version": "1.2.0",
+  "description": "BidCars lotlarını və admin Buy Now qaydalarını 20 dəqiqəlik Chrome relay ilə izləyin; extension, e-poçt və WhatsApp bildirişləri.",
   "minimum_chrome_version": "120",
   "permissions": ["storage", "alarms", "notifications"],
   "host_permissions": ["https://nex.autos/*", "https://bid.cars/*", "https://www.bid.cars/*"],

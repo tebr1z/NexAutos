@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Length, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 export class CreateWatchDto {
   @IsString() @Length(2, 80) name: string;
@@ -14,6 +14,11 @@ export class CreateWatchDto {
   @IsBoolean() whatsappEnabled: boolean;
 }
 export class ToggleWatchDto { @IsBoolean() enabled: boolean; }
+export class CreateDealDto extends CreateWatchDto {
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(10000000) maxBuyNowUsd?: number;
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(10000000) marketValueUsd?: number;
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(99.99) minDiscountPercent?: number;
+}
 export class RadarPlanDto {
   @IsBoolean() enabled: boolean;
   @IsInt() @Min(0) @Max(100) watchLimit: number;

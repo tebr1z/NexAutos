@@ -10,13 +10,15 @@ export function parseRadarFeed(raw: unknown): RadarLot[] {
     if (!url || !['title','make','model'].every(k => typeof v[k] === 'string' && String(v[k]).length > 0 && String(v[k]).length <= 200) || !Number.isInteger(v.year) || Number(v.year) < 1950 || Number(v.year) > 2100 || typeof v.active !== 'boolean') throw new Error('Inventar lotunun əsas məlumatı düzgün deyil.');
     const engine = v.engineCc == null ? null : Number(v.engineCc);
     if (engine != null && (!Number.isInteger(engine) || engine < 0 || engine > 20000)) throw new Error('Inventarda mühərrik həcmi düzgün deyil.');
+    const buyNowUsd = v.buyNowUsd == null ? null : v.buyNowUsd;
+    if (buyNowUsd != null && (typeof buyNowUsd !== 'number' || !Number.isFinite(buyNowUsd) || buyNowUsd <= 0 || buyNowUsd > 10000000)) throw new Error('İnventarda Buy Now qiyməti müsbət USD məbləği olmalıdır.');
     let auctionAt: string | undefined;
     if (v.auctionAt) {
       if (typeof v.auctionAt !== 'string' || !/T.*(?:Z|[+-]\d{2}:\d{2})$/i.test(v.auctionAt) || !Number.isFinite(Date.parse(v.auctionAt))) throw new Error('Hərrac vaxtının saat qurşağı göstərilməyib.');
       auctionAt = new Date(v.auctionAt).toISOString();
     }
     const document = String(v.document || '').slice(0, 150);
-    return { key: url.match(/\/lot\/([01]-\d+)/)![1], url, title: String(v.title), make: String(v.make), model: String(v.model), year: Number(v.year), engineCc: engine, primaryDamage: String(v.primaryDamage || '').slice(0, 100), secondaryDamage: String(v.secondaryDamage || '').slice(0, 100), document, documentKind: documentKind(document), active: v.active, auctionAt, auctionTimeText: String(v.auctionTimeText || '').slice(0, 120) || undefined };
+    return { key: url.match(/\/lot\/([01]-\d+)/)![1], url, title: String(v.title), make: String(v.make), model: String(v.model), year: Number(v.year), engineCc: engine, buyNowUsd, primaryDamage: String(v.primaryDamage || '').slice(0, 100), secondaryDamage: String(v.secondaryDamage || '').slice(0, 100), document, documentKind: documentKind(document), active: v.active, auctionAt, auctionTimeText: String(v.auctionTimeText || '').slice(0, 120) || undefined };
   });
 }
 export async function fetchRadarFeed(filters: RadarFilters) {

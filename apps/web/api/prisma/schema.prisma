@@ -122,6 +122,9 @@ model LotWatch {
   nextCheckAt DateTime @default(now())
   leaseUntil DateTime?
   lastError String?
+  lastSource String?
+  browserAttemptedAt DateTime?
+  collectorUserId String?
   createdAt DateTime @default(now())
   lots LotWatchLot[]
   @@index([enabled, nextCheckAt])

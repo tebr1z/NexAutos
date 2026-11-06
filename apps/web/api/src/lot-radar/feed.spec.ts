@@ -9,4 +9,10 @@ describe('authorized inventory adapter',()=>{
     expect(()=>parseRadarFeed({complete:true,lots:[{...lot,url:'https://evil.test'}]})).toThrow();
     expect(()=>parseRadarFeed({complete:true,lots:[{...lot,auctionAt:'2026-12-01 12:00'}]})).toThrow();
   });
+  it('accepts only an explicit positive numeric USD Buy Now amount; missing stays unknown',()=>{
+    expect(parseRadarFeed({complete:true,lots:[{...lot,buyNowUsd:4500.25}]})[0].buyNowUsd).toBe(4500.25);
+    expect(parseRadarFeed({complete:true,lots:[lot]})[0].buyNowUsd).toBeNull();
+    expect(parseRadarFeed({complete:true,lots:[{...lot,buyNowUsd:null}]})[0].buyNowUsd).toBeNull();
+    for (const value of ['4500',true,0,-1,NaN,Infinity,10000001]) expect(()=>parseRadarFeed({complete:true,lots:[{...lot,buyNowUsd:value}]})).toThrow();
+  });
 });

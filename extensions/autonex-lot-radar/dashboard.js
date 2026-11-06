@@ -11,6 +11,13 @@ function button(label, fn, danger = false) { const b = node('button', label, `qu
 const time = value => value ? new Date(value).toLocaleString('az-AZ',{timeZone:'Asia/Baku'}) : 'Hələ yoxlanmayıb';
 const deliveryText = code => ({ not_configured:'Xidmət qurulmayıb', delivery_failed:'Göndərilmədi; təkrar yoxlanacaq' }[code] || code || '—');
 const auctionText = lot => lot.auctionAt && Number.isFinite(Date.parse(lot.auctionAt)) ? `${time(lot.auctionAt)} · Bakı vaxtı` : lot.auctionTimeText || 'Hərrac günü və saatı açıqlanmayıb';
+const dollars = value => Number.isFinite(value) && value > 0 ? `$${value.toLocaleString('en-US')} USD` : 'naməlum';
+function priceRule(filters) {
+  const parts=[];
+  if(filters.maxBuyNowUsd)parts.push(`Buy Now ≤ ${dollars(filters.maxBuyNowUsd)}`);
+  if(filters.marketValueUsd&&filters.minDiscountPercent)parts.push(`Admin bazar dəyəri ${dollars(filters.marketValueUsd)} · ən az ${filters.minDiscountPercent}% ucuz`);
+  return parts.join(' · ');
+}
 function link(label, url) { const a=node('a',label); a.href=url; a.target='_blank'; a.rel='noreferrer'; return a; }
 for (const make of Object.keys(makes).sort()) { const o=node('option',make); o.value=make; $('make').append(o); }
 $('make').onchange=()=>{ $('model').value=''; $('models').replaceChildren(...(makes[$('make').value] || []).map(model=>{const o=node('option');o.value=model;return o;})); };
@@ -26,6 +33,7 @@ $('watch-form').onsubmit=async e=>{
 };
 $('refresh').onclick=()=>void load();
 $('browser-mode').onchange=()=>void action({type:'BROWSER_MODE',enabled:$('browser-mode').checked});
+$('collector-mode').onchange=()=>void action({type:'COLLECTOR_MODE',enabled:$('collector-mode').checked});
 async function load() {
   try {
     const state=await send({type:'STATE'});$('login').hidden=true;$('app').hidden=false;$('logout').hidden=false;$('connection').textContent=state.delivery.email;
@@ -33,18 +41,22 @@ async function load() {
     let planInfo=$('plan-info');if(!planInfo){planInfo=node('p',null,'hint');planInfo.id='plan-info';$('delivery-status').after(planInfo);}
     if(state.plan)planInfo.textContent=`Admin limiti: ${state.plan.active} / ${state.plan.watchLimit} aktiv axtarış · ${state.plan.used} / ${state.plan.monthlyAlertLimit} yeni lot bildirişi (${state.plan.month}). ${state.plan.enabled?'':'Xidmət admin tərəfindən bağlıdır.'}`;
     $('delivery-status').textContent=`E-poçt: ${state.delivery.email} · ${state.delivery.emailReady?'hazırdır':'SMTP qurulmayıb'}. WhatsApp: ${state.delivery.phone||'profilə nömrə əlavə edin'} · ${state.delivery.whatsappReady?'xidmət hazırdır':'xidmət qurulmayıb'}. Kanalları seçməklə bu ünvana/nömrəyə yeni lot mesajlarına razılıq verirsiniz.`;
-    $('server-status').textContent=state.delivery.serverMonitoring?'SERVER AKTİVDİR':'SERVER DAYANIB';$('browser-mode').checked=!!state.browserMode;
-    $('job-status').textContent=state.job?`Brauzer yoxlaması gedir · qalan ${state.job.pending} lot`:state.browserError||state.lastError||'İzləmə seçilən rejimə əsasən işləyir. Chrome bağlı olduqda extension bildirişi gəlmir; e-poçt/WhatsApp üçün serverin mənbəyə çıxışı lazımdır.';
+    $('server-status').textContent=state.delivery.serverMonitoring?'SERVER NÖVBƏSİ AKTİVDİR':'SERVER NÖVBƏSİ BAĞLIDIR';$('browser-mode').checked=!!state.browserMode;
+    $('collector-settings').hidden=!state.collectorAllowed;$('collector-mode').checked=!!state.collectorMode;
+    $('job-status').textContent=state.job?`${state.job.collector?'Admin kollektoru':'Şəxsi brauzer yoxlaması'} işləyir · qalan ${state.job.pending} lot`:state.browserError||state.lastError||(state.browserMode&&state.collectorMode?'Admin kollektoru server növbəsində növbəti uyğun işi gözləyir.':state.browserMode?'Şəxsi axtarışlar 20 dəqiqəlik növbədədir.':'Chrome ilə avtomatik yoxlama bağlıdır. Serverin mənbəyə çıxışı yoxdursa yeni nəticə gəlməyəcək.');
+    $('last-browser-status').textContent=`Son uğurlu Chrome göndərişi: ${time(state.lastBrowserAt)}${state.lastBrowserFailureAt?` · Son xəta: ${time(state.lastBrowserFailureAt)}`:''}`;
     $('job-status').className=`hint${state.browserError?' error':''}`;
     $('watches').replaceChildren();
-    for(const w of state.watches){const row=node('article',null,'watch');const f=w.filters;row.append(node('h3',`${w.enabled?'●':'○'} ${w.name}`),node('p',`${f.make} ${f.model} · ${f.yearFrom}–${f.yearTo} · ${f.engineMin||'—'}–${f.engineMax||'—'} cm³`),node('p',`${f.damages.map(d=>damageNames[d]).join(', ')||'Bütün zədələr'} · sənəd: ${f.document}`),node('p',`Son yoxlama: ${time(w.checkedAt)} · ${w.initializedAt?'Yeni lotlar izlənir':'İlk yoxlama gözlənilir'}`));if(w.lastError)row.append(node('p',w.lastError,'error'));const controls=node('div',null,'actions');controls.append(link('BidCars-da aç ↗',w.searchUrl),button('Chrome ilə yoxla',()=>action({type:'CHECK',id:w.id,browser:true})),button('Server yoxla',()=>action({type:'CHECK',id:w.id,browser:false})),button(w.enabled?'Dayandır':'Aktiv et',()=>action({type:'TOGGLE',id:w.id,enabled:!w.enabled})),button('Sil',()=>{if(confirm('Bu axtarış və ona aid bildiriş tarixçəsi silinsin?'))return action({type:'DELETE',id:w.id});},true));row.append(controls);$('watches').append(row);}
+    for(const w of state.watches){const row=node('article',null,'watch');const f=w.filters;const heading=node('h3',`${w.enabled?'●':'○'} ${w.name}`);heading.append(node('span',f.mode==='buy_now'?'BUY NOW':'YENİ LOT','chip rule-badge'));row.append(heading,node('p',`${f.make} ${f.model} · ${f.yearFrom}–${f.yearTo} · ${f.engineMin||'—'}–${f.engineMax||'—'} cm³`),node('p',`${(f.damages||[]).map(d=>damageNames[d]).join(', ')||'Bütün zədələr'} · sənəd: ${f.document}`),node('p',`Son yoxlama: ${time(w.checkedAt)} · ${w.initializedAt?'İzlənir':f.mode==='buy_now'?'İlk yoxlamada ucuz lotlar da bildirilir':'İlk yoxlama gözlənilir'}`));if(f.mode==='buy_now')row.append(node('p',priceRule(f),'price-rule'));if(w.nextCheckAt)row.append(node('p',`Növbəti yoxlama ən tez: ${time(w.nextCheckAt)}`));if(w.lastError)row.append(node('p',w.lastError,'error'));const controls=node('div',null,'actions');controls.append(link('BidCars-da aç ↗',w.searchUrl),button('Chrome ilə yoxla',()=>action({type:'CHECK',id:w.id,browser:true})),button('Server yoxla',()=>action({type:'CHECK',id:w.id,browser:false})),button(w.enabled?'Dayandır':'Aktiv et',()=>action({type:'TOGGLE',id:w.id,enabled:!w.enabled})),button('Sil',()=>{if(confirm('Bu axtarış və ona aid bildiriş tarixçəsi silinsin?'))return action({type:'DELETE',id:w.id});},true));row.append(controls);$('watches').append(row);}
     if(!state.watches.length)$('watches').append(node('p','İlk axtarışınızı yaradın.','empty'));
     $('inbox').replaceChildren();
     for(const item of state.items){
       const lot=item.data, row=node('article',null,'lot'), info=node('div'), title=node('h3');
       title.append(link(lot.title,lot.url));
       if(!item.readAt)title.append(node('span','YENİ','new'));
-      info.append(title,
+      info.append(title);
+      if(lot.buyNowUsd>0)info.append(node('p',`Buy Now: ${dollars(lot.buyNowUsd)}`,'buy-price'));
+      info.append(
         node('p',`${lot.engineCc||'?'} cm³ · ${lot.primaryDamage||'Zədə naməlum'} / ${lot.secondaryDamage||'—'}`),
         node('p',`Sənəd: ${lot.document||'Naməlum'} · ${lot.documentKind}`),
         node('p',`Hərrac: ${auctionText(lot)}`),

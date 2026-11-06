@@ -1,6 +1,6 @@
 import { browserApiBase, nestApiBase } from "./nest-url";
 import type { TrackingShipment, VinRecord, AuthUser } from "./types";
-import type { RadarMatch, RadarPlan, RadarSearch, RadarState } from "./lot-radar";
+import type { RadarDealSearch, RadarMatch, RadarPlan, RadarSearch, RadarState } from "./lot-radar";
 import { calculatorAccountPath, radarAccountPath, requiredAccountId } from "./account-target";
 
 export type CatalogCar = {
@@ -290,6 +290,9 @@ export type AccessUser = {
 export const api = {
   radarState: () => request<RadarState>('/lot-radar'),
   radarInbox: () => request<RadarMatch[]>('/lot-radar/inbox'),
+  adminRadarDeals: () => request<RadarState>('/lot-radar/admin/deals'),
+  createAdminRadarDeal: (payload: RadarDealSearch) => request('/lot-radar/admin/deals', { method: 'POST', body: JSON.stringify(payload) }),
+  checkRadarWatch: (id: string) => request(`/lot-radar/${encodeURIComponent(requiredAccountId(id))}/check`, { method: 'POST' }),
   createRadarWatch: (payload: RadarSearch) => request('/lot-radar', { method: 'POST', body: JSON.stringify(payload) }),
   toggleRadarWatch: (id: string, enabled: boolean) => request(`/lot-radar/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
   deleteRadarWatch: (id: string) => request(`/lot-radar/${encodeURIComponent(id)}`, { method: 'DELETE' }),

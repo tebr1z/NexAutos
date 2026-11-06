@@ -7,13 +7,14 @@ import { Logo } from "@/components/brand/logo";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 import { adminHomeForRole, canAccessAdminPath, ROLE_DETAILS, type InternalRole } from "@/lib/admin-access";
-import { Archive, Bug, CarFront, Database, FileSignature, Images, LogOut, MessageSquareText, Settings, Shield, Ship, Users } from "lucide-react";
+import { Archive, Bug, CarFront, Database, FileSignature, Images, LogOut, MessageSquareText, Radar, Settings, Shield, Ship, Users } from "lucide-react";
 
 const LINKS = [
   { href: "/admin", label: "Maşınlar", icon: CarFront },
   { href: "/admin/catalog", label: "Kataloq", icon: Images },
   { href: "/admin/freight", label: "Yol pulu", icon: Ship },
   { href: "/admin/market", label: "Bazar analizi", icon: Database },
+  { href: "/admin/lot-radar", label: "Buy Now Radar", icon: Radar },
   { href: "/admin/contracts", label: "Müqavilələr", icon: FileSignature },
   { href: "/admin/insurance", label: "Sığorta", icon: Shield },
   { href: "/admin#arxiv", label: "Arxiv", icon: Archive },
