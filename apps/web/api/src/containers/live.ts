@@ -1,5 +1,12 @@
 export type LiveOcean = {
   vesselName?: string;
+  vesselImo?: string;
+  vesselMmsi?: string;
+  carrierCode?: string;
+  carrierName?: string;
+  positionKind?: 'ais' | 'port' | 'unknown';
+  positionUpdatedAt?: string;
+  positionSource?: string;
   voyageNumber?: string;
   originPort?: string;
   destinationPort?: string;
@@ -56,7 +63,7 @@ function pickPin(v: unknown): { lat?: number; lng?: number } {
   return {};
 }
 
-async function timedFetch(url: string, init?: RequestInit, ms = 8000) {
+async function timedFetch(url: string, init?: RequestInit, ms = 25000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   try {
@@ -66,9 +73,10 @@ async function timedFetch(url: string, init?: RequestInit, ms = 8000) {
   }
 }
 
-function parseSearates(raw: unknown): LiveOcean | null {
+export function parseSearates(raw: unknown): LiveOcean | null {
   const root = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+  const metadata = data.metadata as Record<string, unknown> | undefined;
   const locations = Array.isArray(data.locations) ? (data.locations as Record<string, unknown>[]) : [];
   const locName = (id: unknown) => {
     const row = locations.find((l) => l.id === id || l.location === id);
@@ -81,44 +89,53 @@ function parseSearates(raw: unknown): LiveOcean | null {
   const aisData = (aisBlock?.data && typeof aisBlock.data === "object" ? aisBlock.data : aisBlock) as
     | Record<string, unknown>
     | undefined;
-  const aisVessel = (aisData?.vessel ?? vessels[vessels.length - 1]) as Record<string, unknown> | undefined;
 
   const containers = Array.isArray(data.containers) ? (data.containers as Record<string, unknown>[]) : [];
   const box = containers[0] ?? {};
   const events = Array.isArray(box.events) ? (box.events as Record<string, unknown>[]) : [];
-  const lastEvent = [...events].reverse().find((e) => e.actual) ?? events[events.length - 1];
+  const actualEvents = events.filter((e) => e.actual === true).sort((a, b) => Date.parse(String(a.date)) - Date.parse(String(b.date)));
+  const lastEvent = actualEvents[actualEvents.length - 1];
+  const eventVessel = [...actualEvents].reverse().find((e) => e.vessel != null);
+  const aisVessel = (aisData?.vessel ?? vessels.find(v => String(v.id) === String(eventVessel?.vessel))) as Record<string, unknown> | undefined;
 
   const pol = route.pol as Record<string, unknown> | undefined;
   const pod = route.pod as Record<string, unknown> | undefined;
-  const pin = pickPin(route.pin ?? aisData?.location ?? aisData?.coordinates ?? data.pin);
+  // Route pins are carrier event/route positions, not necessarily AIS fixes.
+  const lastPosition = aisData?.last_vessel_position as Record<string, unknown> | undefined;
+  const aisPin = pickPin(lastPosition ?? aisData?.location ?? aisData?.coordinates);
+  const hasAis = aisPin.lat != null && aisPin.lng != null && Math.abs(aisPin.lat) <= 90 && Math.abs(aisPin.lng) <= 180;
 
-  const vesselName = str(aisVessel?.name) ?? str(vessels[vessels.length - 1]?.name);
+  const vesselName = str(aisVessel?.name);
   const voyage =
     str((aisData?.last_event as Record<string, unknown> | undefined)?.voyage) ?? str(lastEvent?.voyage);
 
-  if (!vesselName && !pin.lat && !str(box.status)) return null;
+  if (!vesselName && !hasAis && !str(box.status) && !lastEvent) return null;
 
   const origin = locName(pol?.location) ?? str(pol?.name);
   const dest = locName(pod?.location) ?? str(pod?.name);
-  const current =
-    locName(lastEvent?.location) ??
-    str((aisData?.discharge_port as Record<string, unknown> | undefined)?.name) ??
-    dest;
+  const current = locName(lastEvent?.location);
 
   const etaRaw = str(pod?.date) ?? str((aisData?.discharge_port as Record<string, unknown> | undefined)?.date);
-  const eta = etaRaw ? new Date(etaRaw.replace(" ", "T") + (etaRaw.endsWith("Z") ? "" : "Z")).toISOString() : undefined;
+  const eta = etaRaw && Number.isFinite(Date.parse(etaRaw)) ? new Date(etaRaw).toISOString() : undefined;
 
   return {
     source: "live",
     vesselName,
+    vesselImo: aisVessel?.imo ? String(aisVessel.imo) : undefined,
+    vesselMmsi: aisVessel?.mmsi ? String(aisVessel.mmsi) : undefined,
+    carrierCode: str(metadata?.sealine),
+    carrierName: str(metadata?.sealine_name),
+    positionKind: hasAis ? 'ais' : 'unknown',
+    positionUpdatedAt: hasAis ? str(lastPosition?.updated_at) ?? str(aisData?.updated_at) ?? str(aisData?.date) : undefined,
+    positionSource: hasAis ? 'SeaRates AIS' : undefined,
     voyageNumber: voyage,
     originPort: origin,
     destinationPort: dest,
     currentPort: current,
     containerStatus: str(box.status) ?? str(lastEvent?.description),
     eta: eta && !Number.isNaN(Date.parse(eta)) ? eta : undefined,
-    lat: pin.lat,
-    lng: pin.lng,
+    lat: hasAis ? aisPin.lat : undefined,
+    lng: hasAis ? aisPin.lng : undefined,
   };
 }
 
@@ -157,8 +174,8 @@ async function trySearates(number: string, key: string, carrierCode?: string): P
   url.searchParams.set("type", "CT");
   url.searchParams.set("route", "true");
   url.searchParams.set("ais", "true");
-  const sealine = carrierCode ? SEALINE[carrierCode] : undefined;
-  if (sealine) url.searchParams.set("sealine", sealine);
+  // Equipment owner prefixes do not reliably identify the shipping line.
+  url.searchParams.set("sealine", "auto");
   const res = await timedFetch(url.toString(), { headers: { Accept: "application/json" } });
   if (!res.ok) return null;
   const json = await res.json().catch(() => null);

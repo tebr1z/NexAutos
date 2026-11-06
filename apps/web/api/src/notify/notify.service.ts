@@ -212,6 +212,9 @@ export class NotifyService {
     if (!host) return { sent: false, error: 'not_configured' };
     try {
       const transporter = nodemailer.createTransport({
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 20000,
         host,
         port: Number(process.env.SMTP_PORT ?? 587),
         secure: process.env.SMTP_PORT === '465',
@@ -243,6 +246,7 @@ export class NotifyService {
     const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     if (token && phoneId) {
       const res = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+        signal: AbortSignal.timeout(15000),
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -271,12 +275,20 @@ export class NotifyService {
     return vexira.error && vexira.error !== 'not_configured' ? vexira : { sent: false, error: 'not_configured' };
   }
 
+  async sendRadarWhatsApp(phone: string | null | undefined, text: string): Promise<NotifyResult> {
+    const to = normalizePhone(phone);
+    if (!to) return { sent: false, error: 'no_phone' };
+    try { return await this.sendWhatsApp(to, text); }
+    catch { return { sent: false, error: 'whatsapp_failed' }; }
+  }
+
   private async sendVexira(to: string, body: string): Promise<NotifyResult> {
     const key = process.env.VEXIRA_WHATSAPP_KEY ?? process.env.WHATSAPP_API_KEY;
     if (!key) return { sent: false, error: 'not_configured' };
     const url = process.env.VEXIRA_WHATSAPP_URL ?? 'https://api.vexirahost.com/api/v1/whatsapp/messages';
     try {
       const res = await fetch(url, {
+        signal: AbortSignal.timeout(15000),
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
         body: JSON.stringify({ phone: e164Phone(to), message: body }),
@@ -313,6 +325,7 @@ export class NotifyService {
     if (!sid || !token) return { sent: false, error: 'not_configured' };
     const auth = Buffer.from(`${sid}:${token}`).toString('base64');
     const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+      signal: AbortSignal.timeout(15000),
       method: 'POST',
       headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ To: to, From: from, Body: body }),

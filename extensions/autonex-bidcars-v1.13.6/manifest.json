@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Auto Nex – BidCars Kalkulyatoru",
+  "version": "1.13.6",
+  "description": "BidCars ümumi qiymətini hesablayır və Caucasus Auto-dan Copart/IAAI yol tariflərini toplayır.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://nex.autos/*",
+    "https://login.caucasusauto.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "BidCars səhifəsini Auto Nex ilə hesabla",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  },
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "content_scripts": [
+    {
+      "matches": ["https://bid.cars/*", "https://www.bid.cars/*"],
+      "js": ["parser.js", "content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://login.caucasusauto.com/admin.php*"],
+      "js": ["caucasus.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

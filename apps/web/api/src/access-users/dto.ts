@@ -1,8 +1,8 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import type { Role } from '@prisma/client';
 
-export const ASSIGNABLE_ACCESS_ROLES = ['ADMIN', 'MANAGER', 'STAFF', 'FREIGHT_USER'] as const;
+export const ASSIGNABLE_ACCESS_ROLES = ['ADMIN', 'MANAGER', 'STAFF', 'FREIGHT_USER', 'CUSTOMER'] as const;
 export type AssignableAccessRole = (typeof ASSIGNABLE_ACCESS_ROLES)[number];
 
 function toBool(value: unknown) {
@@ -12,6 +12,9 @@ function toBool(value: unknown) {
 }
 
 export class CreateAccessUserDto {
+  @IsOptional() @IsString() @MaxLength(32) phone?: string;
+  @IsOptional() @IsInt() @Min(0) @Max(100) radarWatchLimit?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) radarMonthlyAlertLimit?: number;
   @IsString()
   @MinLength(2)
   name: string;
@@ -28,6 +31,7 @@ export class CreateAccessUserDto {
 }
 
 export class UpdateAccessUserDto {
+  @IsOptional() @IsString() @MaxLength(32) phone?: string;
   @IsOptional()
   @IsString()
   @MinLength(2)

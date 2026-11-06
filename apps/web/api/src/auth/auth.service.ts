@@ -23,6 +23,7 @@ export class AuthService {
         phone: dto.phone,
         passwordHash,
         role: 'CUSTOMER',
+        radarPlan: { create: {} },
         customer: {
           create: { name: dto.name, email: dto.email.toLowerCase(), phone: dto.phone ?? '' },
         },

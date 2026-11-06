@@ -2,6 +2,28 @@
 
 Bu Manifest V3 əlavəsi BidCars lot səhifəsindəki məlumatları brauzerdən birbaşa oxuyur və səhifəyə Auto Nex hesab paneli əlavə edir.
 
+## v1.13.6 — lot və texniki məlumatların daha etibarlı oxunması
+
+- BidCars URL-də dil/prefiks və ya əlavə slug hissəsini dəyişəndə də domen və rəqəmli `/lot/<mənbə>-<lot nömrəsi>` hissəsi ilə real lot səhifəsi tanınır; ana səhifə, axtarış və profil yenə qəbul edilmir.
+- `3.7LV-6`, `5.7LV-8`, `1,998 cc` kimi mühərrik yazılışları da cm³-ə çevrilir.
+- Bitişik gələn `...HPFuel Type...` mətni, standart HTML cədvəl/siyahı texniki blokları və ingilis, polyak, alman, rus, Azərbaycan etiketləri oxunur.
+- Yeni API/web deploy və DB migrasiyası lazım deyil. Extension-u Reload etdikdən sonra açıq BidCars səhifələrini `Ctrl+R` ilə təzələyin.
+
+## v1.13.4 — yalnız avtomobil lotunu oxuma
+
+- Yalnız `https://bid.cars/.../lot/1-.../...` və IAAI `lot/0-...` tipli avtomobil səhifələri oxunur. Ana səhifə, axtarış, profil və kənar saytda ikona vuranda «Zəhmət olmasa BidCars-da avtomobilin lot səhifəsini açın» bildirişi və BidCars-a keçid görünür. Bu səhifələr üçün qiymət/gömrük sorğusu göndərilmir.
+- `script`, `style`, `noscript` və digər kod/köməkçi elementlər avtomobil məlumatına daxil edilmir. `location.href`, hesab aktivləşdirmə və depozit skriptləri artıq «Səhifədən oxundu» mətninə düşmür. «Show more» altında bağlı texniki məlumatlar oxunmağa davam edir.
+- Səhifə dəyişəndə əvvəlki qiymət, avtomobil məlumatı və nəticə təmizlənir; əvvəlki lotun gecikmiş cavabı yeni səhifədə göstərilmir.
+- Caucasus Auto tarif toplayıcısı saxlanılıb. Yeni icazə, API/web deploy və DB migrasiyası lazım deyil.
+- Yeniləmə: ZIP-i ayrıca qovluğa açın və `chrome://extensions` → Developer mode → Load unpacked ilə `manifest.json` olan qovluğu seçin. Mövcud unpacked qovluğu istifadə edirsinizsə, həmin qovluğun fayllarını yeniləyib Reload basın. Sonra açıq BidCars sekmələrini `Ctrl+R` ilə təzələyin. Store-dan quraşdırılmış versiya mağaza yenilənməsindən sonra yenilənəcək.
+- Yoxlama: `node extensions/autonex-bidcars/test-parser.cjs` və `node --test extensions/autonex-bidcars/test-pages.cjs`.
+
+## v1.13.5 — DGK cavabı üçün gözləmə
+
+- Gömrük sorğuları müvəqqəti şəbəkə/5xx/boş cavabda 3 dəfə yoxlanır; arada 1.5 və 3 saniyə gözlənilir. Hər cəhdin 25 saniyə vaxt limiti cavabın JSON mətninin oxunmasını da əhatə edir.
+- Yenə alınmazsa «Gömrüklə bağlı müvəqqəti problem var. Zəhmət olmasa bir az sonra yenidən yoxlayın» bildirişi görünür. Məbləğ və sessiya xətaları təkrarlanmır. DGK təkrarı ayrıca shipping/quote əməliyyatı yaratmır.
+- Lot səhifəsinin əvvəlki avtomatik oxunması saxlanır; yeni API/web deploy və DB migrasiyası lazım deyil.
+
 ## 1.11.0 — hesab paketləri
 
 - Admin → İstifadəçilər → Aylıq limit və endirimlər: istifadəçi üzrə limit, limitsiz seçim, üç qiymət qrupunun endirimi və fərdi Poti–Bakı məbləği.

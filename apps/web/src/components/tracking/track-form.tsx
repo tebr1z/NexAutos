@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/providers/i18n-provider";
 import { ShippingNotice } from "@/components/layout/shipping-notice";
 import { MapPin, Search } from "lucide-react";
+import { ContainerTracker } from "./container-tracker";
 
 export function TrackForm() {
   const { t } = useI18n();
@@ -12,7 +13,7 @@ export function TrackForm() {
   const [code, setCode] = useState("");
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pb-16 pt-28 sm:px-6 md:pt-36">
+    <div className="mx-auto max-w-6xl px-4 pb-16 pt-28 sm:px-6 md:pt-36">
       <div className="text-center">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-royal/10 text-royal"><MapPin size={22} /></span>
         <h1 className="font-display mt-5 text-3xl md:text-5xl">{t.track.title}</h1>
@@ -43,6 +44,7 @@ export function TrackForm() {
       </form>
       <p className="mx-auto mt-4 max-w-xl text-center text-xs leading-5 text-muted">{t.track.featSafeD}</p>
       <details className="mx-auto mt-7 max-w-xl rounded-2xl border border-line p-4"><summary className="cursor-pointer text-sm text-muted">{t.track.featStages}</summary><ShippingNotice className="mt-3" /></details>
+      <div className="mt-12"><ContainerTracker /></div>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import type { TrackingShipment } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { useI18n } from "@/providers/i18n-provider";
+import { LotRadarPanel } from "@/components/lot-radar/lot-radar-panel";
 
 export default function AccountPage() {
   const { user, loading, logout } = useAuth();
@@ -57,6 +58,7 @@ export default function AccountPage() {
         </button>
       </div>
 
+      <LotRadarPanel />
       <div className="mt-10 grid gap-4 sm:grid-cols-3">
         <Summary icon={CarFront} label={t.account.allOrders} value={orders.length} />
         <Summary icon={Ship} label={t.account.activeShip} value={active.length} />

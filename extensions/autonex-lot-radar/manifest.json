@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Auto Nex – Lot Radar",
+  "version": "1.1.0",
+  "description": "BidCars-da seçdiyiniz avtomobilləri izləyin; yeni lotları extension, e-poçt və WhatsApp ilə öyrənin.",
+  "minimum_chrome_version": "120",
+  "permissions": ["storage", "alarms", "notifications"],
+  "host_permissions": ["https://nex.autos/*", "https://bid.cars/*", "https://www.bid.cars/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Lot Radar-ı aç", "default_icon": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" } },
+  "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "options_page": "dashboard.html",
+  "content_scripts": [{ "matches": ["https://bid.cars/*", "https://www.bid.cars/*"], "js": ["content.js"], "run_at": "document_idle" }]
+}

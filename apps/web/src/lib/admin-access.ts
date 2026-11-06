@@ -1,9 +1,10 @@
 import type { AuthUser } from "./types";
 
 export type InternalRole = Exclude<AuthUser["role"], "CUSTOMER">;
-export type AssignableRole = Exclude<InternalRole, "SUPER_ADMIN">;
+export type AssignableRole = Exclude<AuthUser["role"], "SUPER_ADMIN">;
 
-export const ROLE_DETAILS: Record<InternalRole, { label: string; short: string; description: string }> = {
+export const ROLE_DETAILS: Record<AuthUser["role"], { label: string; short: string; description: string }> = {
+  CUSTOMER: { label: "Müştəri", short: "Şəxsi hesab və Lot Radar", description: "Avtomobil izləməsi və adminin təyin etdiyi limitlə yeni lot bildirişləri." },
   SUPER_ADMIN: {
     label: "Baş administrator",
     short: "Tam sistem nəzarəti",
@@ -59,5 +60,5 @@ export function adminHomeForRole(role: AuthUser["role"] | undefined) {
 }
 
 export function assignableRolesFor(role: AuthUser["role"] | undefined): AssignableRole[] {
-  return role === "SUPER_ADMIN" ? ["ADMIN", "MANAGER", "STAFF", "FREIGHT_USER"] : ["MANAGER", "STAFF", "FREIGHT_USER"];
+  return role === "SUPER_ADMIN" ? ["ADMIN", "MANAGER", "STAFF", "FREIGHT_USER", "CUSTOMER"] : ["MANAGER", "STAFF", "FREIGHT_USER", "CUSTOMER"];
 }

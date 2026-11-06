@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api, type VesselHit, type VesselPosition } from "@/lib/api";
 import { useI18n } from "@/providers/i18n-provider";
+import { ShipmentMap } from "./shipment-map";
 
 export function VesselSearch() {
   const { t } = useI18n();
@@ -75,7 +76,7 @@ export function VesselSearch() {
                 }`}
                 onClick={() => {
                   setLoading(true);
-                  loadPosition(String(row.mmsi)).finally(() => setLoading(false));
+                  loadPosition(String(row.mmsi)).catch(err => setError(err instanceof Error ? err.message : t.vessel.notFound)).finally(() => setLoading(false));
                 }}
               >
                 <strong>{row.name}</strong>
@@ -92,11 +93,7 @@ export function VesselSearch() {
         <div className="mt-10 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="glass overflow-hidden rounded-3xl">
             {vessel.hasCoordinates && vessel.latitude != null && vessel.longitude != null ? (
-              <iframe
-                title={vessel.name ?? t.vessel.title}
-                className="h-[420px] w-full border-0"
-                src={`https://www.openstreetmap.org/export/embed.html?bbox=${vessel.longitude - 2.2}%2C${vessel.latitude - 1.3}%2C${vessel.longitude + 2.2}%2C${vessel.latitude + 1.3}&layer=mapnik&marker=${vessel.latitude}%2C${vessel.longitude}`}
-              />
+              <ShipmentMap lat={vessel.latitude} lng={vessel.longitude} label={vessel.name || t.vessel.title} />
             ) : (
               <p className="p-8 text-sm text-muted">{t.vessel.noCoords}</p>
             )}

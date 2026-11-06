@@ -55,6 +55,8 @@
       .status { min-height:0; margin:6px 0 0; color:#93a4bb; font-size:10px; line-height:1.35; }
       .status:empty, .note:empty { display:none; }
       .status.error { color:#fca5a5; }
+      .page-notice { padding:12px; border:1px solid #334155; border-radius:9px; background:#111d30; color:#dbeafe; font-size:12px; line-height:1.5; }
+      .page-notice a { display:inline-block; margin-top:8px; color:#93c5fd; }
       .result { margin-top:6px; border-top:1px solid #273449; padding-top:6px; }
       .price-line { padding:5px; border:1px solid #273449; border-radius:7px; background:#0f172a; }
       .price-line span { display:block; margin:0 2px 5px; color:#8da2bd; font-size:9px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
@@ -98,6 +100,7 @@
         <div><button class="ghost" id="refresh" type="button" title="Səhifədən yenidən oxu">↻ Oxu</button> <button class="ghost" id="close" type="button" title="Bağla">✕</button></div>
       </header>
       <div class="body">
+        <section class="page-notice" id="pageNotice" hidden><div id="pageNoticeText"></div><a href="https://bid.cars/en/" target="_blank" rel="noreferrer">BidCars-ı aç ↗</a></section>
         <section class="auth-box" id="authBox">
           <div id="authGuest">
             <div class="auth-title">Auto Nex hesabına giriş</div>
@@ -151,7 +154,9 @@
     ["brandTitle", "authBox", "authGuest", "authUser", "authEmail", "loginEmail", "loginPassword", "loginButton", "logoutButton", "authStatus", "calculatorContent", "priceSource", "price", "auctionFee", "auction", "location", "titleKind", "year", "engine", "fuel", "refresh", "close", "calculate", "status", "result", "toggleAdvanced", "advancedControls", "rateEditor", "rateHint", "rateUsd", "saveRate", "rateStatus"].map((id) => [id, shadow.getElementById(id)]),
   );
   const manual = new Set();
-  for (const id of ["usageInfo", "accessStatus", "bugMessage", "sendBug", "bugStatus"]) refs[id] = shadow.getElementById(id);
+  for (const id of ["usageInfo", "accessStatus", "bugMessage", "sendBug", "bugStatus", "pageNotice", "pageNoticeText"]) refs[id] = shadow.getElementById(id);
+  refs.pageNoticeText.textContent = parser.LOT_PAGE_NOTICE;
+  let pageGeneration = 0;
   let lastUrl = location.href;
   let lastAutoSignature = "";
   let calculating = false;
@@ -164,6 +169,26 @@
   let showDetails = false;
   let authenticated = false;
   let profile = null;
+
+  function applyPageGate() {
+    const supported = parser.isBidCarsLotUrl(location.href);
+    refs.pageNotice.hidden = supported;
+    refs.authBox.hidden = !supported;
+    refs.calculatorContent.hidden = !supported || !authenticated;
+    refs.refresh.disabled = !supported;
+    refs.calculate.disabled = !supported || !authenticated || calculating || Boolean(profile?.expired);
+    return supported;
+  }
+  function resetLotData() {
+    pageGeneration += 1;
+    latestData = null; lastQuote = null; lastCalculation = null;
+    includeDyp = false; manual.clear(); lastAutoSignature = "";
+    for (const name of ["price", "auctionFee", "auction", "location", "year", "engine", "fuel"]) refs[name].value = "";
+    refs.priceSource.value = "manual";
+    refs.result.hidden = true; refs.result.textContent = "";
+    refs.rateEditor.hidden = true; refs.rateHint.textContent = "";
+    refs.status.textContent = "";
+  }
 
   function calculatorBrand() {
     return String(profile?.brandName || "Auto Nex").replace(/\s+/g, " ").trim().slice(0, 40) || "Auto Nex";
@@ -180,7 +205,7 @@
     refs.accessStatus.hidden = false;
     refs.accessStatus.className = profile.expired ? "status error" : "auth-copy";
     refs.accessStatus.textContent = profile.expired ? profile.accessMessage : profile.accessUntil ? `Son istifadə günü: ${profile.accessUntil} (Bakı vaxtı)` : "İstifadə müddəti: məhdudiyyətsiz";
-    refs.calculate.disabled = Boolean(profile.expired) || calculating;
+    applyPageGate();
     if (profile.expired) { lastCalculation = null; refs.result.hidden = true; refs.rateEditor.hidden = true; }
   }
   async function reportBug() {
@@ -207,12 +232,11 @@
   function renderAuth(email = "") {
     refs.authGuest.hidden = authenticated;
     refs.authUser.hidden = !authenticated;
-    refs.calculatorContent.hidden = !authenticated;
     refs.authBox.classList.toggle("signed-in", authenticated);
     refs.authStatus.hidden = authenticated;
     refs.authEmail.textContent = email;
     if (!authenticated) { profile = null; refs.brandTitle.textContent = "Auto Nex"; refs.accessStatus.hidden = true; }
-    refs.calculate.disabled = !authenticated;
+    applyPageGate();
     if (!authenticated) refs.calculate.textContent = "Hesablamaq üçün giriş edin";
     else if (!calculating) refs.calculate.textContent = `${calculatorBrand()} ilə hesabla`;
   }
@@ -222,7 +246,7 @@
       const settings = await send({ type: "ANX_GET_SETTINGS" });
       authenticated = Boolean(settings.authenticated);
       renderAuth(settings.authEmail || "");
-      if (authenticated) await loadProfile();
+      if (authenticated && parser.isBidCarsLotUrl(location.href)) await loadProfile();
       return authenticated;
     } catch (error) {
       authenticated = false;
@@ -322,15 +346,15 @@
     return candidates[0]?.value || "";
   }
 
-  function visibleLabeledValue(label, stopLabels) {
-    const lines = String(document.body?.innerText || "")
+  function visibleLabeledValue(labels, stopLabels, pageText) {
+    const lines = String(pageText || "")
       .split(/\r?\n/)
       .map((line) => parser.clean(line))
       .filter(Boolean);
-    const wanted = label.toLowerCase();
+    const wanted = new Set(labels.map((label) => label.toLowerCase()));
     const stops = new Set(stopLabels.map((value) => value.toLowerCase()));
     for (let index = 0; index < lines.length; index += 1) {
-      if (lines[index].toLowerCase() !== wanted) continue;
+      if (!wanted.has(lines[index].replace(/:$/, "").toLowerCase())) continue;
       const values = [];
       for (let cursor = index + 1; cursor < lines.length && values.length < 3; cursor += 1) {
         if (stops.has(lines[cursor].toLowerCase())) break;
@@ -344,12 +368,13 @@
 
   function specificationValue(labels) {
     const wanted = new Set(labels.map((label) => label.toLowerCase()));
-    for (const row of document.querySelectorAll(".options-list .option, .vehicle-info .option, .specifications .option")) {
+    const rows = document.querySelectorAll(".options-list .option, .vehicle-info .option, .specifications .option, [class*='specification'] li, [class*='vehicle-info'] li, dl > div, tr");
+    for (const row of rows) {
       if (host.contains(row)) continue;
-      const valueElement = row.querySelector(".right-info");
+      const valueElement = row.querySelector(".right-info, [class*='value'], dd, td:last-child");
       if (!valueElement) continue;
       const copy = row.cloneNode(true);
-      copy.querySelectorAll(".right-info, img, svg").forEach((element) => element.remove());
+      copy.querySelectorAll(".right-info, [class*='value'], dd, td:last-child, img, svg").forEach((element) => element.remove());
       const label = parser.clean(copy.textContent).replace(/:$/, "").toLowerCase();
       const value = parser.clean(valueElement.textContent);
       if (wanted.has(label) && value) return value;
@@ -358,13 +383,8 @@
   }
 
   function snapshot() {
-    const textParts = [];
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    while (walker.nextNode()) {
-      const parent = walker.currentNode.parentElement;
-      if (parent && !host.contains(parent)) textParts.push(walker.currentNode.nodeValue || "");
-    }
-    const pageText = textParts.join("\n");
+    if (!parser.isBidCarsLotUrl(location.href)) return null;
+    const pageText = parser.readDocumentText(document.body, host);
     const exactTokens = [...document.querySelectorAll("span,a,button,strong")]
       .filter((element) => !host.contains(element))
       .map((element) => parser.clean(element.textContent))
@@ -374,12 +394,10 @@
       title: `${document.title} ${document.querySelector("h1")?.innerText || ""}`,
       url: location.href,
       auctionHint: auctionHintNearTitle(),
-      engineLabel:
-        specificationValue(["Engine", "Engine Size", "Engine displacement", "Engine capacity"]) ||
-        visibleLabeledValue("Engine", ["Transmission", "Fuel Type", "Drive Type", "Cylinders", "Keys"]),
-      fuel:
-        specificationValue(["Fuel Type", "Fuel", "Engine Type"]) ||
-        visibleLabeledValue("Fuel Type", ["Drive Type", "Transmission", "Engine", "Cylinders", "Keys", "Show more"]),
+      engineLabel: specificationValue(["Engine", "Engine Size", "Engine displacement", "Engine capacity", "Motor", "Silnik", "Mühərrik", "Двигатель"]) ||
+        visibleLabeledValue(["Engine", "Engine Size", "Engine displacement", "Engine capacity", "Motor", "Silnik", "Mühərrik", "Двигатель"], ["Transmission", "Fuel Type", "Drive Type", "Cylinders", "Keys", "Getriebe", "Kraftstoffart", "Skrzynia biegów", "Rodzaj paliwa", "Трансмиссия", "Тип топлива"], pageText),
+      fuel: specificationValue(["Fuel Type", "Fuel", "Engine Type", "Kraftstoffart", "Kraftstoff", "Rodzaj paliwa", "Paliwo", "Yanacaq", "Тип топлива"]) ||
+        visibleLabeledValue(["Fuel Type", "Fuel", "Engine Type", "Kraftstoffart", "Kraftstoff", "Rodzaj paliwa", "Paliwo", "Yanacaq", "Тип топлива"], ["Drive Type", "Transmission", "Engine", "Cylinders", "Keys", "Show more", "Antrieb", "Getriebe", "Motor", "Napęd", "Skrzynia biegów", "Silnik", "Привод", "Трансмиссия", "Двигатель"], pageText),
       exactTokens,
       bidCandidates: collectBidCandidates(),
     });
@@ -391,8 +409,10 @@
   }
 
   function readPage(force = false) {
-    if (force) manual.clear();
+    if (!applyPageGate()) { resetLotData(); return null; }
+    if (force) resetLotData();
     const data = snapshot();
+    if (!data) return null;
     latestData = data;
     updatePriceChoices(data, force);
     if (force) refs.auctionFee.value = "";
@@ -530,6 +550,7 @@
   }
 
   async function calculate(triggeredAutomatically = false) {
+    if (!applyPageGate()) { resetLotData(); return; }
     if (triggeredAutomatically) return;
     if (!authenticated) {
       if (!triggeredAutomatically) {
@@ -543,6 +564,8 @@
       return;
     }
     const priceUsd = Number(refs.price.value);
+    const calculationUrl = location.href, generation = pageGeneration;
+    const stillCurrent = () => generation === pageGeneration && calculationUrl === location.href && parser.isBidCarsLotUrl(location.href);
     const auction = refs.auction.value;
     const yard = refs.location.value.trim();
     const state = stateFromLocation(yard);
@@ -566,6 +589,7 @@
 
     try {
       await loadProfile();
+      if (!stillCurrent()) return;
       if (profile.expired) throw new Error(profile.accessMessage || "Kalkulyatordan istifadə müddətiniz bitib. VexiraLabs ilə əlaqə qurun.");
       const pageFee = parser.selectAuctionFee({
         priceUsd,
@@ -580,12 +604,13 @@
           type: "ANX_API",
           path: "/shipping/quote",
           method: "POST",
-          body: { url: location.href, priceUsd, auctionFeeUsd: pageAuctionFeeUsd, auction, yard, state, titleKind: refs.titleKind.value },
+          body: { url: calculationUrl, priceUsd, auctionFeeUsd: pageAuctionFeeUsd, auction, yard, state, titleKind: refs.titleKind.value },
         }),
         latestData?.vin
           ? send({ type: "ANX_API", path: `/vins/${latestData.vin}` }).catch(() => null)
           : Promise.resolve(null),
       ]);
+      if (!stillCurrent()) return;
       const fallbackEngineCc = parser.parseEngineCc(quote.engineLabel || vinDetails?.engine || "") || Number(quote.engineCc) || 0;
       const fallbackFuel = quote.fuel || vinDetails?.fuel || "";
       if (!year && Number(quote.year || vinDetails?.year) > 0) {
@@ -627,7 +652,9 @@
         customsNote = "DGK hesabı üçün il, mühərrik həcmi və yanacaq növü lazımdır.";
       } else {
         try {
+          refs.status.textContent = 'Gömrük cavabı gözlənilir… (3 cəhdə qədər)';
           const options = await send({ type: "ANX_API", path: "/customs/auto-options?lang=az" });
+          if (!stillCurrent()) return;
           const code = parser.fuelCode(fuel);
           const engines = options.AutoEngineTypes || [];
           const picked = engines.find((row) => row.code === code) || engines.find((row) => row.code === "1") || engines[0];
@@ -648,6 +675,7 @@
               otherExpenses: 0,
             },
           });
+          if (!stillCurrent()) return;
           duty = response.autoDuty;
           if (!duty || Number(duty.usdCourse) <= 0) throw new Error("DGK nəticəsi boş qayıtdı.");
           customsUsd = Number(duty.total?.value || 0) / Number(duty.usdCourse);
@@ -656,12 +684,14 @@
         }
       }
 
+      if (!stillCurrent()) return;
       const totalWithCustomsUsd = totalWithoutCustomsUsd == null || !duty ? null : totalWithoutCustomsUsd + customsUsd;
       const totalWithCustomsAzn = totalWithCustomsUsd == null || !duty ? null : totalWithCustomsUsd * Number(duty.usdCourse || 0);
       lastCalculation = { priceUsd, auctionFeeUsd, auctionFeeSource, invoiceUsd, freightUsd, totalWithoutCustomsUsd, duty, customsUsd, customsNote, totalWithCustomsUsd, totalWithCustomsAzn, quote };
       renderCalculation();
       refs.status.textContent = `${quote.auction} · ${quote.yard || yard} · ${quote.state} · ${year || "il yoxdur"} · ${engineCc || "EV"} cm³ · ${fuel}`;
     } catch (error) {
+      if (!stillCurrent()) return;
       refs.status.className = "status error";
       const message = error instanceof Error ? error.message : String(error);
       refs.status.textContent = /503|Service Unavailable/i.test(message)
@@ -669,7 +699,7 @@
         : message;
     } finally {
       calculating = false;
-      refs.calculate.disabled = Boolean(profile?.expired);
+      applyPageGate();
       refs.calculate.textContent = `${calculatorBrand()} ilə hesabla`;
       if (recalculateAfterCurrent) {
         recalculateAfterCurrent = false;
@@ -679,6 +709,7 @@
   }
 
   async function saveMissingRate() {
+    if (!applyPageGate()) { resetLotData(); return; }
     const rateUsd = Number(refs.rateUsd.value);
     if (!lastQuote?.cellKey || !Number.isFinite(rateUsd) || rateUsd <= 0) {
       refs.rateStatus.className = "status error";
@@ -716,18 +747,17 @@
   function scheduleAuto() {
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
-      if (location.href !== lastUrl) {
+      const pageChanged = location.href !== lastUrl;
+      if (pageChanged) {
         lastUrl = location.href;
-        manual.clear();
-        lastAutoSignature = "";
-        refs.result.hidden = true;
-        lastCalculation = null;
-        includeDyp = false;
+        resetLotData();
         showDetails = false;
         refs.advancedControls.hidden = true;
         refs.toggleAdvanced.textContent = "Ətraflı";
+        if (parser.isBidCarsLotUrl(location.href)) void loadAuth();
       }
-      const data = readPage(false);
+      const data = readPage(pageChanged);
+      if (!data) return;
       const signature = [refs.priceSource.value, refs.price.value, data.bidNowUsd, data.currentBidUsd, data.lotPriceUsd, data.auctionFeeUsd, data.auction, data.location].join("|");
       if (!host.hidden && signature !== lastAutoSignature) {
         lastAutoSignature = signature;

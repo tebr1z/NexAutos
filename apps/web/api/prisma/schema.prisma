@@ -86,6 +86,66 @@ model User {
   calculatorPlan CalculatorPlan?
   calculatorUses CalculatorUse[]
   bugReports CalculatorBugReport[]
+  lotWatches LotWatch[]
+  radarPlan RadarPlan?
+  radarUsage RadarUsage[]
+}
+
+model RadarPlan {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled Boolean @default(false)
+  watchLimit Int @default(3)
+  monthlyAlertLimit Int @default(100)
+  updatedAt DateTime @updatedAt
+}
+
+model RadarUsage {
+  userId String
+  month String @db.VarChar(7)
+  used Int @default(0)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([userId, month])
+}
+
+model LotWatch {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name String
+  filters Json
+  enabled Boolean @default(true)
+  emailEnabled Boolean @default(false)
+  whatsappEnabled Boolean @default(false)
+  initializedAt DateTime?
+  checkedAt DateTime?
+  nextCheckAt DateTime @default(now())
+  leaseUntil DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  lots LotWatchLot[]
+  @@index([enabled, nextCheckAt])
+  @@index([userId, createdAt])
+}
+
+model LotWatchLot {
+  id String @id @default(cuid())
+  watchId String
+  watch LotWatch @relation(fields: [watchId], references: [id], onDelete: Cascade)
+  lotKey String
+  data Json
+  isAlert Boolean @default(false)
+  quotaBlocked Boolean @default(false)
+  readAt DateTime?
+  emailSentAt DateTime?
+  whatsappSentAt DateTime?
+  emailError String?
+  whatsappError String?
+  attempts Int @default(0)
+  deliveryLeaseUntil DateTime?
+  createdAt DateTime @default(now())
+  @@unique([watchId, lotKey])
+  @@index([watchId, isAlert, createdAt])
 }
 
 model CalculatorPlan {

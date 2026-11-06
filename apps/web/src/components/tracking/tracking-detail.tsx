@@ -14,6 +14,8 @@ import { getLocalOrder, overlayLocal } from "@/lib/local-orders";
 import { PhotoCatalog } from "@/components/tracking/photo-catalog";
 import { journeyPosition, normalizeTransits } from "@/lib/journey";
 import { ShippingNotice } from "@/components/layout/shipping-notice";
+import { ContainerTracker } from "./container-tracker";
+import { ShipmentMap } from "./shipment-map";
 import {
   ArrowRight,
   CalendarClock,
@@ -62,9 +64,7 @@ async function pinFromImo(shipment: TrackingShipment): Promise<TrackingShipment>
 async function pinFromPorts(shipment: TrackingShipment): Promise<TrackingShipment> {
   if (shipment.lat != null && shipment.lng != null) return shipment;
   const hit =
-    findPortCoords(shipment.currentPort) ??
-    findPortCoords(shipment.destinationPort) ??
-    findPortCoords(shipment.originPort);
+    findPortCoords(shipment.currentPort);
   if (hit) {
     return {
       ...shipment,
@@ -73,7 +73,7 @@ async function pinFromPorts(shipment: TrackingShipment): Promise<TrackingShipmen
       currentCountry: shipment.currentCountry || hit.country,
     };
   }
-  const label = shipment.currentPort || shipment.destinationPort || shipment.originPort;
+  const label = shipment.currentPort;
   if (!label) return shipment;
   try {
     const res = await fetch(
@@ -132,30 +132,6 @@ async function refreshImoUntilPinned(
   return withManualPin(current);
 }
 
-function keepLocalRoute(prev: TrackingShipment, ocean: Partial<TrackingShipment>): TrackingShipment {
-  return {
-    ...prev,
-    vesselName: prev.vesselName || ocean.vesselName,
-    voyageNumber: prev.voyageNumber || ocean.voyageNumber,
-    carrierName: prev.carrierName || ocean.carrierName,
-    carrierCode: prev.carrierCode || ocean.carrierCode,
-    currentPort: prev.currentPort || ocean.currentPort,
-    currentCountry: prev.currentCountry || ocean.currentCountry,
-    originPort: prev.originPort || ocean.originPort,
-    destinationPort: prev.destinationPort || ocean.destinationPort,
-    containerStatus: prev.containerStatus || ocean.containerStatus,
-    eta: prev.eta || ocean.eta,
-    lat:
-      prev.vesselImo && isLiveVesselMapStatus(prev.currentStatus)
-        ? (prev.lat ?? prev.mapLat)
-        : (prev.lat ?? ocean.lat),
-    lng:
-      prev.vesselImo && isLiveVesselMapStatus(prev.currentStatus)
-        ? (prev.lng ?? prev.mapLng)
-        : (prev.lng ?? ocean.lng),
-  };
-}
-
 function arrivalText(shipment: TrackingShipment, pending: string, locale: "az" | "en" | "ru" | "tr") {
   if (shipment.currentStatus === "DELIVERED") {
     return TRACKING_STEPS.find((step) => step.key === "DELIVERED")?.[locale] ?? pending;
@@ -193,14 +169,6 @@ export function TrackingDetail({ code }: { code: string }) {
         if (cancelled) return;
         setAisPending(false);
         setData(withImo);
-        if (!withImo.containerNumber) return;
-        try {
-          const ocean = await api.lookupOcean(withImo.containerNumber);
-          if (cancelled) return;
-          setData((prev) => (prev ? keepLocalRoute(prev, ocean) : prev));
-        } catch {
-          /* keep merged shipment */
-        }
       })
       .catch(() => {
         if (!cancelled) setError(t.track.notFound);
@@ -294,6 +262,8 @@ export function TrackingDetail({ code }: { code: string }) {
         </div>
       </section>
 
+      {data.containerNumber && <div className="mt-6"><ContainerTracker initialNumber={data.containerNumber} /></div>}
+
       <div id="shipment-photos" className="scroll-mt-28">
         <PhotoCatalog photos={data.photos ?? []} />
       </div>
@@ -340,7 +310,8 @@ export function TrackingDetail({ code }: { code: string }) {
         <div className="min-w-0 space-y-6">
           <section className="overflow-hidden rounded-3xl border border-line bg-card">
             <div className="flex items-center justify-between p-5"><div><h2 className="font-medium">{t.track.liveTitle}</h2><p className="mt-1 text-xs text-muted">{location || t.track.livePending}</p></div><MapPin size={20} className="text-royal" /></div>
-            {data.lat != null && data.lng != null ? <iframe loading="lazy" title={data.vesselName ?? t.track.location} className="h-[240px] w-full border-0 sm:h-[300px]" src={`https://www.openstreetmap.org/export/embed.html?bbox=${data.lng - 2.2}%2C${data.lat - 1.3}%2C${data.lng + 2.2}%2C${data.lat + 1.3}&layer=mapnik&marker=${data.lat}%2C${data.lng}`} /> : <p className="px-5 pb-5 text-sm text-muted">{t.track.coordsPending}</p>}
+            <ShipmentMap lat={data.lat} lng={data.lng} label={data.currentPort || data.vesselName || t.track.location} className="h-[300px]" />
+            <p className="border-t border-line px-5 py-3 text-xs leading-5 text-muted">Sifarişin son məlum məntəqəsi. Dəqiq gəmi mövqeyi və məlumatın vaxtı konteyner izləmə panelində ayrıca göstərilir.</p>
             {(data.vesselName || data.containerNumber || data.vesselImo) && <details className="border-t border-line p-5"><summary className="cursor-pointer text-sm text-royal">{t.track.vessel} · {t.track.container}</summary><div className="mt-4 space-y-3 text-sm">{data.vesselName && <p className="flex items-center gap-2 break-words"><Ship size={16} className="shrink-0 text-muted" />{data.vesselName}</p>}{data.containerNumber && <p className="flex items-center gap-2 break-all font-mono"><Container size={16} className="shrink-0 text-muted" />{data.containerNumber}</p>}{data.vesselImo && <p className="text-xs text-muted">IMO {data.vesselImo}</p>}{data.carrierName && <p className="text-muted">{data.carrierName}</p>}</div></details>}
           </section>
 

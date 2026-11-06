@@ -1,8 +1,8 @@
 import { Controller, Get, Param } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { ContainersService } from './containers.service';
 
-@SkipThrottle()
+@Throttle({ default: { limit: 12, ttl: 60000 } })
 @Controller('containers')
 export class ContainersController {
   constructor(private containers: ContainersService) {}

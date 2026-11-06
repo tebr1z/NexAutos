@@ -47,7 +47,10 @@ assert.equal(parser.fuelCode(parser.normalizeFuel("Mild Hybrid Diesel")), "13");
 assert.equal(parser.parseEngineCc("2.0L4"), 2000);
 assert.equal(parser.parseEngineCc("2,0 L I4"), 2000);
 assert.equal(parser.parseEngineCc("3.6L-V6"), 3600);
+assert.equal(parser.parseEngineCc("3.7LV-6DOHC,VVT,332HP"), 3700);
+assert.equal(parser.parseEngineCc("5.7LV-8VVT,372HP"), 5700);
 assert.equal(parser.parseEngineCc("1998 cc"), 1998);
+assert.equal(parser.parseEngineCc("1,998 cc"), 1998);
 assert.equal(parser.parseEngineCc("1998 cubic centimeters"), 1998);
 assert.equal(parser.parseEngineCc("Electric"), null);
 
@@ -68,6 +71,17 @@ assert.equal(visibleSpecsWinOverHiddenMenu.fuel, "Gasoline");
 assert.equal(visibleSpecsWinOverHiddenMenu.fuelCode, "1");
 assert.equal(visibleSpecsWinOverHiddenMenu.vin, "");
 
+const textFallbackWinsOverHiddenMenu = parser.parseSnapshot({
+  title: "2021 KIA K5, GT LINE",
+  text: `
+    Search & Bid Engine size, type, horsepower Type Electric Hybrid Gasoline Diesel
+    Location: Freetown (MA) Shipping from: Newark (NJ)
+    Exterior color Gray Engine 2.0L Transmission Automatic Fuel Type Hybrid Drive Type FWD
+  `,
+});
+assert.equal(textFallbackWinsOverHiddenMenu.engineCc, 2000);
+assert.equal(textFallbackWinsOverHiddenMenu.fuel, "Hybrid");
+
 const compactEngineLot = parser.parseSnapshot({
   title: "2016 HYUNDAI SONATA, LIMITED KMHE54L29GA021523",
   text: "Location: Freetown (MA)",
@@ -75,6 +89,16 @@ const compactEngineLot = parser.parseSnapshot({
 });
 assert.equal(compactEngineLot.engineCc, 2000);
 assert.equal(compactEngineLot.vin, "KMHE54L29GA021523");
+
+const compactBidCarsText = parser.parseSnapshot({
+  url: "https://bid.cars/en/vehicles/archive/lot/0-38985660/2017-Nissan-370Z-JN1AZ4EH9HM954155/details",
+  title: "2017 Nissan 370Z, Sport | JN1AZ4EH9HM954155",
+  text: "Location: Dallas (TX) Engine 3.7LV-6DOHC,VVT,332HPFuel Type GasolineDrive Type Rear wheel drive",
+});
+assert.equal(compactBidCarsText.engineCc, 3700);
+assert.equal(compactBidCarsText.fuel, "Gasoline");
+assert.equal(compactBidCarsText.location, "Dallas (TX)");
+assert.equal(parser.isBidCarsLotUrl(compactBidCarsText ? "https://bid.cars/en/vehicles/archive/lot/0-38985660/2017-Nissan-370Z/details" : ""), true);
 
 const dieselSpecs = parser.parseSnapshot({
   title: "2020 TEST CAR",

@@ -1,5 +1,8 @@
 "use strict";
 
+importScripts("parser.js");
+const pageParser = globalThis.AutoNexBidCarsParser;
+
 const DEFAULTS = {
   apiBase: "https://nex.autos/api/v1",
   autoCalculate: false,
@@ -32,7 +35,9 @@ async function fetchWithTimeout(url, init, timeoutMs = 25000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    const body = await response.json().catch(() => null);
+    return { response, body };
   } finally {
     clearTimeout(timer);
   }
@@ -43,7 +48,13 @@ async function apiRequest(path, init = {}) {
     throw new Error("Bu API əməliyyatına icazə yoxdur.");
   }
   const base = DEFAULTS.apiBase;
-  let response;
+  const isCustoms = path.startsWith('/customs/');
+  const customsMessage = 'Gömrüklə bağlı müvəqqəti problem var. Zəhmət olmasa bir az sonra yenidən yoxlayın.';
+  const validCustomsBody = body => path.includes('auto-options')
+    ? Array.isArray(body?.AutoCategories) && body.AutoCategories.length > 0 && Array.isArray(body?.AutoEngineTypes) && body.AutoEngineTypes.length > 0
+    : body?.autoDuty?.total?.value != null && Number.isFinite(Number(body.autoDuty.total.value)) && Number(body.autoDuty.total.value) >= 0 && Number(body.autoDuty.usdCourse) > 0;
+  const attempts = isCustoms ? 3 : 2;
+  let response, body;
   const request = {
     method: init.method || "GET",
     headers: {
@@ -56,26 +67,30 @@ async function apiRequest(path, init = {}) {
     credentials: "omit",
   };
   let lastNetworkError;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    response = null; body = null;
     try {
-      response = await fetchWithTimeout(`${base}${path}`, request);
-      if (![502, 503, 504].includes(response.status) || attempt === 1) break;
+      const result = await fetchWithTimeout(`${base}${path}`, request);
+      response = result.response; body = result.body;
+      const temporary = (isCustoms ? [408, 429, 500, 502, 503, 504] : [502, 503, 504]).includes(response.status) || (isCustoms && response.ok && !validCustomsBody(body));
+      if (!temporary || attempt === attempts - 1) break;
     } catch (error) {
       lastNetworkError = error;
-      if (attempt === 1) break;
+      if (attempt === attempts - 1) break;
     }
-    await delay(450);
+    await delay(isCustoms ? 1500 * (attempt + 1) : 450);
   }
   if (!response) {
+    if (isCustoms) throw new Error(customsMessage);
     const timedOut = lastNetworkError?.name === "AbortError";
     const detail = timedOut ? "sorğunun vaxtı bitdi" : "şəbəkə bağlantısı alınmadı";
     throw new Error(`nex.autos API-yə qoşulmaq alınmadı (${detail}). İnterneti yoxlayıb yenidən Hesabla basın.`);
   }
-  const body = await response.json().catch(() => null);
-  if (!response.ok) {
+  if (!response.ok || (isCustoms && !validCustomsBody(body))) {
     const raw = body && body.message;
     const message = Array.isArray(raw) ? raw.join(" ") : raw;
-    const error = new Error(message || `Auto Nex API ${response.status} xətası verdi.`);
+    const unavailable = isCustoms && (response.ok || response.status >= 500 || [408, 429].includes(response.status));
+    const error = new Error(unavailable ? customsMessage : message || `Auto Nex API ${response.status} xətası verdi.`);
     error.status = response.status;
     throw error;
   }
@@ -181,14 +196,16 @@ async function handleActionClick(tab) {
     return;
   }
 
-  if (!tab.id || !isBidCarsUrl(tab.url)) {
+  if (!tab.id || !isBidCarsUrl(tab.url) || !pageParser.isBidCarsLotUrl(tab.url)) {
     await chrome.action.setBadgeBackgroundColor({ color: "#dc2626" });
     await chrome.action.setBadgeText({ text: "BID" });
+    await chrome.action.setTitle({ title: pageParser.LOT_PAGE_NOTICE });
     setTimeout(() => chrome.action.setBadgeText({ text: "" }), 2200);
     return;
   }
 
   try {
+    await chrome.action.setTitle({ title: "BidCars səhifəsini Auto Nex ilə hesabla" });
     await notifyTab(tab.id);
   } catch {
     await chrome.scripting.executeScript({
@@ -209,6 +226,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || typeof message !== "object") return false;
 
   (async () => {
+    if (message.type === "ANX_OPEN_ACTIVE_TAB") {
+      if (_sender.tab || _sender.url !== chrome.runtime.getURL("popup.html")) throw new Error("Bu əməliyyat yalnız extension ikonundan açılır.");
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id || (!pageParser.isBidCarsLotUrl(tab.url) && !isCaucasusUrl(tab.url))) throw new Error(pageParser.LOT_PAGE_NOTICE);
+      await handleActionClick(tab);
+      return { ok: true, data: { opened: true } };
+    }
     if (message.type === "ANX_GET_SETTINGS") {
       const auth = await chrome.storage.local.get({ authToken: "", refreshToken: "", authEmail: "" });
       return { ok: true, data: { ...(await settings()), authenticated: Boolean(auth.authToken || auth.refreshToken), authEmail: auth.authEmail } };
@@ -219,6 +243,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return { ok: true, data: next };
     }
     if (message.type === "ANX_API") {
+      if (message.path === "/shipping/quote" && (!pageParser.isBidCarsLotUrl(message.body?.url) || (_sender.tab && !pageParser.isBidCarsLotUrl(_sender.tab.url)))) throw new Error(pageParser.LOT_PAGE_NOTICE);
       const request = message.path === "/shipping/quote" || message.path.startsWith("/calculator/") ? staffRequest : apiRequest;
       const data = await request(message.path, { method: message.method, body: message.body });
       if (message.path === "/shipping/quote" && !data.pricingApplied) throw new Error("Server yenilənməlidir. Admin yeni kalkulyator versiyasını deploy etməlidir.");
