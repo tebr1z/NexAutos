@@ -9,14 +9,14 @@ const cache = new Map();
 function load(name) {
   const file = path.resolve(__dirname, '../src/lib', `${name}.ts`);
   if (cache.has(file)) return cache.get(file);
-  const module = { exports: {} };
+  const compiledModule = { exports: {} };
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
   const resolve = spec => load(spec.replace('@/lib/', '').replace('./', ''));
-  vm.runInNewContext(`(function(require,module,exports){${code}\n})`, { process })(resolve, module, module.exports);
-  cache.set(file, module.exports);
-  return module.exports;
+  vm.runInNewContext(`(function(require,module,exports){${code}\n})`, { process })(resolve, compiledModule, compiledModule.exports);
+  cache.set(file, compiledModule.exports);
+  return compiledModule.exports;
 }
 
 const { getTrackingOverview, getTrackingPhases } = load('tracking-overview');
