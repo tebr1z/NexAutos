@@ -1,13 +1,15 @@
 import { isArchiveExpired } from "./archive";
 import { normalizeTransits } from "./journey";
-import type { TrackingShipment, TransitStop } from "./types";
+import type { TrackingShipment } from "./types";
 
 const KEY = "anx_local_orders";
 
 export function listLocalOrders(): TrackingShipment[] {
   if (typeof window === "undefined") return [];
   try {
-    const rows = JSON.parse(localStorage.getItem(KEY) ?? "[]") as TrackingShipment[];
+    const parsed: unknown = JSON.parse(localStorage.getItem(KEY) ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    const rows = parsed.filter((row): row is TrackingShipment => !!row && typeof row === "object" && typeof row.trackingCode === "string" && !!row.trackingCode.trim() && typeof row.vin === "string");
     const kept = rows.filter((row) => !isArchiveExpired(row));
     const normalized = kept.map((row) => ({ ...row, transitPorts: normalizeTransits(row.transitPorts) }));
     if (kept.length !== rows.length) localStorage.setItem(KEY, JSON.stringify(normalized));
@@ -27,57 +29,26 @@ export function pickImo(preferred?: string | null, fallback?: string | null) {
   return a || b || undefined;
 }
 
-function pickTransits(local?: TransitStop[], remote?: TransitStop[]) {
-  const localTransits = normalizeTransits(local);
-  const remoteTransits = normalizeTransits(remote);
-  const useLocal = localTransits.length >= remoteTransits.length;
-  return {
-    transitPorts: useLocal ? localTransits : remoteTransits,
-    useLocal,
-  };
-}
-
-/** Remote list fetch: keep local transits/photos if the API has none. */
+/** Persisted API fields are authoritative, including deliberately cleared arrays. */
 export function mergeRemotePreserveLocal(
   local: TrackingShipment | undefined,
   remote: TrackingShipment,
 ): TrackingShipment {
   if (!local) return remote;
-  const picked = pickTransits(local.transitPorts, remote.transitPorts);
   return {
-    ...local,
     ...remote,
     id: remote.id ?? local.id,
-    photos: remote.photos?.length ? remote.photos : local.photos,
-    transitPorts: picked.transitPorts,
-    currentTransitIndex: picked.useLocal
-      ? (local.currentTransitIndex ?? -1)
-      : (remote.currentTransitIndex ?? local.currentTransitIndex ?? -1),
-    customerPhone: remote.customerPhone || local.customerPhone,
-    vesselName: local.vesselName || remote.vesselName,
-    vesselImo: pickImo(local.vesselImo, remote.vesselImo),
-    events: (local.events?.length ?? 0) >= (remote.events?.length ?? 0) ? local.events : remote.events,
+    photos: remote.photos ?? local.photos,
+    transitPorts: normalizeTransits(remote.transitPorts ?? local.transitPorts),
+    currentTransitIndex: remote.currentTransitIndex ?? -1,
+    events: remote.events ?? local.events,
   };
 }
 
-/** Track page: local admin edits (especially transits) win over an empty API row. */
+/** A successful public fetch must never be overwritten by stale admin browser data. */
 export function overlayLocal(remote: TrackingShipment, code: string): TrackingShipment {
-  const local = getLocalOrder(code);
-  if (!local) return { ...remote, transitPorts: normalizeTransits(remote.transitPorts) };
-  const picked = pickTransits(local.transitPorts, remote.transitPorts);
-  return {
-    ...remote,
-    ...local,
-    id: remote.id ?? local.id,
-    photos: remote.photos?.length ? remote.photos : local.photos,
-    transitPorts: picked.transitPorts,
-    currentTransitIndex: picked.useLocal
-      ? (local.currentTransitIndex ?? -1)
-      : (remote.currentTransitIndex ?? local.currentTransitIndex),
-    vesselName: local.vesselName || remote.vesselName,
-    vesselImo: pickImo(local.vesselImo, remote.vesselImo),
-    events: (local.events?.length ?? 0) >= (remote.events?.length ?? 0) ? local.events : remote.events,
-  };
+  void code;
+  return { ...remote, transitPorts: normalizeTransits(remote.transitPorts) };
 }
 
 export function getLocalOrder(code: string) {

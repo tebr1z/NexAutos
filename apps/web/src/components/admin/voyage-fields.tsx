@@ -4,8 +4,6 @@ import { useState } from "react";
 import type { TransitStop } from "@/lib/types";
 import { DESTINATION_PORTS } from "@/lib/constants";
 import { findPortCoords } from "@/lib/carriers";
-import { isValidImo } from "@/lib/imo";
-import { api } from "@/lib/api";
 
 export type VoyageValues = {
   vesselName: string;
@@ -69,7 +67,6 @@ export function VoyageFields({
   value: VoyageValues;
   onChange: (next: VoyageValues) => void;
 }) {
-  const [mapBusy, setMapBusy] = useState("");
   const [mapNotice, setMapNotice] = useState("");
 
   function set<K extends keyof VoyageValues>(key: K, next: VoyageValues[K]) {
@@ -89,52 +86,6 @@ export function VoyageFields({
       mapLng: lng.toFixed(5),
     });
     setMapNotice(notice);
-  }
-
-  async function pinFromImo() {
-    const imo = isValidImo(value.vesselImo);
-    const mmsi = value.vesselMmsi.replace(/\D/g, "");
-    if (!imo && mmsi.length !== 9) {
-      setMapNotice("IMO (7 rəqəm) və ya MMSI (9 rəqəm) yazın — ikisini də yaza bilərsiniz.");
-      return;
-    }
-    setMapBusy("imo");
-    setMapNotice("");
-    try {
-      const pos = imo
-        ? await api.vesselByImo(imo, {
-            lat: Number(value.mapLat) || undefined,
-            lng: Number(value.mapLng) || undefined,
-            mmsi: mmsi.length === 9 ? mmsi : undefined,
-            name: value.vesselName.trim() || undefined,
-          })
-        : await api.vesselPosition(mmsi);
-      const typedName = value.vesselName.trim();
-      const lookupName = pos?.name?.trim() || "";
-      const nextName = typedName || lookupName;
-      const nextMmsi = pos?.mmsi && String(pos.mmsi).replace(/\D/g, "").length === 9 ? String(pos.mmsi) : mmsi;
-      const nextImo = imo || (pos?.imo && isValidImo(String(pos.imo))) || value.vesselImo;
-      const live = pos?.hasCoordinates && pos.latitude != null && pos.longitude != null;
-      onChange({
-        ...value,
-        vesselImo: nextImo,
-        vesselMmsi: nextMmsi,
-        vesselName: nextName,
-        ...(live ? { mapLat: pos.latitude!.toFixed(5), mapLng: pos.longitude!.toFixed(5) } : {}),
-      });
-      const shown = nextName || lookupName || (nextImo ? `IMO ${nextImo}` : `MMSI ${nextMmsi}`);
-      if (!live) {
-        setMapNotice(
-          `Gəmi tapıldı (${shown}). Canlı AIS hələ gəlməyib — 1-2 dəq sonra yenə basın və ya koordinatı əl ilə yazın.`,
-        );
-        return;
-      }
-      setMapNotice(`Gəmi AIS: ${shown}`);
-    } catch (err) {
-      setMapNotice(err instanceof Error ? err.message : "AIS-ə çıxılmadı. Koordinatı əl ilə yazın.");
-    } finally {
-      setMapBusy("");
-    }
   }
 
   function pinFromPort() {
@@ -203,26 +154,6 @@ export function VoyageFields({
           onChange={(e) => set("vesselName", e.target.value.toUpperCase())}
           className={field}
         />
-        <input
-          name="vesselImo"
-          placeholder="IMO — 7 rəqəm, dəyişmək olar"
-          value={value.vesselImo}
-          onChange={(e) => set("vesselImo", e.target.value.replace(/\D/g, "").slice(0, 7))}
-          className={`${field} font-mono`}
-          inputMode="numeric"
-          maxLength={7}
-          autoComplete="off"
-        />
-        <input
-          name="vesselMmsi"
-          placeholder="MMSI — 9 rəqəm (məs. 255803480)"
-          value={value.vesselMmsi}
-          onChange={(e) => set("vesselMmsi", e.target.value.replace(/\D/g, "").slice(0, 9))}
-          className={`${field} font-mono md:col-span-2`}
-          inputMode="numeric"
-          maxLength={9}
-          autoComplete="off"
-        />
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <input
@@ -243,14 +174,6 @@ export function VoyageFields({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => void pinFromImo()}
-          disabled={mapBusy === "imo"}
-          className="rounded-lg border border-white/15 px-3 py-2 text-xs text-sky-300 disabled:opacity-50"
-        >
-          {mapBusy === "imo" ? "IMO axtarılır…" : "IMO / MMSI-dən tap"}
-        </button>
-        <button
-          type="button"
           onClick={pinFromPort}
           className="rounded-lg border border-white/15 px-3 py-2 text-xs text-sky-300"
         >
@@ -258,8 +181,7 @@ export function VoyageFields({
         </button>
       </div>
       <p className="text-[11px] text-zinc-500">
-        Dənizdə (konteyner/gəmi yoldadır) xəritə IMO ilə canlı gəmini göstərir. TIR və gömrükdə əl pin və ya liman
-        koordinatı işləyir. AIS tapılmasa da əl rəqəmləri qalır.
+        Xəritə daxil etdiyiniz son təsdiqlənmiş koordinatı göstərir, canlı gəmi mövqeyi deyil. Dəqiq yenilənən məlumat üçün daşıyıcının izləmə linkini əlavə edin.
       </p>
       {mapNotice ? <p className="text-[11px] text-sky-300">{mapNotice}</p> : null}
       <div className="grid gap-3 md:grid-cols-2">

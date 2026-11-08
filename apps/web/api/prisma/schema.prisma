@@ -26,6 +26,21 @@ enum AuctionHouse {
 
 enum ShipmentStatus {
   PURCHASED
+  PAYMENT_RECEIVED
+  AUCTION_RELEASED
+  EXPORT_READY
+  TO_ORIGIN_PORT
+  CONTAINER_LOADING
+  VESSEL_WAITING
+  VESSEL_LOADED
+  ISTANBUL_TO_POTI
+  DESTINATION_APPROACHING
+  CONTAINER_DISCHARGED
+  CONTAINER_OPENING_PENDING
+  CONTAINER_OPENED
+  TIR_LOADING_PENDING
+  CUSTOMS_DOCUMENTS
+  CUSTOMS_DOCUMENTS_READY
   AUCTION_PAID
   PICKED_UP
   EXPORT_DOCUMENTS
@@ -270,6 +285,14 @@ model Order {
   vesselImo       String?
   voyageNumber    String?
   carrierTrackingUrl String?
+  originCountry   String?
+  freightPaymentStatus String @default("UNPAID")
+  documentMethod  String @default("UNSET")
+  documentStatus  String @default("PENDING")
+  purchasePaymentPercent Int?
+  commissionUsd   Decimal? @db.Decimal(12, 2)
+  containerOpeningDate String? @db.VarChar(10)
+  reviewToken     String? @unique
   containerStatus String?
   originPort      String?
   destinationPort String?
@@ -304,10 +327,20 @@ model Order {
   photos    OrderPhoto[]
   invoices  Invoice[]
   contracts Contract[]
+  review    OrderReview?
 
   @@index([trackingCode])
   @@index([currentStatus])
   @@index([vin])
+}
+
+model OrderReview {
+  id        String @id @default(cuid())
+  orderId   String @unique
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String? @db.VarChar(2000)
+  createdAt DateTime @default(now())
 }
 
 model ContactInquiry {

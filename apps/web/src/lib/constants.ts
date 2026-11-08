@@ -1,20 +1,35 @@
 export const TRACKING_STEPS = [
-  { key: "PURCHASED", en: "Purchased", az: "Alınıb", ru: "Куплено", tr: "Satın alındı" },
+  { key: "PURCHASED", en: "Vehicle purchased", az: "Maşın alınıb", ru: "Автомобиль куплен", tr: "Araç satın alındı" },
+  { key: "PAYMENT_RECEIVED", en: "Payment received by company", az: "Pul şirkətin hesabına mədaxil olub", ru: "Оплата поступила компании", tr: "Ödeme şirket hesabına ulaştı" },
   { key: "AUCTION_PAID", en: "Auction Paid", az: "Hərrac ödənilib", ru: "Аукцион оплачен", tr: "Açık artırma ödendi" },
-  { key: "PICKED_UP", en: "Picked Up", az: "Götürülüb", ru: "Забрано", tr: "Teslim alındı" },
-  { key: "EXPORT_DOCUMENTS", en: "Export documents ready", az: "İxrac sənədləri hazırdır", ru: "Экспортные документы готовы", tr: "İhracat evrakları hazır" },
+  { key: "AUCTION_RELEASED", en: "Released by auction", az: "Hərracdan çıxarılıb", ru: "Выдан аукционом", tr: "Açık artırmadan çıkarıldı" },
+  { key: "EXPORT_DOCUMENTS", en: "Documents being prepared", az: "Sənədləri hazırlanır", ru: "Документы готовятся", tr: "Evrakları hazırlanıyor" },
+  { key: "EXPORT_READY", en: "Export document ready", az: "İxrac sənədi hazırdır", ru: "Экспортный документ готов", tr: "İhracat evrakı hazır" },
+  { key: "PICKED_UP", en: "Collected from purchase location", az: "Alındığı yerdən götürülüb", ru: "Забран с места покупки", tr: "Satın alındığı yerden alındı" },
+  { key: "TO_ORIGIN_PORT", en: "On the way to port", az: "Limana doğru yoldadır", ru: "Следует в порт", tr: "Limana doğru yolda" },
   { key: "ARRIVED_PORT", en: "Arrived Port", az: "Limana çatıb", ru: "Прибыло в порт", tr: "Limana vardı" },
-  { key: "LOADED_CONTAINER", en: "Loaded Container", az: "Konteynerə yüklənib", ru: "Загружено в контейнер", tr: "Konteynere yüklendi" },
-  { key: "SHIP_DEPARTED", en: "Ship Departed", az: "Gəmi yola düşüb", ru: "Судно отправилось", tr: "Gemi yola çıktı" },
-  { key: "IN_TRANSIT", en: "In Transit", az: "Yoldadır", ru: "В пути", tr: "Yolda" },
+  { key: "CONTAINER_LOADING", en: "Container loading in progress", az: "Konteynerə yüklənmə mərhələsindədir", ru: "Идёт загрузка в контейнер", tr: "Konteynere yükleniyor" },
+  { key: "LOADED_CONTAINER", en: "Container loaded, awaiting departure", az: "Konteynerə yüklənib, yola çıxmağı gözləyir", ru: "В контейнере, ожидает отправления", tr: "Konteynere yüklendi, kalkış bekleniyor" },
+  { key: "VESSEL_WAITING", en: "Awaiting vessel arrival", az: "Gəminin limana yaxınlaşmasını gözləyir", ru: "Ожидает прибытия судна", tr: "Geminin limana gelişi bekleniyor" },
+  { key: "VESSEL_LOADED", en: "Loaded onto vessel", az: "Gəmiyə yüklənib", ru: "Погружен на судно", tr: "Gemiye yüklendi" },
+  { key: "SHIP_DEPARTED", en: "Vessel underway", az: "Gəmi hərəkətdədir", ru: "Судно в пути", tr: "Gemi hareket halinde" },
+  { key: "IN_TRANSIT", en: "Transit route", az: "Tranzit marşrutundadır", ru: "Транзитный маршрут", tr: "Transit güzergâhında" },
+  { key: "ISTANBUL_TO_POTI", en: "Departed Istanbul towards Poti", az: "İstanbuldan Poti istiqamətinə yola düşüb", ru: "Отправлен из Стамбула в Поти", tr: "İstanbul’dan Poti yönüne çıktı" },
+  { key: "DESTINATION_APPROACHING", en: "Vessel approaching Poti / Batumi", az: "Gəmi Poti / Batum limanına yaxınlaşır", ru: "Судно приближается к Поти / Батуми", tr: "Gemi Poti / Batum limanına yaklaşıyor" },
   { key: "DESTINATION_PORT", en: "Destination Port", az: "Təyinat limanı", ru: "Порт назначения", tr: "Varış limanı" },
+  { key: "CONTAINER_DISCHARGED", en: "Container discharged", az: "Konteyner boşaldılıb", ru: "Контейнер выгружен", tr: "Konteyner tahliye edildi" },
+  { key: "CONTAINER_OPENING_PENDING", en: "Awaiting container opening", az: "Konteynerin açılmasını gözləyir", ru: "Ожидает вскрытия контейнера", tr: "Konteynerin açılması bekleniyor" },
+  { key: "CONTAINER_OPENED", en: "Container opened", az: "Konteyner açılıb", ru: "Контейнер открыт", tr: "Konteyner açıldı" },
+  { key: "TIR_LOADING_PENDING", en: "Awaiting truck loading", az: "TIR-a yüklənməyi gözləyir", ru: "Ожидает погрузки на фуру", tr: "TIR’a yükleme bekleniyor" },
   { key: "TIR_LOADED", en: "Loaded on truck", az: "TIR yüklənib", ru: "Погружено на фуру", tr: "TIR yüklendi" },
+  { key: "CUSTOMS_DOCUMENTS", en: "Baku customs documents being prepared", az: "Bakı gömrüyü üçün sənədlər hazırlanır", ru: "Готовятся документы для таможни Баку", tr: "Bakü gümrük evrakları hazırlanıyor" },
+  { key: "CUSTOMS_DOCUMENTS_READY", en: "Customs documents ready", az: "Gömrük sənədləri hazırdır", ru: "Таможенные документы готовы", tr: "Gümrük evrakları hazır" },
   { key: "TIR_DEPARTED", en: "Truck departed", az: "TIR yola çıxıb", ru: "Фура выехала", tr: "TIR yola çıktı" },
   { key: "TIR_GEORGIA_BORDER", en: "At Georgia border", az: "TIR Gürcüstan sərhədindədir", ru: "Фура на границе Грузии", tr: "TIR Gürcistan sınırında" },
   { key: "TIR_BAKU_CUSTOMS", en: "At Baku customs", az: "TIR Bakı gömrüyündədir", ru: "Фура на таможне Баку", tr: "TIR Bakü gümrüğünde" },
   { key: "CUSTOMS_CLEARANCE", en: "Customs Clearance", az: "Gömrük rəsmiləşdirməsi", ru: "Таможенное оформление", tr: "Gümrükleme" },
-  { key: "READY_FOR_DELIVERY", en: "Ready For Delivery", az: "Çatdırılmağa hazır", ru: "Готово к доставке", tr: "Teslime hazır" },
-  { key: "DELIVERED", en: "Delivered", az: "Çatdırılıb", ru: "Доставлено", tr: "Teslim edildi" },
+  { key: "READY_FOR_DELIVERY", en: "Unloaded at Baku customs — please collect", az: "Maşın Bakı gömrüyündə boşaldılıb — zəhmət olmasa təhvil götürün", ru: "Выгружен на таможне Баку — заберите автомобиль", tr: "Bakü gümrüğünde indirildi — lütfen teslim alın" },
+  { key: "DELIVERED", en: "Handed over", az: "Təhvil verilib", ru: "Передано клиенту", tr: "Teslim edildi" },
 ] as const;
 
 export type ShipmentStatus = (typeof TRACKING_STEPS)[number]["key"] | "CANCELLED";
@@ -23,6 +38,7 @@ export type ShipmentStatus = (typeof TRACKING_STEPS)[number]["key"] | "CANCELLED
 export const SMS_NOTIFY_STATUSES = [
   "PURCHASED",
   "EXPORT_DOCUMENTS",
+  "EXPORT_READY",
   "LOADED_CONTAINER",
   "SHIP_DEPARTED",
   "DESTINATION_PORT",
@@ -36,10 +52,11 @@ export function shouldNotifyStatus(status: string) {
   return (SMS_NOTIFY_STATUSES as readonly string[]).includes(status);
 }
 
-/** TIR/gömrük/çatdırılma: xəritə liman/əl pin. Əks halda IMO varsa gəmi AIS birinci. */
+/** Road/customs stages use the last reported land location. */
 export function isRoadMapStatus(status: string) {
   return (
     status.startsWith("TIR_") ||
+    status.startsWith("CUSTOMS_") ||
     status === "CUSTOMS_CLEARANCE" ||
     status === "READY_FOR_DELIVERY" ||
     status === "DELIVERED" ||
@@ -70,13 +87,13 @@ export function locationForStatus(
   destinationPort?: string | null,
 ): { currentPort?: string; currentCountry?: string } {
   const dest = destinationPort?.trim();
-  if (status === "DESTINATION_PORT" || status === "TIR_LOADED" || status === "TIR_DEPARTED") {
+  if (["DESTINATION_PORT", "CONTAINER_DISCHARGED", "CONTAINER_OPENING_PENDING", "CONTAINER_OPENED", "TIR_LOADING_PENDING", "TIR_LOADED", "CUSTOMS_DOCUMENTS", "CUSTOMS_DOCUMENTS_READY"].includes(status)) {
     return dest ? { currentPort: dest, currentCountry: "Georgia" } : {};
   }
   if (status === "TIR_GEORGIA_BORDER") {
     return { currentPort: "Gürcüstan sərhədi", currentCountry: "Georgia" };
   }
-  if (status === "TIR_BAKU_CUSTOMS") {
+  if (["TIR_BAKU_CUSTOMS", "CUSTOMS_CLEARANCE", "READY_FOR_DELIVERY"].includes(status)) {
     return { currentPort: "Bakı gömrüyü", currentCountry: "Azerbaijan" };
   }
   return {};

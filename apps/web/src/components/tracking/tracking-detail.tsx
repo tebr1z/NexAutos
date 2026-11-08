@@ -4,67 +4,35 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { api } from "@/lib/api";
-import { SITE, TRACKING_STEPS, isLiveVesselMapStatus } from "@/lib/constants";
+import { SITE, TRACKING_STEPS } from "@/lib/constants";
 import type { TrackingShipment } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { findPortCoords } from "@/lib/carriers";
-import { isValidImo } from "@/lib/imo";
 import { useI18n } from "@/providers/i18n-provider";
 import { getLocalOrder, overlayLocal } from "@/lib/local-orders";
 import { PhotoCatalog } from "@/components/tracking/photo-catalog";
 import { journeyPosition, normalizeTransits } from "@/lib/journey";
 import { ShippingNotice } from "@/components/layout/shipping-notice";
-import { ContainerTracker } from "./container-tracker";
 import { ShipmentMap } from "./shipment-map";
+import { CarrierDetails, ShipmentNotices } from "./shipment-notices";
+import { ShipmentReview } from "./shipment-review";
 import {
   ArrowRight,
   CalendarClock,
   CarFront,
   Check,
-  Container,
   Download,
   FileText,
   MapPin,
   Navigation,
-  Ship,
 } from "lucide-react";
 
 function withManualPin(shipment: TrackingShipment): TrackingShipment {
-  if (shipment.lat != null && shipment.lng != null) return shipment;
   if (shipment.mapLat != null && shipment.mapLng != null) {
     return { ...shipment, lat: shipment.mapLat, lng: shipment.mapLng };
   }
-  return shipment;
-}
-
-async function pinFromImo(shipment: TrackingShipment): Promise<TrackingShipment> {
-  const imo = isValidImo(shipment.vesselImo);
-  if (!imo) return withManualPin(shipment);
-  try {
-    const pos = await api.vesselByImo(imo, {
-      lat: shipment.lat ?? shipment.mapLat,
-      lng: shipment.lng ?? shipment.mapLng,
-    });
-    const name = pos?.name?.trim() || shipment.vesselName;
-    if (!pos?.hasCoordinates || pos.latitude == null || pos.longitude == null) {
-      return withManualPin({ ...shipment, vesselName: name, vesselImo: shipment.vesselImo || imo });
-    }
-    return {
-      ...shipment,
-      lat: pos.latitude,
-      lng: pos.longitude,
-      vesselName: name,
-      vesselImo: shipment.vesselImo || (pos.imo ? String(pos.imo) : imo),
-    };
-  } catch {
-    return withManualPin(shipment);
-  }
-}
-
-async function pinFromPorts(shipment: TrackingShipment): Promise<TrackingShipment> {
   if (shipment.lat != null && shipment.lng != null) return shipment;
-  const hit =
-    findPortCoords(shipment.currentPort);
+  const hit = findPortCoords(shipment.currentPort);
   if (hit) {
     return {
       ...shipment,
@@ -73,63 +41,7 @@ async function pinFromPorts(shipment: TrackingShipment): Promise<TrackingShipmen
       currentCountry: shipment.currentCountry || hit.country,
     };
   }
-  const label = shipment.currentPort;
-  if (!label) return shipment;
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(`${label} port`)}`,
-      { headers: { Accept: "application/json" } },
-    );
-    const rows = (await res.json()) as { lat?: string; lon?: string }[];
-    const lat = Number(rows?.[0]?.lat);
-    const lng = Number(rows?.[0]?.lon);
-    if (Number.isFinite(lat) && Number.isFinite(lng)) return { ...shipment, lat, lng };
-  } catch {
-    /* geocode optional */
-  }
   return shipment;
-}
-
-async function locateShipment(shipment: TrackingShipment) {
-  const seeded = withManualPin(shipment);
-  if (isValidImo(seeded.vesselImo) && isLiveVesselMapStatus(seeded.currentStatus)) {
-    const live = await pinFromImo(seeded);
-    if (live.lat != null && live.lng != null) return live;
-    return pinFromPorts(withManualPin(live));
-  }
-  if (seeded.mapLat != null && seeded.mapLng != null) return seeded;
-  return pinFromPorts({ ...seeded, lat: undefined, lng: undefined });
-}
-
-async function refreshImoUntilPinned(
-  shipment: TrackingShipment,
-  onUpdate: (next: TrackingShipment) => void,
-  cancelled: () => boolean,
-) {
-  let current = withManualPin(shipment);
-  if (cancelled()) return current;
-  onUpdate(current);
-  current = await locateShipment(current);
-  if (cancelled()) return current;
-  onUpdate(current);
-  const waitingAis =
-    Boolean(isValidImo(current.vesselImo)) &&
-    isLiveVesselMapStatus(current.currentStatus) &&
-    current.mapLat != null &&
-    current.lat === current.mapLat;
-  if (!isValidImo(current.vesselImo) || !isLiveVesselMapStatus(current.currentStatus)) return current;
-  if (current.lat != null && !waitingAis) return current;
-  for (let i = 0; i < 12 && !cancelled(); i++) {
-    await new Promise((r) => setTimeout(r, 5000));
-    if (cancelled()) return current;
-    const next = await pinFromImo(current);
-    if (next.lat != null && next.lng != null) {
-      current = next;
-      onUpdate(current);
-      if (current.mapLat == null || current.lat !== current.mapLat) break;
-    }
-  }
-  return withManualPin(current);
 }
 
 function arrivalText(shipment: TrackingShipment, pending: string, locale: "az" | "en" | "ru" | "tr") {
@@ -143,7 +55,6 @@ export function TrackingDetail({ code }: { code: string }) {
   const { t, locale } = useI18n();
   const [data, setData] = useState<TrackingShipment | null>(null);
   const [error, setError] = useState("");
-  const [aisPending, setAisPending] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,18 +68,11 @@ export function TrackingDetail({ code }: { code: string }) {
         if (!local) throw new Error("not-found");
         return local;
       })
-      .then(async (shipment) => {
+      .then((shipment) => {
         if (cancelled) return;
         const merged = withManualPin(overlayLocal(shipment, code));
         setData(merged);
         setError("");
-        if (merged.vesselImo && isLiveVesselMapStatus(merged.currentStatus) && merged.mapLat == null) {
-          setAisPending(true);
-        }
-        const withImo = await refreshImoUntilPinned(merged, (next) => setData(next), () => cancelled);
-        if (cancelled) return;
-        setAisPending(false);
-        setData(withImo);
       })
       .catch(() => {
         if (!cancelled) setError(t.track.notFound);
@@ -204,7 +108,8 @@ export function TrackingDetail({ code }: { code: string }) {
     locale,
     data.destinationPort,
   );
-  const currentLabel = items[cursor]?.label ?? data.currentStatus;
+  const cancelled = data.currentStatus === "CANCELLED";
+  const currentLabel = cancelled ? ({ az: "Sifariş ləğv edilib", en: "Order cancelled", ru: "Заказ отменён", tr: "Sipariş iptal edildi" })[locale] : items[cursor]?.label ?? data.currentStatus;
   const route = [data.originPort, ...stops.map((s) => s.place), data.destinationPort].filter(Boolean).join(" → ");
   const location = [data.currentPort, data.currentCountry].filter(Boolean).join(", ");
 
@@ -240,6 +145,7 @@ export function TrackingDetail({ code }: { code: string }) {
             ) : null}
           </h1>
           <p className="mt-2 break-all font-mono text-xs text-muted sm:text-sm">VIN {data.vin}</p>
+          {data.lotNumber && <p className="mt-1 font-mono text-xs text-muted">Lot № {data.lotNumber}</p>}
         </div>
         <div className="glass hidden items-center gap-4 rounded-2xl p-3 sm:flex">
           <div className="pl-2 text-right"><p className="text-xs text-muted">{t.track.openPhone}</p><p className="mt-1 text-sm">{t.track.scanQr}</p></div>
@@ -257,12 +163,13 @@ export function TrackingDetail({ code }: { code: string }) {
           <div className="h-full royal-gradient" style={{ width: `${progress}%` }} />
         </div>
         <div className="mt-5 grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
-          <div><p className="flex items-center gap-2 text-xs text-muted"><CalendarClock size={16} />{t.track.eta}</p><p className="mt-2 text-xl font-semibold">{arrivalText(data, t.track.pending, locale)}</p>{data.currentStatus !== 'DELIVERED' && <p className="mt-2 text-xs leading-5 text-muted">{t.track.etaHint}</p>}</div>
-          <div><p className="text-xs text-muted">{t.track.destination}</p><p className="mt-2 font-medium">{data.destinationPort || t.track.pending}</p>{items[cursor + 1] && <p className="mt-2 flex items-center gap-2 text-sm text-muted"><ArrowRight size={15} className="shrink-0" />{items[cursor + 1].label}</p>}</div>
+          <div><p className="flex items-center gap-2 text-xs text-muted"><CalendarClock size={16} />{t.track.eta}</p><p className="mt-2 text-xl font-semibold">{cancelled ? "—" : arrivalText(data, t.track.pending, locale)}</p>{!cancelled && data.currentStatus !== 'DELIVERED' && <p className="mt-2 text-xs leading-5 text-muted">{t.track.etaHint}</p>}</div>
+          <div><p className="text-xs text-muted">{t.track.destination}</p><p className="mt-2 font-medium">{data.destinationPort || t.track.pending}</p>{!cancelled && items[cursor + 1] && <p className="mt-2 flex items-center gap-2 text-sm text-muted"><ArrowRight size={15} className="shrink-0" />{items[cursor + 1].label}</p>}</div>
         </div>
       </section>
 
-      {data.containerNumber && <div className="mt-6"><ContainerTracker initialNumber={data.containerNumber} /></div>}
+      {!cancelled && <ShipmentNotices shipment={data} />}
+      <CarrierDetails shipment={data} />
 
       <div id="shipment-photos" className="scroll-mt-28">
         <PhotoCatalog photos={data.photos ?? []} />
@@ -271,23 +178,23 @@ export function TrackingDetail({ code }: { code: string }) {
         <div id="shipment-route" className="mt-6 scroll-mt-28 rounded-3xl border border-line bg-card p-5 sm:p-6">
           <div className="flex items-center gap-3"><Navigation size={19} className="text-royal" /><div><h2 className="font-medium">{t.track.routeTitle}</h2><p className="mt-1 text-xs text-muted">{t.track.routeSub}</p></div></div>
           {route ? <p className="mt-6 flex flex-wrap items-center gap-2 text-sm">{[data.originPort, ...stops.map((s) => s.place), data.destinationPort].filter(Boolean).map((place, index, all) => <span key={`${place}-${index}`} className="contents"><span className="rounded-full bg-bg px-3 py-2">{place}</span>{index < all.length - 1 && <ArrowRight size={14} className="text-muted" />}</span>)}</p> : <p className="mt-5 text-sm text-muted">{t.track.routePending}</p>}
-          {aisPending && <p className="mt-3 text-sm text-muted">{t.track.aisPending}</p>}
         </div>
 
       <div className="mt-6 grid items-start gap-5 lg:grid-cols-2">
         <section className="min-w-0 rounded-3xl border border-line bg-card p-5 sm:p-6">
           <h2 className="flex items-center gap-3 font-semibold"><CarFront size={20} className="text-royal" />{t.track.stagesTitle}</h2>
-          <ol className="mt-5 space-y-3">{items.slice(Math.max(0, cursor - 1), cursor + 2).map((item) => {
+          {!cancelled && <ol className="mt-5 space-y-3">{items.slice(Math.max(0, cursor - 1), cursor + 2).map((item) => {
             const index = items.indexOf(item);
             return <li key={item.id} className={`flex items-center gap-3 rounded-xl p-3 text-sm ${index === cursor ? 'bg-royal/10 font-semibold text-royal' : 'bg-bg text-muted'}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-current">{index < cursor ? <Check size={15} /> : index === cursor ? <Navigation size={14} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}</span>{item.label}</li>;
-          })}</ol>
+          })}</ol>}
+          {cancelled && <p className="mt-4 rounded-xl bg-bg p-4 text-sm text-muted">{currentLabel}</p>}
           <details className="mt-5 border-t border-line pt-4"><summary className="cursor-pointer py-2 text-sm font-medium text-royal">{t.track.stagesSub}</summary>
       <ol className="mt-5 space-y-0">
         {items.map((item, i) => {
           const event = item.kind === "step" ? data.events.find((e) => e.status === item.key) : undefined;
           const when = item.kind === "transit" ? item.occurredAt : event?.occurredAt;
-          const done = i <= cursor;
-          const current = i === cursor;
+          const done = cancelled ? Boolean(when) : i <= cursor;
+          const current = !cancelled && i === cursor;
           return (
             <li key={item.id} className="grid grid-cols-[28px_1fr] gap-4">
               <div className="flex flex-col items-center">
@@ -309,15 +216,16 @@ export function TrackingDetail({ code }: { code: string }) {
 
         <div className="min-w-0 space-y-6">
           <section className="overflow-hidden rounded-3xl border border-line bg-card">
-            <div className="flex items-center justify-between p-5"><div><h2 className="font-medium">{t.track.liveTitle}</h2><p className="mt-1 text-xs text-muted">{location || t.track.livePending}</p></div><MapPin size={20} className="text-royal" /></div>
-            <ShipmentMap lat={data.lat} lng={data.lng} label={data.currentPort || data.vesselName || t.track.location} className="h-[300px]" />
-            <p className="border-t border-line px-5 py-3 text-xs leading-5 text-muted">Sifarişin son məlum məntəqəsi. Dəqiq gəmi mövqeyi və məlumatın vaxtı konteyner izləmə panelində ayrıca göstərilir.</p>
-            {(data.vesselName || data.containerNumber || data.vesselImo) && <details className="border-t border-line p-5"><summary className="cursor-pointer text-sm text-royal">{t.track.vessel} · {t.track.container}</summary><div className="mt-4 space-y-3 text-sm">{data.vesselName && <p className="flex items-center gap-2 break-words"><Ship size={16} className="shrink-0 text-muted" />{data.vesselName}</p>}{data.containerNumber && <p className="flex items-center gap-2 break-all font-mono"><Container size={16} className="shrink-0 text-muted" />{data.containerNumber}</p>}{data.vesselImo && <p className="text-xs text-muted">IMO {data.vesselImo}</p>}{data.carrierName && <p className="text-muted">{data.carrierName}</p>}</div></details>}
+            <div className="flex items-center justify-between p-5"><div><h2 className="font-medium">Son bildirilən məntəqə</h2><p className="mt-1 text-xs text-muted">{location || "Məntəqə təsdiqləndikdə göstəriləcək"}</p></div><MapPin size={20} className="text-royal" /></div>
+            <ShipmentMap lat={data.lat} lng={data.lng} label={data.currentPort || t.track.location} className="h-[300px]" />
+            <p className="border-t border-line px-5 py-3 text-xs leading-5 text-muted">Xəritə sifariş üzrə qeyd edilmiş son koordinatı və ya limanın təxmini yerini göstərir. Bu, canlı gəmi GPS-i deyil. Yenilənən məlumat üçün daşıyıcının izləmə linkindən istifadə edin.</p>
           </section>
 
           {(data.invoice || data.documents.length > 0) && <section id="shipment-documents" className="scroll-mt-28 rounded-3xl border border-line bg-card p-5"><div className="flex items-center gap-3"><FileText size={19} className="text-royal" /><h2 className="font-medium">{t.track.docsTitle}</h2></div>{data.invoice && <div className="mt-5 rounded-2xl bg-bg p-4 text-sm"><div className="flex flex-wrap justify-between gap-3"><span className="break-all text-muted">{t.track.invoice} {data.invoice.number}</span><span className="font-medium">${data.invoice.amountUsd.toLocaleString()}</span></div><p className="mt-2 text-xs text-royal">{data.invoice.status}</p></div>}<div className="mt-3 space-y-2">{data.documents.map((doc) => <a key={doc.url} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-4 text-sm transition hover:bg-bg"><span className="min-w-0 break-words">{doc.title}</span><Download size={17} className="shrink-0 text-muted" /></a>)}</div></section>}
         </div>
       </div>
+
+      <ShipmentReview key={data.trackingCode} shipment={data} />
 
       <details className="mt-6 rounded-2xl border border-line p-4"><summary className="cursor-pointer text-sm text-muted">{t.track.etaHint}</summary><ShippingNotice className="mt-4" /></details>
     </div>

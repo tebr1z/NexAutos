@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { api, type ContractRecord, type OceanLookup } from "@/lib/api";
-import { enrichKnownContainer, lookupCarrier, oceanFields, findPortCoords } from "@/lib/carriers";
+import { api, type ContractRecord } from "@/lib/api";
+import { findPortCoords } from "@/lib/carriers";
 import { generateTrackingCode, previewTrackingCode } from "@/lib/tracking-code";
 import {
   listLocalOrders,
@@ -20,7 +20,6 @@ import { EMPTY_VOYAGE, VoyageFields, type VoyageValues } from "@/components/admi
 import { PhotoFields } from "@/components/admin/photo-fields";
 import { emptyPhotos, flattenPhotos, photosFromList, type PhotosByCategory } from "@/lib/photo-categories";
 import { fitDataUrl } from "@/lib/fit-image";
-import { isValidImo } from "@/lib/imo";
 import { daysLeftInArchive, isDelivered, normalizeTrackingCode } from "@/lib/archive";
 
 type NotifyInfo = { sent?: boolean; channel?: string; error?: string };
@@ -29,10 +28,6 @@ type Screen = "list" | "create" | "edit";
 const inp =
   "w-full rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm text-white placeholder:text-zinc-500";
 
-function imoDigits(raw: string) {
-  return raw.replace(/\D/g, "").slice(0, 7);
-}
-
 const EMPTY_FORM = {
   customerName: "",
   phone: "",
@@ -40,8 +35,46 @@ const EMPTY_FORM = {
   make: "",
   model: "",
   year: "",
+  lotNumber: "",
   containerNumber: "",
+  carrierTrackingUrl: "",
+  originCountry: "" as "" | "USA" | "KOREA" | "CHINA" | "OTHER",
+  freightPaymentStatus: "UNPAID" as "UNPAID" | "PARTIAL" | "PAID",
+  documentMethod: "UNSET" as "UNSET" | "POWER_OF_ATTORNEY" | "SIGNIFY",
+  documentStatus: "PENDING" as "PENDING" | "COMPLETED",
+  purchasePaymentPercent: "",
+  commissionUsd: "",
+  containerOpeningDate: "",
 };
+
+function formDetails(form: typeof EMPTY_FORM) {
+  return {
+    originCountry: form.originCountry || undefined,
+    freightPaymentStatus: form.freightPaymentStatus,
+    documentMethod: form.originCountry === "USA" ? "SIGNIFY" as const : form.documentMethod,
+    documentStatus: form.originCountry === "USA" && form.documentMethod !== "SIGNIFY" ? "PENDING" as const : form.documentStatus,
+    purchasePaymentPercent: form.purchasePaymentPercent === "" ? undefined : Number(form.purchasePaymentPercent),
+    commissionUsd: form.commissionUsd === "" ? undefined : Number(form.commissionUsd),
+    containerOpeningDate: form.containerOpeningDate || undefined,
+    carrierTrackingUrl: form.carrierTrackingUrl.trim() || undefined,
+  };
+}
+
+function formError(form: typeof EMPTY_FORM) {
+  if (!form.vin.trim()) return "VIN yazın.";
+  if (form.year && (!Number.isInteger(Number(form.year)) || Number(form.year) < 1950 || Number(form.year) > 2100)) return "İl 1950–2100 aralığında olmalıdır.";
+  if (form.purchasePaymentPercent && (!Number.isInteger(Number(form.purchasePaymentPercent)) || Number(form.purchasePaymentPercent) < 0 || Number(form.purchasePaymentPercent) > 100)) return "Alış ödənişi 0–100% aralığında olmalıdır.";
+  if (form.commissionUsd && (!Number.isFinite(Number(form.commissionUsd)) || Number(form.commissionUsd) < 0 || Number(form.commissionUsd) > 1_000_000)) return "Komissiya 0–1 000 000 USD aralığında olmalıdır.";
+  if (form.carrierTrackingUrl.trim()) {
+    try {
+      const url = new URL(form.carrierTrackingUrl.trim());
+      if (url.protocol !== "https:" || url.username || url.password) return "Daşıyıcının giriş məlumatı olmayan HTTPS izləmə linkini yazın.";
+    } catch {
+      return "Daşıyıcının düzgün HTTPS izləmə linkini yazın.";
+    }
+  }
+  return "";
+}
 
 function parseCoord(raw?: string) {
   if (!raw?.trim()) return undefined;
@@ -60,9 +93,18 @@ function createOrderBody(shipment: TrackingShipment) {
     containerNumber: shipment.containerNumber,
     make: shipment.make,
     model: shipment.model,
+    year: shipment.year,
+    lotNumber: shipment.lotNumber,
     trackingCode,
     vesselName: shipment.vesselName,
-    vesselImo: shipment.vesselImo || undefined,
+    carrierTrackingUrl: shipment.carrierTrackingUrl,
+    originCountry: shipment.originCountry,
+    freightPaymentStatus: shipment.freightPaymentStatus,
+    documentMethod: shipment.documentMethod,
+    documentStatus: shipment.documentStatus,
+    purchasePaymentPercent: shipment.purchasePaymentPercent,
+    commissionUsd: shipment.commissionUsd,
+    containerOpeningDate: shipment.containerOpeningDate,
     originPort: shipment.originPort,
     destinationPort: shipment.destinationPort,
     currentPort: shipment.currentPort,
@@ -141,25 +183,6 @@ function stageNotice(label: string, phone: string | undefined, notify?: NotifyIn
   return `${label} yeniləndi. SMS göndərilmədi.`;
 }
 
-async function notifyLocal(order: TrackingShipment, status: string): Promise<NotifyInfo> {
-  try {
-    const res = await fetch("/api/notify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        phone: order.customerPhone,
-        trackingCode: order.trackingCode,
-        status,
-        make: order.make,
-        model: order.model,
-      }),
-    });
-    return (await res.json()) as NotifyInfo;
-  } catch {
-    return { sent: false, error: "notify_failed" };
-  }
-}
-
 function stageLabel(order: TrackingShipment) {
   const { items, cursor } = journeyPosition(
     order.currentStatus,
@@ -200,7 +223,6 @@ export default function AdminHomePage() {
   const [smsText, setSmsText] = useState("");
   const [photoSmsReady, setPhotoSmsReady] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [liveOcean, setLiveOcean] = useState<OceanLookup | null>(null);
   const [contracts, setContracts] = useState<ContractRecord[]>([]);
   const [contractId, setContractId] = useState("");
   const [query, setQuery] = useState("");
@@ -208,10 +230,6 @@ export default function AdminHomePage() {
 
   const editingOrder = editingCode ? orders.find((row) => row.trackingCode === editingCode) : null;
   const preview = previewTrackingCode(form.customerName, form.make, form.model);
-  const prefixOcean = useMemo(() => {
-    if (form.containerNumber.replace(/\s/g, "").length < 4) return null;
-    return enrichKnownContainer(lookupCarrier(form.containerNumber));
-  }, [form.containerNumber]);
 
   useEffect(() => {
     api
@@ -251,22 +269,6 @@ export default function AdminHomePage() {
       });
   }, []);
 
-  useEffect(() => {
-    if (screen !== "create") return;
-    const n = form.containerNumber.replace(/[^A-Za-z0-9]/g, "");
-    if (n.length < 10) {
-      setLiveOcean(null);
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      api
-        .lookupOcean(n)
-        .then(setLiveOcean)
-        .catch(() => setLiveOcean(null));
-    }, 400);
-    return () => window.clearTimeout(timer);
-  }, [form.containerNumber, screen]);
-
   const activeOrders = orders.filter((o) => !isDelivered(o.currentStatus));
   const archivedOrders = orders.filter((o) => isDelivered(o.currentStatus) && daysLeftInArchive(o.deliveredAt) > 0);
   const filteredActiveOrders = activeOrders.filter((order) => {
@@ -298,7 +300,6 @@ export default function AdminHomePage() {
     setPhotos(emptyPhotos());
     setSmsText("");
     setPhotoSmsReady(false);
-    setLiveOcean(null);
   }
 
   function goCreate() {
@@ -327,11 +328,20 @@ export default function AdminHomePage() {
       make: order.make ?? "",
       model: order.model ?? "",
       year: order.year ? String(order.year) : "",
+      lotNumber: order.lotNumber ?? "",
       containerNumber: order.containerNumber ?? "",
+      carrierTrackingUrl: order.carrierTrackingUrl ?? "",
+      originCountry: order.originCountry ?? "",
+      freightPaymentStatus: order.freightPaymentStatus ?? "UNPAID",
+      documentMethod: order.originCountry === "USA" ? "SIGNIFY" : order.documentMethod ?? "UNSET",
+      documentStatus: order.originCountry === "USA" && order.documentMethod !== "SIGNIFY" ? "PENDING" : order.documentStatus ?? "PENDING",
+      purchasePaymentPercent: order.purchasePaymentPercent != null ? String(order.purchasePaymentPercent) : "",
+      commissionUsd: order.commissionUsd != null ? String(order.commissionUsd) : "",
+      containerOpeningDate: order.containerOpeningDate ?? "",
     });
     setVoyage({
       vesselName: order.vesselName ?? "",
-      vesselImo: imoDigits(order.vesselImo ?? ""),
+      vesselImo: order.vesselImo ?? "",
       vesselMmsi: "",
       originPort: order.originPort ?? "",
       destinationPort: order.destinationPort ?? "",
@@ -476,35 +486,38 @@ export default function AdminHomePage() {
     };
     const phone = form.phone.trim() || order.customerPhone;
     const localNext = { ...order, ...patch, customerPhone: phone };
-    persist(localNext, order.trackingCode);
-
     let notify: NotifyInfo | undefined;
-    try {
-      if (order.id) {
-        const remote = await api.updateOrderStatus(order.id, status, event.description, transitIdx, phone);
-        notify = remote.notify;
-        const next = mergeRemotePreserveLocal(localNext, { ...remote, ...patch, customerPhone: remote.customerPhone || phone });
-        persist(next, order.trackingCode);
-        setNotice(stageNotice(label, next.customerPhone, notify));
-        return next;
-      }
-    } catch {
-      /* local copy */
+    if (order.id) {
+      const remote = await api.updateOrderStatus(order.id, status, event.description, transitIdx, phone);
+      notify = remote.notify;
+      const next = mergeRemotePreserveLocal(localNext, remote);
+      persist(next, order.trackingCode);
+      setNotice(stageNotice(label, next.customerPhone, notify));
+      return next;
     }
-    notify = await notifyLocal(localNext, status);
     const saved = updateLocalOrder(order.trackingCode, { ...patch, customerPhone: phone }) ?? localNext;
     persist(saved, order.trackingCode);
-    setNotice(stageNotice(label, phone, notify));
+    setNotice("Mərhələ yalnız bu brauzerdə saxlanıldı. Müştəri görmür; əvvəl maşını serverə yadda saxlayın. Bildiriş göndərilmədi.");
     return saved;
   }
 
   async function markDelivered(order: TrackingShipment) {
     if (!window.confirm("Maşın arxivə düşəcək və 30 gün sonra silinəcək. Davam edilsin?")) return;
-    await applyStage(order, "DELIVERED");
+    try {
+      await applyStage(order, "DELIVERED");
+    } catch (err) {
+      setNotice(err instanceof Error ? `Təhvil statusu serverə yazılmadı: ${err.message}` : "Təhvil statusu serverə yazılmadı. Yenidən cəhd edin.");
+    }
   }
 
   async function saveEdit(order: TrackingShipment) {
     setSaving(true);
+    const invalid = formError(form);
+    if (invalid) {
+      setSaving(false);
+      setNotice(invalid);
+      return;
+    }
     const trackingCode = normalizeTrackingCode(editCode) || order.trackingCode;
     if (trackingCode.length < 4) {
       setSaving(false);
@@ -527,24 +540,19 @@ export default function AdminHomePage() {
       return;
     }
     const location = locationForStatus(status, voyage.destinationPort);
-    const imo = isValidImo(voyage.vesselImo) ?? "";
-    if (voyage.vesselImo.replace(/\D/g, "") && !imo) {
-      setSaving(false);
-      window.alert("IMO səhvdir. 0000000 olmaz — gəminin real IMO-sunu yazın, və ya boş buraxın.");
-      return;
-    }
     const next: TrackingShipment = {
       ...order,
+      ...formDetails(form),
       trackingCode,
       customerName: form.customerName.trim() || order.customerName,
       customerPhone: form.phone.trim() || undefined,
-      vin: form.vin.toUpperCase() || order.vin,
-      make: form.make || undefined,
-      model: form.model || undefined,
+      vin: form.vin.trim().toUpperCase() || order.vin,
+      make: form.make.trim() || undefined,
+      model: form.model.trim() || undefined,
       year: form.year ? Number(form.year) : undefined,
-      containerNumber: form.containerNumber || undefined,
+      lotNumber: form.lotNumber.trim() || undefined,
+      containerNumber: form.containerNumber.trim() || undefined,
       vesselName: voyage.vesselName || undefined,
-      vesselImo: imo || "",
       originPort: voyage.originPort || undefined,
       destinationPort: voyage.destinationPort || undefined,
       currentPort: location.currentPort || voyage.currentPort || undefined,
@@ -563,6 +571,7 @@ export default function AdminHomePage() {
     const hadNewPhotos = flattenPhotos(photos).some((row) => row.url.startsWith("data:image/"));
     let saved = next;
     let serverOk = Boolean(order.id);
+    let metadataSaved = false;
 
     try {
       if (order.id) {
@@ -570,9 +579,21 @@ export default function AdminHomePage() {
           trackingCode,
           phone: form.phone.trim(),
           customerName: form.customerName.trim(),
+          vin: next.vin,
+          make: next.make ?? "",
+          model: next.model ?? "",
+          year: next.year ?? null,
+          lotNumber: next.lotNumber ?? "",
+          originCountry: next.originCountry ?? null,
+          freightPaymentStatus: next.freightPaymentStatus,
+          documentMethod: next.documentMethod,
+          documentStatus: next.documentStatus,
+          purchasePaymentPercent: next.purchasePaymentPercent ?? null,
+          commissionUsd: next.commissionUsd ?? null,
+          containerOpeningDate: next.containerOpeningDate ?? null,
+          carrierTrackingUrl: next.carrierTrackingUrl ?? "",
           containerNumber: next.containerNumber ?? "",
           vesselName: next.vesselName ?? "",
-          vesselImo: imo,
           originPort: next.originPort ?? "",
           destinationPort: next.destinationPort ?? "",
           currentPort: next.currentPort ?? "",
@@ -584,31 +605,40 @@ export default function AdminHomePage() {
           mapLng: next.mapLng ?? null,
         });
         saved = mergeRemotePreserveLocal(next, remote);
-        persist({ ...saved, vesselImo: imo || undefined, vesselName: next.vesselName || saved.vesselName }, trackingCode);
+        persist(saved, trackingCode);
+        metadataSaved = true;
         serverOk = true;
       } else {
         const remote = await api.createOrder(createOrderBody(next));
-        saved = mergeRemotePreserveLocal(next, { ...remote, ...next, id: remote.id, trackingCode: remote.trackingCode || trackingCode });
+        saved = mergeRemotePreserveLocal(next, remote);
         persist(saved, trackingCode);
+        metadataSaved = true;
         serverOk = true;
       }
       if (saved.id) {
         const withPhotos = await pushOrderPhotos(saved.id, flattenPhotos(photos));
         saved = mergeRemotePreserveLocal(saved, withPhotos);
-        persist({ ...saved, vesselImo: imo || undefined, vesselName: next.vesselName || saved.vesselName }, trackingCode);
+        persist(saved, trackingCode);
         setPhotos(photosFromList(saved.photos ?? []));
       }
     } catch (err) {
       serverOk = false;
       setNotice(
-        err instanceof Error
-          ? `Yalnız admin brauzerində qaldı. Müştəri görmür, çünki serverə yazılmadı: ${err.message}`
-          : "Yalnız admin brauzerində qaldı. Müştəri izləmə səhifəsini görmür — yenidən yadda saxlayın.",
+        metadataSaved
+          ? `Maşın məlumatları serverdə saxlanıldı, amma şəkillər tamamlanmadı. Mərhələ dəyişdirilmədi.${err instanceof Error ? ` ${err.message}` : ""}`
+          : `Dəyişikliklər yalnız bu brauzerdə qaldı; serverə yazılmadı və bildiriş göndərilmədi.${err instanceof Error ? ` ${err.message}` : ""}`,
       );
     }
 
     if (serverOk && (status !== saved.currentStatus || transitIndex !== (saved.currentTransitIndex ?? -1))) {
-      await applyStage(saved, status, transitIndex);
+      try {
+        await applyStage(saved, status, transitIndex);
+      } catch (err) {
+        setSaving(false);
+        setEditingCode(trackingCode);
+        setNotice(err instanceof Error ? `Maşın məlumatları saxlanıldı, amma mərhələ serverə yazılmadı: ${err.message}` : "Maşın məlumatları saxlanıldı, amma mərhələ serverə yazılmadı. Yenidən cəhd edin.");
+        return;
+      }
     }
 
     setSaving(false);
@@ -631,15 +661,15 @@ export default function AdminHomePage() {
 
   async function createCar(e: FormEvent) {
     e.preventDefault();
+    if (saving) return;
     const contract = contractId ? signedContracts.find((row) => row.id === contractId) : undefined;
     if (contractId && !contract) {
       window.alert("Seçilmiş müqavilə tapılmadı.");
       return;
     }
-    if (!form.customerName.trim() || !form.vin.trim()) return;
-    const createdImo = isValidImo(voyage.vesselImo) ?? "";
-    if (voyage.vesselImo.replace(/\D/g, "") && !createdImo) {
-      window.alert("IMO səhvdir. 0000000 olmaz — gəminin real IMO-sunu yazın, və ya boş buraxın.");
+    const invalid = formError(form);
+    if (invalid) {
+      setNotice(invalid);
       return;
     }
     if (
@@ -650,42 +680,25 @@ export default function AdminHomePage() {
     }
     const existing = orders.map((o) => o.trackingCode);
     const trackingCode = generateTrackingCode(form.customerName, form.make, form.model, existing);
-    const loaded = form.containerNumber ? enrichKnownContainer(lookupCarrier(form.containerNumber)) : null;
-    const live = liveOcean;
-    const transitPorts = normalizeTransits(voyage.transitPorts);
+    setSaving(true);
+    setNotice("");
     const shipment: TrackingShipment = {
+      ...formDetails(form),
       trackingCode,
-      vin: form.vin.toUpperCase(),
+      vin: form.vin.trim().toUpperCase(),
       make: form.make,
       model: form.model,
       year: form.year ? Number(form.year) : undefined,
+      lotNumber: form.lotNumber.trim() || undefined,
       auctionHouse: "OTHER",
-      currentStatus: loaded?.containerStatus || live?.containerStatus ? "LOADED_CONTAINER" : "PURCHASED",
-      customerName: form.customerName.trim(),
+      currentStatus: "PURCHASED",
+      customerName: form.customerName.trim() || "Müştəri təyin edilməyib",
       customerPhone: form.phone.trim() || undefined,
       events: [],
       documents: [],
       photos: flattenPhotos(photos),
-      ...(loaded ? oceanFields(loaded) : {}),
-      containerNumber:
-        live?.formatted || (loaded ? oceanFields(loaded).containerNumber : form.containerNumber || undefined),
-      voyageNumber: live?.voyageNumber || loaded?.voyageNumber,
-      carrierName: live?.carrierName || loaded?.carrier?.name,
-      carrierCode: live?.carrierCode || loaded?.carrier?.code,
-      originPort: voyage.originPort || live?.originPort || loaded?.originPort,
-      destinationPort: voyage.destinationPort || live?.destinationPort || loaded?.destinationPort,
-      currentPort: voyage.currentPort || live?.currentPort || loaded?.currentPort,
-      currentCountry: voyage.currentCountry || live?.currentCountry || loaded?.currentCountry,
-      transitPorts,
+      transitPorts: [],
       currentTransitIndex: -1,
-      vesselName: voyage.vesselName || live?.vesselName || loaded?.vesselName,
-      vesselImo: createdImo || undefined,
-      containerStatus: live?.containerStatus || loaded?.containerStatus,
-      eta: voyage.eta || live?.eta || loaded?.eta,
-      mapLat: parseCoord(voyage.mapLat),
-      mapLng: parseCoord(voyage.mapLng),
-      lat: parseCoord(voyage.mapLat) ?? live?.lat ?? loaded?.lat,
-      lng: parseCoord(voyage.mapLng) ?? live?.lng ?? loaded?.lng,
     };
 
     saveLocalOrder(shipment);
@@ -697,10 +710,8 @@ export default function AdminHomePage() {
       const remote = await api.createOrder({
         ...createOrderBody(shipment),
         phone: form.phone.trim() || shipment.customerPhone,
-        containerNumber: form.containerNumber,
-        vesselImo: createdImo,
       });
-      saved = mergeRemotePreserveLocal(shipment, { ...remote, ...shipment, trackingCode: remote.trackingCode || trackingCode });
+      saved = mergeRemotePreserveLocal(shipment, remote);
       persist(saved, trackingCode);
       if (saved.id) {
         saved = mergeRemotePreserveLocal(saved, await pushOrderPhotos(saved.id, flattenPhotos(photos)));
@@ -709,9 +720,9 @@ export default function AdminHomePage() {
       setCreated(saved.trackingCode);
     } catch (err) {
       setNotice(
-        err instanceof Error
-          ? `Kod yerli siyahıdadır, amma izləmə səhifəsi üçün serverə yazılmadı: ${err.message}`
-          : "Kod yerli siyahıdadır, amma serverə yazılmadı. Yenidən yadda saxlayın.",
+        saved.id
+          ? `Maşın serverə yazıldı, amma şəkillər tam yüklənmədi. Redaktədən yenidən yadda saxlayın.${err instanceof Error ? ` ${err.message}` : ""}`
+          : `Bu, yalnız brauzerdəki qaralamadır; müştəri izləyə bilmir. Qaralamanı açıb yenidən yadda saxlayın.${err instanceof Error ? ` ${err.message}` : ""}`,
       );
     }
 
@@ -743,9 +754,12 @@ export default function AdminHomePage() {
         /* car exists; assignment can be retried from the contract or edit screen */
       }
     }
+    setSaving(false);
   }
 
   if (screen === "create") {
+    const createdOrder = orders.find((order) => order.trackingCode === created);
+    const synced = Boolean(createdOrder?.id);
     return (
       <div className="mx-auto max-w-2xl">
         <button type="button" onClick={goList} className="text-sm text-zinc-400 hover:text-white">
@@ -753,27 +767,29 @@ export default function AdminHomePage() {
         </button>
         <h1 className="font-display mt-4 text-3xl">Yeni maşın</h1>
         <p className="mt-2 text-sm text-zinc-400">
-          Maşını indi əlavə edin. Müqavilə varsa seçin, yoxdursa sonra müştəriyə təyin edin.
+          Əvvəl VIN, marka, model, il və lot məlumatlarını yazın. Konteyner, daşıyıcı linki və ödəniş qeydlərini sonra əlavə edə bilərsiniz.
         </p>
+        {notice && <p role="status" className="mt-5 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">{notice}</p>}
 
         {created ? (
           <div className="mt-8 rounded-2xl border border-sky-500/40 bg-sky-500/10 p-6">
-            <p className="text-xs uppercase tracking-widest text-sky-300">Müştəriyə verin</p>
+            <p className="text-xs uppercase tracking-widest text-sky-300">{saving ? "Saxlanılır…" : synced ? "Müştəriyə verin" : "Yalnız yerli qaralama"}</p>
             <p className="mt-2 font-display text-3xl tracking-wide">{created}</p>
             <p className="mt-2 text-sm text-sky-200/80">
-              {contractId ? "Müqaviləyə təyin olundu." : "Müqavilə sonra təyin oluna bilər."}
+              {synced ? "Maşın serverdə saxlanılıb. Müqavilə sonra təyin oluna bilər." : "Serverə yazılana qədər bu kod müştəri üçün aktiv deyil."}
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
-              <Link href={`/track/${created}`} className="text-sm text-sky-300 underline">
+              {synced && <Link href={`/track/${created}`} className="text-sm text-sky-300 underline">
                 İzləmə səhifəsini aç
-              </Link>
+              </Link>}
+              {createdOrder && <button type="button" disabled={saving} onClick={() => goEdit(createdOrder)} className="text-sm text-sky-300 underline disabled:opacity-50">{synced ? "Əlavə məlumatları yaz" : "Qaralamanı aç və serverə yaz"}</button>}
               <Link href="/admin/contracts" className="text-sm text-sky-300 underline">
                 Müqavilələr
               </Link>
-              <button type="button" onClick={goList} className="text-sm text-zinc-400 hover:text-white">
+              <button type="button" disabled={saving} onClick={goList} className="text-sm text-zinc-400 hover:text-white disabled:opacity-50">
                 Siyahıya qayıt
               </button>
-              <button type="button" onClick={goCreate} className="text-sm text-zinc-400 hover:text-white">
+              <button type="button" disabled={saving} onClick={goCreate} className="text-sm text-zinc-400 hover:text-white disabled:opacity-50">
                 Daha bir maşın
               </button>
             </div>
@@ -818,19 +834,12 @@ export default function AdminHomePage() {
               </p>
             )}
             <CarBasics form={form} onChange={setForm} lockCustomer={Boolean(contractId)} />
-            <VoyageFields value={voyage} onChange={setVoyage} />
-            {(liveOcean?.carrierName || prefixOcean?.carrier) && (
-              <p className="text-sm text-sky-300">
-                Daşıyıcı: {liveOcean?.carrierCode ?? prefixOcean?.carrier?.code} ·{" "}
-                {liveOcean?.carrierName ?? prefixOcean?.carrier?.name}
-              </p>
-            )}
-            <PhotoFields value={photos} onChange={setPhotos} />
+            <details className="rounded-2xl border border-white/10 p-4"><summary className="cursor-pointer text-sm text-zinc-300">İlkin şəkillər — istəyə bağlı</summary><div className="mt-4"><PhotoFields value={photos} onChange={setPhotos} /></div></details>
             <p className="font-mono text-sm text-zinc-400">
               Kod: <span className="text-white">{preview}</span>
             </p>
-            <button className="w-full rounded-xl bg-white py-3 text-sm font-medium text-black">
-              Yüklə və kod yarat
+            <button disabled={saving} className="w-full rounded-xl bg-white py-3 text-sm font-medium text-black disabled:opacity-50">
+              {saving ? "Saxlanılır…" : "Maşını əlavə et və kod yarat"}
             </button>
           </form>
         )}
@@ -878,7 +887,7 @@ export default function AdminHomePage() {
         <div className="mt-7 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-[0.2em] text-zinc-500">İzləmə önizləməsi</p><p className="mt-2 text-lg text-white">{previewLabel}</p></div><Link href={`/track/${editingOrder.trackingCode}`} target="_blank" className="rounded-full border border-white/15 px-4 py-2 text-xs text-sky-300">Müştəri görünüşünü aç ↗</Link></div>
           <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-sky-400 transition-all" style={{ width: `${previewJourney.progress}%` }} /></div>
-          <div className="mt-4 grid gap-3 text-xs sm:grid-cols-3"><div className="rounded-xl bg-black/20 p-3"><p className="text-zinc-500">Hazırkı yer</p><p className="mt-1 text-zinc-200">{[voyage.currentPort, voyage.currentCountry].filter(Boolean).join(", ") || "—"}</p></div><div className="rounded-xl bg-black/20 p-3"><p className="text-zinc-500">Gəmi / IMO</p><p className="mt-1 text-zinc-200">{[voyage.vesselName, voyage.vesselImo].filter(Boolean).join(" · ") || "—"}</p></div><div className="rounded-xl bg-black/20 p-3"><p className="text-zinc-500">Konteyner</p><p className="mt-1 font-mono text-zinc-200">{form.containerNumber || "—"}</p></div></div>
+          <div className="mt-4 grid gap-3 text-xs sm:grid-cols-3"><div className="rounded-xl bg-black/20 p-3"><p className="text-zinc-500">Hazırkı yer</p><p className="mt-1 text-zinc-200">{[voyage.currentPort, voyage.currentCountry].filter(Boolean).join(", ") || "—"}</p></div><div className="rounded-xl bg-black/20 p-3"><p className="text-zinc-500">Gəmi</p><p className="mt-1 text-zinc-200">{voyage.vesselName || "Hələ əlavə edilməyib"}</p></div><div className="rounded-xl bg-black/20 p-3"><p className="text-zinc-500">Konteyner</p><p className="mt-1 font-mono text-zinc-200">{form.containerNumber || "Hələ əlavə edilməyib"}</p></div></div>
         </div>
 
         <form
@@ -894,19 +903,6 @@ export default function AdminHomePage() {
               value={editCode}
               onChange={(e) => setEditCode(e.target.value.toUpperCase())}
               className={`${inp} mt-1 font-mono`}
-            />
-          </label>
-
-          <label className="block text-xs text-zinc-400">
-            IMO kodu
-            <input
-              value={voyage.vesselImo}
-              onChange={(e) => setVoyage({ ...voyage, vesselImo: imoDigits(e.target.value) })}
-              className={`${inp} mt-1 font-mono`}
-              placeholder="7 rəqəm — dəyişmək olar"
-              inputMode="numeric"
-              maxLength={7}
-              autoComplete="off"
             />
           </label>
 
@@ -939,6 +935,7 @@ export default function AdminHomePage() {
           </button>
 
           <CarBasics form={form} onChange={setForm} />
+          <ShipmentTerms form={form} onChange={setForm} />
 
           <label className="block text-xs text-zinc-400">
             Hazırkı mərhələ
@@ -962,7 +959,7 @@ export default function AdminHomePage() {
             </div>
           </div>
 
-          <VoyageFields value={voyage} onChange={setVoyage} />
+          <section className="rounded-2xl border border-white/10 p-5"><h2 className="text-base font-medium">Marşrut və xəritə</h2><p className="mb-5 mt-1 text-xs text-zinc-500">Məlumatlar məlum olduqca əlavə edin. Xəritə son təsdiqlənmiş yeri göstərir; daşıyıcının linki ayrıca açılır.</p><VoyageFields value={voyage} onChange={setVoyage} /></section>
           <PhotoFields value={photos} onChange={setPhotos} />
 
           {photoSmsReady ? (
@@ -1079,55 +1076,47 @@ function CarBasics({
   lockCustomer?: boolean;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      <input
-        required
-        readOnly={lockCustomer}
-        placeholder="Müştəri adı *"
-        value={form.customerName}
-        onChange={(e) => onChange({ ...form, customerName: e.target.value })}
-        className={`${inp} ${lockCustomer ? "opacity-70" : ""}`}
-      />
-      <input
-        required={lockCustomer}
-        readOnly={lockCustomer}
-        placeholder="WhatsApp / telefon"
-        value={form.phone}
-        onChange={(e) => onChange({ ...form, phone: e.target.value })}
-        className={`${inp} ${lockCustomer ? "opacity-70" : ""}`}
-      />
-      <input
-        required
-        placeholder="VIN *"
-        value={form.vin}
-        onChange={(e) => onChange({ ...form, vin: e.target.value.toUpperCase() })}
-        className={`${inp} font-mono md:col-span-2`}
-      />
-      <input
-        placeholder="Marka — Tesla, BMW…"
-        value={form.make}
-        onChange={(e) => onChange({ ...form, make: e.target.value })}
-        className={inp}
-      />
-      <input
-        placeholder="Model — Model 3, X5…"
-        value={form.model}
-        onChange={(e) => onChange({ ...form, model: e.target.value })}
-        className={inp}
-      />
-      <input
-        placeholder="İl"
-        value={form.year}
-        onChange={(e) => onChange({ ...form, year: e.target.value })}
-        className={inp}
-      />
-      <input
-        placeholder="Konteyner — MSCU 4829137"
-        value={form.containerNumber}
-        onChange={(e) => onChange({ ...form, containerNumber: e.target.value.toUpperCase() })}
-        className={`${inp} font-mono`}
-      />
-    </div>
+    <section className="rounded-2xl border border-white/10 p-5">
+      <h2 className="text-base font-medium">Avtomobil məlumatları</h2>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <label className="text-xs text-zinc-400 md:col-span-2">VIN *<input required maxLength={32} placeholder="Avtomobilin VIN kodu" value={form.vin} onChange={(e) => onChange({ ...form, vin: e.target.value.toUpperCase() })} className={`${inp} mt-1 font-mono`} /></label>
+        <label className="text-xs text-zinc-400">Marka<input placeholder="Məsələn, BMW" value={form.make} onChange={(e) => onChange({ ...form, make: e.target.value })} className={`${inp} mt-1`} /></label>
+        <label className="text-xs text-zinc-400">Model<input placeholder="Məsələn, X5" value={form.model} onChange={(e) => onChange({ ...form, model: e.target.value })} className={`${inp} mt-1`} /></label>
+        <label className="text-xs text-zinc-400">İl<input type="number" min={1950} max={2100} step={1} placeholder="2024" value={form.year} onChange={(e) => onChange({ ...form, year: e.target.value })} className={`${inp} mt-1`} /></label>
+        <label className="text-xs text-zinc-400">Lot nömrəsi<input placeholder="Auksion lot nömrəsi" value={form.lotNumber} onChange={(e) => onChange({ ...form, lotNumber: e.target.value })} className={`${inp} mt-1 font-mono`} /></label>
+      </div>
+      <div className="mt-5 grid gap-4 border-t border-white/10 pt-5 md:grid-cols-2">
+        <label className="text-xs text-zinc-400">Müştəri adı — istəyə bağlı<input readOnly={lockCustomer} placeholder="Sonradan təyin edilə bilər" value={form.customerName} onChange={(e) => onChange({ ...form, customerName: e.target.value })} className={`${inp} mt-1 ${lockCustomer ? "opacity-70" : ""}`} /></label>
+        <label className="text-xs text-zinc-400">WhatsApp / telefon — istəyə bağlı<input type="tel" readOnly={lockCustomer} placeholder="+994…" value={form.phone} onChange={(e) => onChange({ ...form, phone: e.target.value })} className={`${inp} mt-1 ${lockCustomer ? "opacity-70" : ""}`} /></label>
+      </div>
+    </section>
+  );
+}
+
+function ShipmentTerms({ form, onChange }: { form: typeof EMPTY_FORM; onChange: (next: typeof EMPTY_FORM) => void }) {
+  const selectClass = "mt-1 w-full rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-sm text-white";
+  const documentLabel = form.documentMethod === "SIGNIFY" ? "Signify imzası" : form.documentMethod === "POWER_OF_ATTORNEY" ? "Etibarnamə" : "Sənəd";
+  return (
+    <section className="space-y-6 rounded-2xl border border-white/10 p-5">
+      <div><h2 className="text-base font-medium">Konteyner və daşıyıcı</h2><p className="mt-1 text-xs text-zinc-500">İlk alış zamanı lazım deyil. Kod və izləmə linki məlum olduqda buradan əlavə edin.</p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <label className="text-xs text-zinc-400">Konteyner nömrəsi<input placeholder="MSCU4829137" value={form.containerNumber} onChange={(e) => onChange({ ...form, containerNumber: e.target.value.toUpperCase() })} className={`${inp} mt-1 font-mono`} /></label>
+          <label className="text-xs text-zinc-400">Konteynerin açılma tarixi<input type="date" value={form.containerOpeningDate} onChange={(e) => onChange({ ...form, containerOpeningDate: e.target.value })} className={`${inp} mt-1`} /></label>
+          <label className="text-xs text-zinc-400 md:col-span-2">Daşıyıcının izləmə linki<input type="url" placeholder="https://…" value={form.carrierTrackingUrl} onChange={(e) => onChange({ ...form, carrierTrackingUrl: e.target.value })} className={`${inp} mt-1`} /><span className="mt-1 block text-[11px] text-zinc-500">Müştəri bu linkə vuraraq daşıyıcının saytında izləyə bilər. Yalnız HTTPS, şifrəsiz link.</span></label>
+        </div>
+      </div>
+      <div className="border-t border-white/10 pt-5"><h2 className="text-base font-medium">Ödəniş və sənədlər</h2><p className="mt-1 text-xs text-zinc-500">Bu məlumatlar müştərinin izləmə səhifəsində görünür. Boş komissiya əvvəlki sifarişə yeni ödəniş tətbiq etmir.</p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <label className="text-xs text-zinc-400">Alış ölkəsi<select value={form.originCountry} onChange={(e) => { const originCountry = e.target.value as typeof form.originCountry; onChange({ ...form, originCountry, documentMethod: originCountry === "USA" ? "SIGNIFY" : form.documentMethod === "SIGNIFY" ? "UNSET" : form.documentMethod, documentStatus: "PENDING" }); }} className={selectClass}><option value="">Hələ təyin edilməyib</option><option value="USA">ABŞ</option><option value="KOREA">Koreya</option><option value="CHINA">Çin</option><option value="OTHER">Digər</option></select></label>
+          <label className="text-xs text-zinc-400">Yol pulunun vəziyyəti<select value={form.freightPaymentStatus} onChange={(e) => onChange({ ...form, freightPaymentStatus: e.target.value as typeof form.freightPaymentStatus })} className={selectClass}><option value="UNPAID">Yol pulu ödənməyib</option><option value="PARTIAL">Qismən ödənilib</option><option value="PAID">Tam ödənilib</option></select></label>
+          <label className="text-xs text-zinc-400">Tələb olunan sənəd<select disabled={form.originCountry === "USA"} value={form.documentMethod} onChange={(e) => onChange({ ...form, documentMethod: e.target.value as typeof form.documentMethod, documentStatus: "PENDING" })} className={`${selectClass} disabled:opacity-70`}><option value="UNSET">Hələ təyin edilməyib</option><option value="POWER_OF_ATTORNEY" disabled={form.originCountry === "USA"}>Etibarnamə</option><option value="SIGNIFY">Signify — ABŞ, etibarnamə tələb olunmur</option></select>{form.originCountry === "USA" && <span className="mt-1 block text-[11px] text-sky-200">ABŞ-dan alışda yalnız Signify imzası tələb olunur; etibarnamə seçilmir.</span>}</label>
+          <label className="text-xs text-zinc-400">{documentLabel} vəziyyəti<select disabled={form.documentMethod === "UNSET"} value={form.documentStatus} onChange={(e) => onChange({ ...form, documentStatus: e.target.value as typeof form.documentStatus })} className={`${selectClass} disabled:opacity-40`}><option value="PENDING">{form.documentMethod === "SIGNIFY" ? "İmza gözlənilir" : "Təqdim edilməyib"}</option><option value="COMPLETED">{form.documentMethod === "SIGNIFY" ? "İmzalanıb" : "Təqdim edilib"}</option></select></label>
+          <label className="text-xs text-zinc-400">Alış üzrə ödənilən hissə (%)<input type="number" min={0} max={100} step={1} placeholder="Təyin edilməyib" value={form.purchasePaymentPercent} onChange={(e) => onChange({ ...form, purchasePaymentPercent: e.target.value })} className={`${inp} mt-1`} /><button type="button" onClick={() => onChange({ ...form, purchasePaymentPercent: "30" })} className="mt-2 text-xs text-sky-300">30% ilə alınıb</button></label>
+          <label className="text-xs text-zinc-400">Ümumi komissiya (USD)<input type="number" min={0} max={1_000_000} step="0.01" placeholder="Tətbiq edilməyib" value={form.commissionUsd} onChange={(e) => onChange({ ...form, commissionUsd: e.target.value })} className={`${inp} mt-1`} /><button type="button" onClick={() => onChange({ ...form, commissionUsd: "105" })} className="mt-2 text-xs text-sky-300">105 USD təyin et</button></label>
+        </div>
+        {form.documentMethod === "SIGNIFY" && <p className="mt-4 rounded-xl border border-sky-400/20 bg-sky-400/5 p-3 text-xs text-sky-200">Müştəriyə “ABŞ-dan alış üçün etibarnamə lazım deyil. Zəhmət olmasa Signify ilə imzalayın; kömək üçün menecerə müraciət edin” bildirişi göstəriləcək.</p>}
+      </div>
+    </section>
   );
 }
 

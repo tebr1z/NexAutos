@@ -101,7 +101,7 @@ export function journeyPosition(
     cursor = Math.max(stepIndex, 0);
   }
   if (cursor < 0) cursor = 0;
-  const progress = items.length ? ((cursor + 1) / items.length) * 100 : 0;
+  const progress = status === "CANCELLED" ? 0 : items.length ? ((cursor + 1) / items.length) * 100 : 0;
   return { items, cursor, progress };
 }
 

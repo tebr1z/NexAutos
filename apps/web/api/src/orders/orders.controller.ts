@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Header, Param, Patch, Post, Put, StreamableFile, UseGuards } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { OrdersService } from './orders.service';
-import { CreateInsuranceDto, CreateOrderDto, CustomerSmsDto, OrderPhotoDto, PrunePhotosDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
+import { CreateInsuranceDto, CreateOrderDto, CreateOrderReviewDto, CustomerSmsDto, OrderPhotoDto, PrunePhotosDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -14,6 +14,12 @@ export class OrdersController {
   @Get('tracking/:code')
   byCode(@Param('code') code: string) {
     return this.orders.findByCode(code);
+  }
+
+  @Post('tracking/:code/review')
+  @Throttle({ default: { limit: 3, ttl: 3600000 } })
+  review(@Param('code') code: string, @Body() dto: CreateOrderReviewDto) {
+    return this.orders.createReview(code, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

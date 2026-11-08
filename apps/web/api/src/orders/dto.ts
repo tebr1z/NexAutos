@@ -1,6 +1,6 @@
 import type { AuctionHouse, Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsEmail, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUrl, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
 
 const AUCTION_HOUSES = {
   COPART: 'COPART',
@@ -9,9 +9,66 @@ const AUCTION_HOUSES = {
   OTHER: 'OTHER',
 } as const;
 
-export class CreateOrderDto {
+export class TrackingDetailsDto {
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== '')
+  @IsUrl({ protocols: ['https'], require_protocol: true, disallow_auth: true })
+  @MaxLength(2000)
+  carrierTrackingUrl?: string | null;
+
+  @IsOptional()
+  @IsIn(['USA', 'KOREA', 'CHINA', 'OTHER'])
+  originCountry?: string | null;
+
+  @IsOptional()
+  @IsIn(['UNPAID', 'PARTIAL', 'PAID'])
+  freightPaymentStatus?: string;
+
+  @IsOptional()
+  @IsIn(['UNSET', 'POWER_OF_ATTORNEY', 'SIGNIFY'])
+  documentMethod?: string;
+
+  @IsOptional()
+  @IsIn(['PENDING', 'COMPLETED'])
+  documentStatus?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  purchasePaymentPercent?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(1000000)
+  commissionUsd?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== '')
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsDateString({ strict: true })
+  containerOpeningDate?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1950)
+  @Max(2100)
+  year?: number | null;
+
+  @IsOptional()
   @IsString()
-  customerName: string;
+  @MaxLength(50)
+  lotNumber?: string | null;
+}
+
+export class CreateOrderDto extends TrackingDetailsDto {
+  @IsOptional()
+  @IsString()
+  customerName?: string;
 
   @IsOptional()
   @IsString()
@@ -120,7 +177,22 @@ export class UpdateStatusDto {
   currentTransitIndex?: number;
 }
 
-export class UpdateVoyageDto {
+export class UpdateVoyageDto extends TrackingDetailsDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  vin?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  make?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  model?: string;
+
   @IsOptional()
   @IsString()
   containerNumber?: string;
@@ -332,6 +404,23 @@ export class PrunePhotosDto {
   @IsArray()
   @IsString({ each: true })
   keepUrls?: string[];
+}
+
+export class CreateOrderReviewDto {
+  @IsString()
+  @Matches(/^[a-f0-9]{48}$/)
+  reviewToken: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  rating: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  comment?: string;
 }
 
 export type Decimal = Prisma.Decimal;

@@ -53,6 +53,13 @@ export function mapOrder(order: {
   vesselImo?: string | null;
   voyageNumber?: string | null;
   carrierTrackingUrl?: string | null;
+  originCountry?: string | null;
+  freightPaymentStatus?: string;
+  documentMethod?: string;
+  documentStatus?: string;
+  purchasePaymentPercent?: number | null;
+  commissionUsd?: unknown;
+  containerOpeningDate?: string | null;
   containerStatus?: string | null;
   originPort: string | null;
   destinationPort: string | null;
@@ -66,7 +73,8 @@ export function mapOrder(order: {
   deliveredAt?: Date | null;
   adminNotes: string | null;
   customer: { name: string; phone?: string | null };
-  vehicle: { make: string | null; model: string | null; year: number | null } | null;
+  vehicle: { make: string | null; model: string | null; year: number | null; lotNumber?: string | null } | null;
+  review?: { rating: number; comment: string | null; createdAt: Date } | null;
   events: {
     status: string;
     title: string;
@@ -102,6 +110,7 @@ export function mapOrder(order: {
     make: order.vehicle?.make,
     model: order.vehicle?.model,
     year: order.vehicle?.year,
+    lotNumber: order.vehicle?.lotNumber ?? undefined,
     auctionHouse: order.auctionHouse,
     containerNumber: order.containerNumber,
     carrierCode: order.carrierCode ?? undefined,
@@ -110,6 +119,18 @@ export function mapOrder(order: {
     vesselImo: order.vesselImo ?? undefined,
     voyageNumber: order.voyageNumber ?? undefined,
     carrierTrackingUrl: order.carrierTrackingUrl ?? undefined,
+    originCountry: order.originCountry ?? undefined,
+    freightPaymentStatus: order.freightPaymentStatus ?? 'UNPAID',
+    documentMethod: order.documentMethod ?? 'UNSET',
+    documentStatus: order.documentStatus ?? 'PENDING',
+    purchasePaymentPercent: order.purchasePaymentPercent ?? undefined,
+    commissionUsd: order.commissionUsd == null ? undefined : Number(order.commissionUsd),
+    containerOpeningDate: order.containerOpeningDate ?? undefined,
+    review: order.review ? {
+      rating: order.review.rating,
+      comment: order.review.comment,
+      createdAt: order.review.createdAt.toISOString(),
+    } : undefined,
     containerStatus: order.containerStatus ?? undefined,
     originPort: order.originPort,
     destinationPort: order.destinationPort,
@@ -211,6 +232,7 @@ export const ORDER_INCLUDE = {
   documents: true,
   photos: true,
   invoices: true,
+  review: true,
   contracts: {
     where: { status: { not: 'VOID' as const } },
     orderBy: { createdAt: 'desc' as const },

@@ -37,7 +37,17 @@ export type TrackingShipment = {
   make?: string;
   model?: string;
   year?: number;
+  lotNumber?: string;
   auctionHouse: AuctionHouse | "OTHER";
+  originCountry?: "USA" | "KOREA" | "CHINA" | "OTHER" | null;
+  freightPaymentStatus?: "UNPAID" | "PARTIAL" | "PAID";
+  documentMethod?: "UNSET" | "POWER_OF_ATTORNEY" | "SIGNIFY";
+  documentStatus?: "PENDING" | "COMPLETED";
+  purchasePaymentPercent?: number | null;
+  commissionUsd?: number | null;
+  containerOpeningDate?: string | null;
+  reviewToken?: string;
+  review?: { rating: number; comment?: string | null; createdAt: string } | null;
   containerNumber?: string;
   carrierCode?: string;
   carrierName?: string;

@@ -1,5 +1,10 @@
 export const PHOTO_CATEGORIES = [
   "auction",
+  "terminal",
+  "container_loading",
+  "poti_terminal",
+  "truck_loading",
+  "baku_customs",
   "depot",
   "exterior",
   "interior",
@@ -12,6 +17,11 @@ export type PhotoCategory = (typeof PHOTO_CATEGORIES)[number];
 
 export const PHOTO_CATEGORY_LABELS: Record<PhotoCategory, { en: string; az: string }> = {
   auction: { en: "Auction", az: "Hərrac" },
+  terminal: { en: "Terminal", az: "Terminal" },
+  container_loading: { en: "Container loading", az: "Konteynerə yüklənmə" },
+  poti_terminal: { en: "Poti terminal", az: "Poti terminalı" },
+  truck_loading: { en: "Truck loading", az: "Avtovoza yüklənmə" },
+  baku_customs: { en: "Baku customs", az: "Bakı gömrüyü" },
   depot: { en: "Depot / yard", az: "Depo" },
   exterior: { en: "Exterior", az: "Gövdə" },
   interior: { en: "Interior", az: "Salon" },

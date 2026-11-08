@@ -1,30 +1,82 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { randomBytes } from 'crypto';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { randomBytes, timingSafeEqual } from 'crypto';
 import { ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ContainersService } from '../containers/containers.service';
 import { VesselsService } from '../vessels/vessels.service';
 import { attachPortCoords, enrichKnownContainer, lookupCarrier } from '../containers/registry';
-import { CreateInsuranceDto, CreateOrderDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
+import { CreateInsuranceDto, CreateOrderDto, CreateOrderReviewDto, TrackingDetailsDto, UpdateInsuranceDto, UpdateStatusDto, UpdateVoyageDto } from './dto';
 import { generateTrackingCode, hasInsuranceRecord, mapContractSummary, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
 import { NotifyService, normalizePhone, siteBase, statusLabelAz, type NotifyResult } from '../notify/notify.service';
 import { CloudinaryStorage } from '../storage/cloudinary.storage';
 
-function opt(value?: string) {
+function opt(value?: string | null) {
   if (value === undefined) return undefined;
+  if (value === null) return null;
   const t = value.trim();
   return t === '' ? null : t;
 }
 
+function workflowFields(dto: TrackingDetailsDto) {
+  let carrierTrackingUrl = opt(dto.carrierTrackingUrl);
+  if (carrierTrackingUrl) {
+    let url: URL;
+    try { url = new URL(carrierTrackingUrl); } catch {
+      throw new BadRequestException('Daşıyıcının keçidi düzgün HTTPS ünvanı olmalıdır.');
+    }
+    if (url.protocol !== 'https:' || !url.hostname || url.username || url.password || carrierTrackingUrl.length > 2000) {
+      throw new BadRequestException('Daşıyıcının keçidi düzgün HTTPS ünvanı olmalıdır.');
+    }
+    carrierTrackingUrl = url.href;
+  }
+  const choices: Record<string, readonly unknown[]> = {
+    originCountry: ['USA', 'KOREA', 'CHINA', 'OTHER', null],
+    freightPaymentStatus: ['UNPAID', 'PARTIAL', 'PAID'],
+    documentMethod: ['UNSET', 'POWER_OF_ATTORNEY', 'SIGNIFY'],
+    documentStatus: ['PENDING', 'COMPLETED'],
+  };
+  for (const [key, allowed] of Object.entries(choices)) {
+    const value = dto[key as keyof TrackingDetailsDto];
+    if (value !== undefined && !allowed.includes(value)) {
+      throw new BadRequestException(`${key}: düzgün dəyər seçin.`);
+    }
+  }
+  if (dto.purchasePaymentPercent != null && (!Number.isInteger(dto.purchasePaymentPercent) || dto.purchasePaymentPercent < 0 || dto.purchasePaymentPercent > 100)) {
+    throw new BadRequestException('İlkin ödəniş faizi 0–100 aralığında olmalıdır.');
+  }
+  if (dto.commissionUsd != null && (!Number.isFinite(dto.commissionUsd) || dto.commissionUsd < 0 || dto.commissionUsd > 1000000 || Math.abs(dto.commissionUsd * 100 - Math.round(dto.commissionUsd * 100)) > 1e-7)) {
+    throw new BadRequestException('Komissiya 0–1 000 000 USD aralığında, ən çox iki onluq rəqəmlə olmalıdır.');
+  }
+  const containerOpeningDate = opt(dto.containerOpeningDate);
+  if (containerOpeningDate && (!/^\d{4}-\d{2}-\d{2}$/.test(containerOpeningDate) || Number.isNaN(Date.parse(containerOpeningDate)) || new Date(containerOpeningDate).toISOString().slice(0, 10) !== containerOpeningDate)) {
+    throw new BadRequestException('Konteyner açılma tarixi YYYY-MM-DD formatında düzgün tarix olmalıdır.');
+  }
+  return {
+    ...(carrierTrackingUrl !== undefined ? { carrierTrackingUrl } : {}),
+    ...(dto.originCountry !== undefined ? { originCountry: dto.originCountry } : {}),
+    ...(dto.freightPaymentStatus !== undefined ? { freightPaymentStatus: dto.freightPaymentStatus } : {}),
+    ...(dto.documentMethod !== undefined ? { documentMethod: dto.documentMethod } : {}),
+    ...(dto.documentStatus !== undefined ? { documentStatus: dto.documentStatus } : {}),
+    ...(dto.purchasePaymentPercent !== undefined ? { purchasePaymentPercent: dto.purchasePaymentPercent } : {}),
+    ...(dto.commissionUsd !== undefined ? { commissionUsd: dto.commissionUsd } : {}),
+    ...(containerOpeningDate !== undefined ? { containerOpeningDate } : {}),
+  };
+}
+
+function publicOrder(order: Parameters<typeof mapOrder>[0]) {
+  const { adminNotes: _adminNotes, ...mapped } = mapOrder(order);
+  return mapped;
+}
+
 function locationForStatus(status: ShipmentStatus, destinationPort?: string | null) {
   const dest = destinationPort?.trim();
-  if (status === 'DESTINATION_PORT' || status === 'TIR_LOADED' || status === 'TIR_DEPARTED') {
+  if (['DESTINATION_PORT', 'CONTAINER_DISCHARGED', 'CONTAINER_OPENING_PENDING', 'CONTAINER_OPENED', 'TIR_LOADING_PENDING', 'TIR_LOADED', 'CUSTOMS_DOCUMENTS', 'CUSTOMS_DOCUMENTS_READY'].includes(status)) {
     return dest ? { currentPort: dest, currentCountry: 'Georgia' } : {};
   }
   if (status === 'TIR_GEORGIA_BORDER') {
     return { currentPort: 'Gürcüstan sərhədi', currentCountry: 'Georgia' };
   }
-  if (status === 'TIR_BAKU_CUSTOMS') {
+  if (['TIR_BAKU_CUSTOMS', 'CUSTOMS_CLEARANCE', 'READY_FOR_DELIVERY'].includes(status)) {
     return { currentPort: 'Bakı gömrüyü', currentCountry: 'Azerbaijan' };
   }
   return {};
@@ -139,14 +191,20 @@ export class OrdersService {
   }
 
   async create(dto: CreateOrderDto, userId?: string) {
+    const details = workflowFields(dto);
+    const vin = dto.vin.trim().toUpperCase();
+    if (!vin) throw new BadRequestException('VIN yazın.');
+    const customerName = dto.customerName?.trim() || 'Müştəri təyin edilməyib';
+    // Unknown customers must not all share the same placeholder email/account.
+    const customerEmail = (dto.email || `${vin.toLowerCase()}@autonex.local`).toLowerCase();
     let customer = await this.prisma.customer.findFirst({
-      where: { email: (dto.email ?? `${dto.customerName}@autonex.local`).toLowerCase() },
+      where: { email: customerEmail },
     });
     if (!customer) {
       customer = await this.prisma.customer.create({
         data: {
-          name: dto.customerName,
-          email: (dto.email ?? `${dto.vin.toLowerCase()}@autonex.local`).toLowerCase(),
+          name: customerName,
+          email: customerEmail,
           phone: normalizePhone(dto.phone) ?? dto.phone ?? '',
         },
       });
@@ -156,13 +214,15 @@ export class OrdersService {
     }
 
     const vehicle = await this.prisma.vehicle.upsert({
-      where: { vin: dto.vin.toUpperCase() },
-      update: { make: dto.make, model: dto.model },
+      where: { vin },
+      update: { make: dto.make, model: dto.model, year: dto.year, lotNumber: opt(dto.lotNumber) },
       create: {
-        vin: dto.vin.toUpperCase(),
+        vin,
         auctionHouse: dto.auctionHouse ?? 'OTHER',
         make: dto.make,
         model: dto.model,
+        year: dto.year,
+        lotNumber: opt(dto.lotNumber),
       },
     });
 
@@ -171,13 +231,13 @@ export class OrdersService {
     if (requested) {
       const already = await this.prisma.order.findUnique({ where: { trackingCode: requested }, include: ORDER_INCLUDE });
       if (already) {
-        if (already.vin === dto.vin.toUpperCase()) return mapOrder(already);
+        if (already.vin === vin) return mapOrder(already);
         throw new ConflictException('Bu izləmə kodu artıq başqa maşındadır.');
       }
     }
-    let trackingCode = requested || generateTrackingCode(dto.customerName, dto.make ?? '', dto.model, existing);
+    let trackingCode = requested || generateTrackingCode(customerName, dto.make ?? '', dto.model, existing);
     while (!requested && (await this.prisma.order.findUnique({ where: { trackingCode } }))) {
-      trackingCode = generateTrackingCode(dto.customerName, dto.make ?? '', dto.model, [...existing, trackingCode]);
+      trackingCode = generateTrackingCode(customerName, dto.make ?? '', dto.model, [...existing, trackingCode]);
     }
 
     const ocean = dto.containerNumber
@@ -189,7 +249,8 @@ export class OrdersService {
         trackingCode,
         customerId: customer.id,
         vehicleId: vehicle.id,
-        vin: dto.vin.toUpperCase(),
+        vin,
+        ...details,
         auctionHouse: dto.auctionHouse ?? 'OTHER',
         containerNumber: ocean?.containerNumber ?? dto.containerNumber,
         carrierCode: ocean?.carrier?.code,
@@ -211,8 +272,8 @@ export class OrdersService {
         events: {
           create: {
             status: 'PURCHASED',
-            title: 'Purchased',
-            description: 'Order created',
+            title: statusLabelAz('PURCHASED'),
+            description: 'Maşın alınıb, izləmə yaradılıb.',
             occurredAt: new Date(),
           },
         },
@@ -294,7 +355,7 @@ export class OrdersService {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    return orders.map(mapOrder);
+    return orders.map(publicOrder);
   }
 
   private async resolveOrderByCode(code: string) {
@@ -338,7 +399,19 @@ export class OrdersService {
       if (order.currentStatus === 'DELIVERED' && deliveredAt && Date.now() - deliveredAt.getTime() > ARCHIVE_MS) {
         throw new NotFoundException('Göndəriş tapılmadı');
       }
-      return mapOrder(order);
+      let reviewToken = order.reviewToken;
+      if (order.currentStatus === 'DELIVERED' && !reviewToken) {
+        // Lazily cover delivered records created before this workflow, safely under concurrency.
+        await this.prisma.order.updateMany({
+          where: { id: order.id, reviewToken: null, currentStatus: 'DELIVERED' },
+          data: { reviewToken: randomBytes(24).toString('hex') },
+        });
+        reviewToken = (await this.prisma.order.findUnique({ where: { id: order.id }, select: { reviewToken: true } }))?.reviewToken ?? null;
+      }
+      return {
+        ...publicOrder(order),
+        ...(order.currentStatus === 'DELIVERED' && reviewToken ? { reviewToken } : {}),
+      };
     }
 
     const contract = found as {
@@ -368,6 +441,33 @@ export class OrdersService {
       photos: [],
       contract: summary,
     };
+  }
+
+  async createReview(code: string, dto: CreateOrderReviewDto) {
+    if (!Number.isInteger(dto.rating) || dto.rating < 1 || dto.rating > 5 || (dto.comment?.length ?? 0) > 2000) {
+      throw new BadRequestException('Qiymət 1–5, rəy isə ən çox 2000 simvol olmalıdır.');
+    }
+    const found = await this.resolveOrderByCode(code);
+    if (!found || !('customer' in found) || !found.customer) throw new NotFoundException('Göndəriş tapılmadı');
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Serialize submission with status updates and duplicate submissions for this order.
+        await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${found.id} FOR UPDATE`;
+        const order = await tx.order.findUnique({ where: { id: found.id }, select: { id: true, currentStatus: true, reviewToken: true, review: true } });
+        if (!order) throw new NotFoundException('Göndəriş tapılmadı');
+        if (order.currentStatus !== 'DELIVERED') throw new BadRequestException('Xidməti yalnız maşın təhvil verildikdən sonra dəyərləndirə bilərsiniz.');
+        const token = typeof dto.reviewToken === 'string' ? dto.reviewToken : '';
+        if (!order.reviewToken || order.reviewToken.length !== 48 || !/^[a-f0-9]{48}$/.test(token) || !timingSafeEqual(Buffer.from(token), Buffer.from(order.reviewToken))) {
+          throw new ForbiddenException('Rəy keçidi etibarlı deyil. İzləmə səhifəsini yeniləyin.');
+        }
+        if (order.review) throw new ConflictException('Bu sifariş üçün rəy artıq göndərilib.');
+        const review = await tx.orderReview.create({ data: { orderId: order.id, rating: dto.rating, comment: dto.comment?.trim() || null } });
+        return { rating: review.rating, comment: review.comment, createdAt: review.createdAt.toISOString() };
+      });
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2002') throw new ConflictException('Bu sifariş üçün rəy artıq göndərilib.');
+      throw error;
+    }
   }
 
   async insurancePublic(order: Parameters<typeof mapOrder>[0]) {
@@ -674,6 +774,10 @@ export class OrdersService {
   }
 
   async updateVoyage(id: string, dto: UpdateVoyageDto, userId?: string) {
+    const details = workflowFields(dto);
+    if (dto.vin !== undefined && (typeof dto.vin !== 'string' || !dto.vin.trim())) {
+      throw new BadRequestException('VIN boş ola bilməz.');
+    }
     const existing = await this.prisma.order.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
 
@@ -711,9 +815,23 @@ export class OrdersService {
       });
     }
 
+    const vin = dto.vin === undefined ? undefined : dto.vin.trim().toUpperCase();
+    let vehicleId: string | undefined;
+    if (vin !== undefined || dto.make !== undefined || dto.model !== undefined || dto.year !== undefined || dto.lotNumber !== undefined) {
+      const vehicle = await this.prisma.vehicle.upsert({
+        where: { vin: vin || existing.vin },
+        update: { make: opt(dto.make), model: opt(dto.model), year: dto.year, lotNumber: opt(dto.lotNumber) },
+        create: { vin: vin || existing.vin, auctionHouse: existing.auctionHouse, make: opt(dto.make), model: opt(dto.model), year: dto.year, lotNumber: opt(dto.lotNumber) },
+      });
+      vehicleId = vehicle.id;
+    }
+
     const order = await this.prisma.order.update({
       where: { id },
       data: {
+        ...details,
+        ...(vin !== undefined ? { vin } : {}),
+        ...(vehicleId !== undefined ? { vehicleId } : {}),
         ...(containerNumber !== undefined ? { containerNumber } : {}),
         ...(vesselName !== undefined ? { vesselName } : {}),
         ...(vesselImo !== undefined ? { vesselImo } : {}),
@@ -737,7 +855,7 @@ export class OrdersService {
         action: 'VOYAGE_UPDATE',
         entity: 'Order',
         entityId: id,
-        meta: { vesselName, vesselImo, currentPort, originPort, destinationPort, trackingCode },
+        meta: { vesselName, vesselImo, currentPort, originPort, destinationPort, trackingCode, ...details },
       },
     });
     return mapOrder(order);
@@ -828,22 +946,33 @@ export class OrdersService {
   }
 
   async updateStatus(id: string, dto: UpdateStatusDto, userId?: string) {
+    // Validate all fallible request input before changing the persisted stage/event.
+    if (dto.phone !== undefined && (typeof dto.phone !== 'string' || (dto.phone.trim() && !normalizePhone(dto.phone)))) {
+      throw new BadRequestException('Düzgün telefon yazın — məsələn 050 719 75 57 və ya 994705990399.');
+    }
     const existing = await this.prisma.order.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
     const status = dto.status as ShipmentStatus;
+    if (!Object.values(ShipmentStatus).includes(status)) throw new BadRequestException('İzləmə mərhələsi düzgün deyil.');
     const packed =
       dto.currentTransitIndex !== undefined
         ? packTransits((existing as { transitPorts?: unknown }).transitPorts, undefined, dto.currentTransitIndex)
         : undefined;
     const location = locationForStatus(status, existing.destinationPort);
+    const movedToDifferentPlace = Boolean(
+      (location.currentPort !== undefined && location.currentPort !== existing.currentPort) ||
+      (location.currentCountry !== undefined && location.currentCountry !== existing.currentCountry),
+    );
     const title = statusLabelAz(status);
     const order = await this.prisma.order.update({
       where: { id },
       data: {
         currentStatus: status,
         ...location,
+        // An explicit coordinate belongs to its reported place, not later milestones.
+        ...(movedToDifferentPlace ? { mapLat: null, mapLng: null } : {}),
         ...(status === 'DELIVERED'
-          ? { deliveredAt: (existing as { deliveredAt?: Date | null }).deliveredAt ?? new Date() }
+          ? { deliveredAt: existing.deliveredAt ?? new Date(), reviewToken: existing.reviewToken ?? randomBytes(24).toString('hex') }
           : {}),
         ...(packed ? { transitPorts: packed } : {}),
         events: {

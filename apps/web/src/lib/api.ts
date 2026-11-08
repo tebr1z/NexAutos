@@ -308,6 +308,11 @@ export const api = {
     request<TrackingShipment>(`/tracking/${encodeURIComponent(code)}`, {
       signal: AbortSignal.timeout(20_000),
     }),
+  submitTrackingReview: (code: string, payload: { reviewToken: string; rating: number; comment?: string }) =>
+    request<{ rating: number; comment?: string | null; createdAt: string }>(`/tracking/${encodeURIComponent(code)}/review`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   vin: (vin: string) => request<VinRecord>(`/vins/${encodeURIComponent(vin)}`),
   login: (email: string, password: string) =>
     request<{ accessToken: string; refreshToken: string; user: AuthUser }>("/auth/login", {
