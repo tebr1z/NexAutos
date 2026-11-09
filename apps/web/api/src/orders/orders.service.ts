@@ -1058,11 +1058,16 @@ export class OrdersService {
     if (dto.phone !== undefined) {
       await this.syncCustomer(existing.customerId, { phone: dto.phone });
     }
+    // syncCustomer ignores an empty phone; notifications and the response must
+    // reflect the normalized number actually retained, not whitespace or the
+    // customer snapshot read before this request updated their phone.
+    const phone = normalizePhone(dto.phone) ?? order.customer.phone;
+    const responseOrder = { ...order, customer: { ...order.customer, phone } };
     let notify: NotifyResult = { sent: false, error: 'skipped' };
     if (changed) {
       try {
         notify = await this.notify.statusChanged({
-          phone: dto.phone || order.customer.phone,
+          phone,
           trackingCode: order.trackingCode,
           status,
           make: order.vehicle?.make,
@@ -1074,7 +1079,7 @@ export class OrdersService {
       }
       await this.auditStatusNotification(id, status, notify, userId);
     }
-    return { ...mapOrder(order), notify };
+    return { ...mapOrder(responseOrder), notify };
   }
 
   /** The caller claims its one-use action in this same transaction. No network I/O here. */

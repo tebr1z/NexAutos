@@ -32,6 +32,7 @@ function harness(extra: Record<string, unknown> = {}) {
       create: jest.fn(async ({ data }) => ({ ...order, ...data, events: [] })),
     },
     customer: {
+      update: jest.fn().mockResolvedValue({}),
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn(async ({ data }) => ({ id: 'customer', ...data })),
     },
@@ -204,6 +205,20 @@ describe('Tracking workflow', () => {
     await expect(service.updateStatus('order', { status: 'DELIVERED', phone: '123' })).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.order.update).not.toHaveBeenCalled();
     expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('uses and returns a newly normalized customer phone after a stage change', async () => {
+    const { service, notify } = harness();
+    const result = await service.updateStatus('order', { status: 'SHIP_DEPARTED', phone: '050 123 45 67' });
+    expect(notify.statusChanged).toHaveBeenCalledWith(expect.objectContaining({ phone: '994501234567' }));
+    expect(result.customerPhone).toBe('994501234567');
+  });
+
+  it('keeps the stored phone when an optional phone field contains only whitespace', async () => {
+    const { service, notify } = harness({ customer: { name: 'Customer', phone: '994501234567' } });
+    const result = await service.updateStatus('order', { status: 'SHIP_DEPARTED', phone: '  ' });
+    expect(notify.statusChanged).toHaveBeenCalledWith(expect.objectContaining({ phone: '994501234567' }));
+    expect(result.customerPhone).toBe('994501234567');
   });
 
   it.each([null, '', '   '])('rejects null/blank VIN edits without partial customer or vehicle writes', async (vin) => {
