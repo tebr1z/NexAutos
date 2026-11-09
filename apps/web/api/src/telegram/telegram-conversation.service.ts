@@ -5,6 +5,7 @@ import { statusLabelAz } from '../notify/notify.service';
 import { TelegramAccessService } from './telegram-access.service';
 import { TelegramActionsService, type TelegramCar } from './telegram-actions.service';
 import { TelegramHttpService } from './telegram-http.service';
+import { TelegramMessagingService } from './telegram-messaging.service';
 import type { TelegramUpdate } from './telegram.types';
 
 type SearchMode = 'all' | 'customer' | 'container';
@@ -22,6 +23,8 @@ type State = { nonce: string } & (
   | { mode: 'stages'; orderId: string; group: number }
   | { mode: 'edit'; orderId: string; kind: EditKind }
   | { mode: 'confirm'; orderId: string; actionId: string }
+  | { mode: 'whatsappDraft'; orderId: string }
+  | { mode: 'whatsappConfirm'; orderId: string; actionId: string }
 );
 type Context = { token: string; chatId: string; telegramUserId: string; userId: string; botId?: string };
 
@@ -75,11 +78,11 @@ function conversation(value: unknown): State | null {
       && Number.isInteger(state.page) && Number(state.page) >= 0 && Number(state.page) <= 1000
       && Array.isArray(state.ids) && state.ids.length <= 10 && state.ids.every(identifier)
       && typeof state.hasMore === 'boolean' ? state as State : null;
-    case 'car': case 'groups': return identifier(state.orderId) ? state as State : null;
+    case 'car': case 'groups': case 'whatsappDraft': return identifier(state.orderId) ? state as State : null;
     case 'stages': return identifier(state.orderId) && Number.isInteger(state.group)
       && Number(state.group) >= 0 && Number(state.group) < STAGE_GROUPS.length ? state as State : null;
     case 'edit': return identifier(state.orderId) && editKind(state.kind) ? state as State : null;
-    case 'confirm': return identifier(state.orderId) && identifier(state.actionId) ? state as State : null;
+    case 'confirm': case 'whatsappConfirm': return identifier(state.orderId) && identifier(state.actionId) ? state as State : null;
     default: return null;
   }
 }
@@ -93,6 +96,7 @@ export class TelegramConversationService {
     private readonly access: TelegramAccessService,
     private readonly http: TelegramHttpService,
     private readonly actions: TelegramActionsService,
+    private readonly messaging: TelegramMessagingService,
   ) {}
 
   async handle(update: TelegramUpdate, token: string, botId?: string): Promise<void> {
@@ -113,16 +117,22 @@ export class TelegramConversationService {
 
   private async handlePrivate(update: TelegramUpdate, token: string, chatId: string, telegramUserId: string, botId?: string) {
     const callback = update.callback_query;
-    const text = update.message?.text?.trim() ?? '';
+    const rawText = update.message?.text ?? '';
+    const text = rawText.trim();
     const start = /^\/start(?:@[A-Za-z0-9_]+)?\s+([A-Za-z0-9_-]{20,128})$/.exec(text);
-    if (start && !callback) {
+    let account = await this.access.authorize(telegramUserId, chatId, botId);
+    const previousState = conversation(account?.conversation);
+    // A pasted pairing link must never become a customer message or silently
+    // replace the operator account while composing a WhatsApp message.
+    const composingWhatsApp = previousState?.mode === 'whatsappDraft' || previousState?.mode === 'whatsappConfirm';
+    if (start && !callback && !composingWhatsApp) {
       const paired = await this.access.pair(start[1], telegramUserId, chatId, update.message?.from?.username, botId);
       if (!paired) {
         await this.send({ token, chatId }, 'Bu qoşulma linki etibarsızdır və ya vaxtı bitib. Admin paneldə Telegram bölməsindən yeni link yaradın.');
         return;
       }
+      account = await this.access.authorize(telegramUserId, chatId, botId);
     }
-    const account = await this.access.authorize(telegramUserId, chatId, botId);
     if (!account) {
       if (callback) await this.answer(token, callback.id, 'Bu hesabın idarəetmə icazəsi yoxdur.');
       else await this.send({ token, chatId }, '🔒 Bu bot yalnız icazəli Auto Nex əməkdaşları üçündür.\n\nHesabınızı qoşmaq üçün admin paneldə Telegram bölməsini açın və şəxsi qoşulma linkindən istifadə edin.');
@@ -141,6 +151,12 @@ export class TelegramConversationService {
       return;
     }
     const command = /^\/([a-z]+)(?:@[A-Za-z0-9_]+)?(?:\s.*)?$/i.exec(text)?.[1]?.toLowerCase();
+    if (state?.mode === 'whatsappDraft') {
+      if (/^\/(?:cancel|menu|start)(?:@[A-Za-z0-9_]+)?(?=\s|$)/i.test(text)) {
+        await this.menu(ctx, 'WhatsApp mesajı ləğv edildi. Heç bir mesaj göndərilmədi.\n\n');
+      } else await this.proposeWhatsApp(ctx, state.orderId, rawText);
+      return;
+    }
     if (command) {
       if (command === 'active') await this.activeCustomers(ctx, '', 0);
       else if (command === 'search') await this.promptSearch(ctx, 'all');
@@ -168,6 +184,10 @@ export class TelegramConversationService {
       }
       const value = state.kind === 'container' ? text.replace(/\s/g, '').toUpperCase() : text;
       await this.propose(ctx, state.orderId, state.kind, value);
+      return;
+    }
+    if (state?.mode === 'whatsappConfirm') {
+      await this.send(ctx, 'Mesaj hələ göndərilməyib. Önizləməni yoxlayıb “✅ WhatsApp-a göndər” düyməsini basın və ya /cancel ilə ləğv edin.', this.whatsappConfirmationButtons(state));
       return;
     }
     await this.menu(ctx);
@@ -226,6 +246,28 @@ export class TelegramConversationService {
       return;
     }
     if (verb === 'back' && 'orderId' in state) { await this.car(ctx, state.orderId); return; }
+    if ((verb === 'whatsapp' && state.mode === 'car')
+      || (verb === 'whatsappedit' && state.mode === 'whatsappConfirm')) {
+      if ('orderId' in state) await this.promptWhatsApp(ctx, state.orderId);
+      return;
+    }
+    if (verb === 'whatsconfirm' && state.mode === 'whatsappConfirm') {
+      // Consume the conversation keyboard before the durable one-use send.
+      // WhatsApp sends are separate from shipment update actions.
+      await this.save(ctx, { mode: 'menu', nonce: nonce() });
+      let result: { text: string; orderId: string };
+      try { result = await this.messaging.confirm(state.actionId, ctx.userId, ctx.telegramUserId, ctx.chatId); }
+      catch {
+        await this.send(ctx, 'WhatsApp göndərişi təsdiqlənmədi. Təsdiqin vaxtı bitmiş, müştərinin məlumatı dəyişmiş və ya icazə ləğv edilmiş ola bilər. Maşını və göndəriş tarixçəsini yoxlayın. Avtomatik təkrar göndərilmədi.');
+        await this.car(ctx, state.orderId);
+        return;
+      }
+      // Provider acceptance is not delivery/read confirmation. In particular,
+      // a Telegram transport failure after sending must not retry WhatsApp.
+      await this.send(ctx, result.text);
+      await this.car(ctx, result.orderId);
+      return;
+    }
     if (verb === 'groups' && ['car', 'stages'].includes(state.mode) && 'orderId' in state) {
       await this.groups(ctx, state.orderId); return;
     }
@@ -269,7 +311,7 @@ export class TelegramConversationService {
   private async menu(ctx: Context, prefix = '') {
     const state: State = { mode: 'menu', nonce: nonce() };
     await this.save(ctx, state);
-    await this.send(ctx, `${prefix}🚘 Auto Nex · Daşınma idarəetməsi\n\n1. Müştəri, VIN, izləmə/lot kodu və ya konteynerlə maşını tapın.\n2. Dəqiq maşını seçin.\n3. Mərhələni və ya logistika məlumatını dəyişib təsdiqləyin.\n\nDəyişiklik saytın izləmə səhifəsində görünəcək. Bütün əməliyyatlar sizin admin hesabınızla qeydə alınır.`, [
+    await this.send(ctx, `${prefix}🚘 Auto Nex · Daşınma idarəetməsi\n\n1. Müştəri, VIN, izləmə/lot kodu və ya konteynerlə maşını tapın.\n2. Dəqiq maşını seçin.\n3. Mərhələni və ya logistika məlumatını dəyişib təsdiqləyin. Müştəriyə WhatsApp mesajı da yaza bilərsiniz: yazın → önizləməni yoxlayın → göndərişi təsdiqləyin.\n\nDəyişiklik saytın izləmə səhifəsində görünəcək. Bütün əməliyyatlar sizin admin hesabınızla qeydə alınır.`, [
       [this.button(state, '🚚 Yolda olan aktiv müştərilər', 'active')],
       [this.button(state, '🔎 Avtomobil tap', 'search', 'all')],
       [this.button(state, '👤 Müştəriyə görə', 'search', 'customer'), this.button(state, '📦 Konteynerə görə', 'search', 'container')],
@@ -280,6 +322,7 @@ export class TelegramConversationService {
   private async help(ctx: Context) {
     const state: State = { mode: 'menu', nonce: nonce() };
     await this.save(ctx, state);
+    await this.send(ctx, '💬 Müştəriyə WhatsApp mesajı\n\nMaşını seçin → “Müştəriyə WhatsApp yaz” → mesajı yazın → müştərinin adını, tam telefonunu, VIN-i və mesajı önizləmədə yoxlayın → “✅ WhatsApp-a göndər”.\n\nMesaj yalnız son təsdiqdən sonra göndərilir. Ən çox 2000 simvol, adi mətn; xidmətə görə daha aşağı limit yazma ekranında göstərilir. Abzaslar saxlanır. Yazarkən /cancel və /menu ləğv edir; /start də təhlükəsizlik üçün ləğv edir. Başqa / ilə başlayan mətnlər mesajın bir hissəsidir. Şəkil və səs dəstəklənmir.\n\nBu, yalnız WhatsApp göndərişidir; alınmasa SMS-ə avtomatik keçilmir. Xidmətin qəbulu çatdırılma və ya oxunma demək deyil. Nəticəsi qeyri-müəyyən olan göndərişi yoxlamadan təkrar göndərməyin.');
     await this.send(ctx, 'ℹ️ Necə istifadə etməli?\n\n/active — yolda/prosesdə olan aktiv müştərilər və onların maşınları\n/search — VIN, izləmə/lot kodu, marka/model və ya müştəri ilə axtarış\n/customers — müştərinin adı və ya telefonu ilə axtarış\n/containers — konteyner nömrəsi ilə axtarış\n/menu — əsas menyu\n/cancel — cari əməliyyatı ləğv et\n\nAktiv siyahı alışdan təhvilə qədər davam edən sifarişlərdir; təhvil verilmiş və ləğv edilmiş maşınlar daxil deyil.\n\nNəticədə maşının VIN-i, müştərisi və izləmə kodunu yoxlayın. Dəyişiklik yalnız “Təsdiqlə” düyməsindən sonra saxlanır. Bir konteynerdə bir neçə maşın varsa, hər maşın ayrıca seçilib yenilənir.\n\nMüştəri bildirişləri saytın mövcud mərhələ qaydalarına və aktiv WhatsApp/SMS xidmətinə bağlıdır. Bildiriş göndərilməsi saxlanma ilə eyni şey deyil.\n\nTəhlükəsizlik: botu şəxsi söhbətdə istifadə edin. Giriş admin paneldən ləğv edilə bilər; köhnə mesajlardakı düymələr yenidən istifadə edilmir.', [[this.button(state, '← Əsas menyu', 'menu')]]);
   }
 
@@ -358,10 +401,79 @@ export class TelegramConversationService {
       [this.button(state, '📍 Mərhələni yenilə', 'groups')],
       [this.button(state, '📦 Konteyner nömrəsi', 'edit', 'container'), this.button(state, '🔗 Canlı izləmə linki', 'edit', 'carrier')],
       [this.button(state, '🗓 Konteyner açılma tarixi', 'edit', 'openingDate')],
+      [this.button(state, '💬 Müştəriyə WhatsApp yaz', 'whatsapp')],
       [this.button(state, '🚚 Aktiv müştərilər', 'active')],
       [this.button(state, '← Əsas menyu / yeni axtarış', 'menu')],
     ];
     await this.send(ctx, `🚘 ${this.vehicle(car)}\n👤 Müştəri: ${clip(car.customerName, 150)}\n📞 Telefon: ${clip(car.customerPhone || 'Əlavə edilməyib', 35)}\n🔢 VIN: ${clip(car.vin, 32)}\n🔎 İzləmə kodu: ${clip(car.trackingCode, 80)}\n📍 Mərhələ: ${clip(statusLabelAz(car.status), 180)}\n📦 Konteyner: ${clip(car.containerNumber || 'Əlavə edilməyib', 40)}\n🗓 Açılma tarixi: ${clip(car.containerOpeningDate || 'Əlavə edilməyib', 40)}\n🔗 Daşıyıcı linki: ${clip(car.carrierTrackingUrl || 'Əlavə edilməyib', 900)}\n\nNəyi yeniləmək istəyirsiniz? Dəyişiklik yalnız bu maşına tətbiq olunur.`, rows);
+  }
+
+  private async promptWhatsApp(ctx: Context, orderId: string) {
+    if (!this.messaging.ready()) {
+      await this.send(ctx, 'WhatsApp göndərişi hazırda aktiv deyil. Admin paneldə WhatsApp bildiriş xidmətini yoxlayın və məsul administratora müraciət edin. Heç bir mesaj göndərilmədi.');
+      return;
+    }
+    const car = await this.actions.get(orderId);
+    if (!car) { await this.menu(ctx, 'Maşın tapılmadı. Heç bir mesaj göndərilmədi.\n\n'); return; }
+    if (!car.customerPhone?.trim()) {
+      await this.send(ctx, 'Bu müştərinin telefon nömrəsi qeyd olunmayıb. Əvvəl admin paneldə müştərinin düzgün WhatsApp nömrəsini əlavə edin. Heç bir mesaj göndərilmədi.');
+      return;
+    }
+    const state: State = { mode: 'whatsappDraft', nonce: nonce(), orderId };
+    await this.save(ctx, state);
+    await this.send(ctx, `💬 Müştəriyə WhatsApp mesajı\n\n👤 ${clip(car.customerName, 150)}\n📞 ${clip(car.customerPhone, 80)}\n🚘 ${this.vehicle(car)}\nVIN: ${clip(car.vin, 32)}\nİzləmə kodu: ${clip(car.trackingCode, 80)}\n\nGöndərmək istədiyiniz mesajı bir mətn olaraq yazın (1–${this.whatsappTextLimit()} simvol). Abzaslar saxlanır; şəkil/səs göndərilmir. Yalnız WhatsApp mesajına razılıq vermiş müştəriyə göndərin.\n\nHələ heç nə göndərilmir: əvvəl tam önizləmə, sonra ayrıca təsdiq olacaq. /cancel və /menu ləğv edir; /start də təhlükəsizlik üçün ləğv edir. Digər / ilə başlayan mətn mesaj sayılır.`, [
+      [this.button(state, '← Mesaj yazmadan maşına qayıt', 'back')],
+      [this.button(state, 'Ləğv et', 'cancel')],
+    ]);
+  }
+
+  private async proposeWhatsApp(ctx: Context, orderId: string, text: string) {
+    const limit = this.whatsappTextLimit();
+    if (!text.trim() || [...text].length > limit) {
+      await this.send(ctx, `WhatsApp üçün 1–${limit} simvolluq adi mətn yazın. Şəkil, səs və boş mesaj qəbul edilmir. Yenidən yazın və ya /cancel ilə ləğv edin.`);
+      return;
+    }
+    let proposal: { id: string; text: string };
+    try { proposal = await this.messaging.propose(ctx.userId, ctx.telegramUserId, ctx.chatId, orderId, text); }
+    catch {
+      await this.send(ctx, `WhatsApp önizləməsi hazırlana bilmədi. Müştərinin telefonunu və WhatsApp xidmətini admin paneldə yoxlayın. Mesaj 1–${limit} simvolluq adi mətn olmalıdır. Heç bir mesaj göndərilmədi. Yenidən yazın və ya /cancel ilə ləğv edin.`);
+      return;
+    }
+    const state: State = { mode: 'whatsappConfirm', nonce: nonce(), orderId, actionId: proposal.id };
+    await this.save(ctx, state);
+    const keyboard = this.whatsappConfirmationButtons(state);
+    const preview = `💬 WhatsApp göndərişinin tam önizləməsi\n\n${proposal.text}`;
+    const instruction = 'Müştərini, tam telefon nömrəsini, VIN-i və mesajın hamısını yoxlayın. Yalnız WhatsApp mesajına razılıq vermiş müştəriyə göndərin. Yalnız “✅ WhatsApp-a göndər” düyməsi mesajı göndərir. SMS-ə avtomatik keçilmir.';
+    if (preview.length + instruction.length + 2 <= 4096) {
+      await this.send(ctx, `${preview}\n\n${instruction}`, keyboard, true);
+    } else {
+      // Telegram uses UTF-16 entities. Keep each message below even that stricter
+      // limit, without splitting emoji or trimming a message-body boundary.
+      let part = '';
+      for (const character of preview) {
+        if (part.length + character.length > 3900) {
+          await this.send(ctx, part, undefined, true);
+          part = '';
+        }
+        part += character;
+      }
+      if (part) await this.send(ctx, part, undefined, true);
+      await this.send(ctx, `Yuxarıdakı tam WhatsApp önizləməsini yoxlayın.\n\n${instruction}`, keyboard);
+    }
+  }
+
+  private whatsappTextLimit(): number {
+    const limit = this.messaging.maxTextLength();
+    return Number.isSafeInteger(limit) && limit > 0 ? Math.min(limit, 2000) : 2000;
+  }
+
+  private whatsappConfirmationButtons(state: Extract<State, { mode: 'whatsappConfirm' }>): Button[][] {
+    return [
+      [this.button(state, '✅ WhatsApp-a göndər', 'whatsconfirm')],
+      [this.button(state, '✏️ Mesajı yenidən yaz', 'whatsappedit')],
+      [this.button(state, '← Göndərmədən maşına qayıt', 'back')],
+      [this.button(state, 'Ləğv et', 'cancel')],
+    ];
   }
 
   private async groups(ctx: Context, orderId: string) {
@@ -434,9 +546,9 @@ export class TelegramConversationService {
   private save(ctx: Context, state: State) {
     return this.access.saveConversation(ctx.userId, state as unknown as Prisma.InputJsonValue, ctx.telegramUserId, ctx.chatId, ctx.botId);
   }
-  private send(ctx: Pick<Context, 'token' | 'chatId'>, text: string, keyboard?: Button[][]) {
+  private send(ctx: Pick<Context, 'token' | 'chatId'>, text: string, keyboard?: Button[][], preservePreview = false) {
     return this.http.call(ctx.token, 'sendMessage', {
-      chat_id: ctx.chatId, text: clip(text, 4096, true), link_preview_options: { is_disabled: true },
+      chat_id: ctx.chatId, text: preservePreview ? text : clip(text, 4096, true), link_preview_options: { is_disabled: true },
       ...(keyboard ? { reply_markup: { inline_keyboard: keyboard } } : {}),
     });
   }

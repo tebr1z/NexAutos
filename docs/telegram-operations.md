@@ -26,6 +26,21 @@ Nəticədən **dəqiq maşını** seçin. Mərhələ, konteyner kodu, daşıyıc
 
 Saytın izləmə səhifəsi eyni məlumat bazasından yenilənir. Yalnız mövcud bildiriş qaydalarına düşən mərhələlər üçün WhatsApp/SMS göndərilməsinə cəhd edilir. Bot göndərilmə, ötürülmə və uğursuzluğu ayrıca bildirir. Daşıyıcı keçidi GPS məlumat mənbəyi deyil; müştərini daşıyıcının izləmə səhifəsinə aparır.
 
+## Telegram-dan müştəriyə WhatsApp mesajı
+
+1. `/active`, müştəri axtarışı və ya VIN ilə **dəqiq maşını** seçin.
+2. **Müştəriyə WhatsApp yaz** düyməsinə basın və ekranda göstərilən limitə qədər mətn yazın (Vexira/Meta üçün 2000, Twilio üçün 1600 simvol). Abzaslar saxlanılır; yalnız mətn mesajı dəstəklənir.
+3. Önizləmədə müştərinin adını, tam telefon nömrəsini, VIN/izləmə kodunu və göndəriləcək mətni yoxlayın.
+4. Yalnız **WhatsApp-a göndər** düyməsi ilə təsdiqdən sonra bir dəfə göndərmə cəhdi edilir. `/cancel`, `/menu` və `/start` yazmaq mesajı göndərmədən bu mərhələdən çıxır. Digər `/` ilə başlayan mətnlər mesaj mətni hesab edilir.
+
+Mesaj yalnız seçilmiş maşının qeydiyyatdakı müştərisinin nömrəsinə göndərilir; botdan başqa nömrə daxil etmək və müştərinin nömrəsini dəyişmək olmur. Öz yazdığınız mətn göndərilir; gizli imza, mərhələ dəyişikliyi və ya avtomatik izləmə keçidi əlavə edilmir. Təsdiqdən əvvəl müştəri, nömrə və ya sifariş dəyişərsə, köhnə təsdiq qəbul olunmur.
+
+Bu funksiya mövcud WhatsApp xidmətinin açarları ilə işləyir. WhatsApp hazır deyilsə, göndərmə açılmır. **SMS-ə və ya başqa provayderə avtomatik keçid yoxdur.** Qəbul edilən göndərmə limiti bir əməkdaş üçün 10 dəqiqəyə 10 cəhd, eyni müştəri üçün 10 dəqiqəyə 3 cəhddir. Yalnız razılıq vermiş müştərilərlə əlaqə saxlayın; abunəlikdən çıxmaq istəklərinə hörmət edin.
+
+“WhatsApp xidməti qəbul etdi” cavabı çatdırılma və ya oxunma qəbzi deyil. Vaxt aşımı, anlaşılmaz cavab və ya proses dayanması olduqda nəticə naməlum qala bilər. Dublikat mesaj getməsin deyə avtomatik təkrar cəhd edilmir; yenidən göndərməzdən əvvəl provayder jurnalını yoxlayın. Meta/Twilio kimi rəsmi WhatsApp inteqrasiyalarında sərbəst mətn üçün son müştəri mesajından sonrakı 24 saatlıq pəncərə və şablon qaydaları tətbiq oluna bilər; [rəsmi izah](https://www.twilio.com/docs/whatsapp/api).
+
+Botu dayandırmaq və ya əməkdaşın girişini ləğv etmək gələcək təsdiqləri bağlayır; artıq təsdiqlənmiş və xidmətə ötürülən mesajı geri çağırmır.
+
 ## Təhlükəsizlik və istismar
 
 - Yalnız botla **şəxsi söhbətlər** qəbul olunur; qrup, kanal, bot hesabları və redaktə olunmuş mesajlar qəbul edilmir.

@@ -40,7 +40,15 @@ function harness() {
     propose: jest.fn().mockResolvedValue({ id: 'action-1', text: 'Honda Accord · NEX-1234\nMüştəri: Test Müştəri\nƏvvəl: Maşın alındı\nSonra: Gəmi yola düşüb' }),
     confirm: jest.fn().mockResolvedValue({ text: 'Dəyişiklik saxlanıldı. Bildiriş: göndərilmədi.', orderId: car.id }),
   };
-  const service = new TelegramConversationService(access as never, http as never, actions as never);
+  const messaging = {
+    ready: jest.fn().mockReturnValue(true),
+    maxTextLength: jest.fn().mockReturnValue(2000),
+    propose: jest.fn().mockImplementation(async (_userId: string, _telegramUserId: string, _chatId: string, _orderId: string, text: string) => ({
+      id: 'whatsapp-action-1', text: `Müştəri: ${car.customerName}\nWhatsApp: ${car.customerPhone}\nVIN: ${car.vin}\nİzləmə: ${car.trackingCode}\n\nMesaj:\n${text}`,
+    })),
+    confirm: jest.fn().mockResolvedValue({ text: 'WhatsApp xidməti mesajı qəbul etdi. Bu, çatdırılma və ya oxunma təsdiqi deyil.', orderId: car.id }),
+  };
+  const service = new TelegramConversationService(access as never, http as never, actions as never, messaging as never);
   const sent = () => http.call.mock.calls.filter(call => call[1] === 'sendMessage').map(call => call[2] as {
     text: string; parse_mode?: string; reply_markup?: { inline_keyboard: { text: string; callback_data: string }[][] };
   });
@@ -56,7 +64,7 @@ function harness() {
     await service.handle(message('Honda'), token);
     await press('Test Müştəri');
   };
-  return { service, access, http, actions, sent, last, button, press, selectCar, state: () => conversation as Record<string, unknown>, revoke: () => { authorized = false; } };
+  return { service, access, http, actions, messaging, sent, last, button, press, selectCar, state: () => conversation as Record<string, unknown>, revoke: () => { authorized = false; } };
 }
 
 describe('Telegram private conversation', () => {
@@ -451,5 +459,247 @@ describe('Telegram private conversation', () => {
       }
     }
     expect(h.actions.confirm).not.toHaveBeenCalled();
+  });
+
+  describe('customer WhatsApp compose and confirmation', () => {
+    const compose = async (h: ReturnType<typeof harness>) => {
+      await h.selectCar();
+      await h.press('Müştəriyə WhatsApp yaz');
+    };
+
+    it('requires a selected car, exact recipient preview and a separate explicit send confirmation', async () => {
+      const h = harness();
+      await h.service.handle(message('/menu'), token);
+      await h.service.handle(callback(`tg:${h.state().nonce}:whatsapp`), token);
+      expect(h.messaging.ready).not.toHaveBeenCalled();
+      await compose(h);
+      expect(h.state()).toMatchObject({ mode: 'whatsappDraft', orderId: car.id });
+      expect(h.last().text).toContain(car.customerName);
+      expect(h.last().text).toContain(car.customerPhone);
+      expect(h.last().text).toContain(car.vin);
+      expect(h.last().text).toContain('razılıq vermiş müştəriyə');
+      expect(h.messaging.propose).not.toHaveBeenCalled();
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+      const body = 'Salam, maşınınız limana çatıb.\n\nƏlavə məlumat üçün bizə yazın.';
+      await h.service.handle(message(body), token);
+      expect(h.messaging.propose).toHaveBeenCalledWith('admin-1', '101', '101', car.id, body);
+      expect(h.state()).toMatchObject({ mode: 'whatsappConfirm', orderId: car.id, actionId: 'whatsapp-action-1' });
+      expect(h.last().text).toContain(body);
+      expect(h.last().text).toContain(car.customerPhone);
+      expect(h.last().text).toContain(car.vin);
+      expect(h.last().parse_mode).toBeUndefined();
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+      await h.service.handle(message('Bu əlavə mətn avtomatik göndərilməsin'), token);
+      expect(h.messaging.propose).toHaveBeenCalledTimes(1);
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+      expect(h.state().mode).toBe('whatsappConfirm');
+      // The previously displayed confirmation remains the only valid send button.
+      const confirmation = h.sent().flatMap(item => item.reply_markup?.inline_keyboard.flat() ?? []).find(item => item.text.includes('WhatsApp-a göndər'))!.callback_data;
+      await h.service.handle(callback(confirmation), token);
+      expect(h.messaging.confirm).toHaveBeenCalledWith('whatsapp-action-1', 'admin-1', '101', '101');
+      expect(h.actions.confirm).not.toHaveBeenCalled();
+      expect(h.actions.propose).not.toHaveBeenCalled();
+      expect(h.sent().some(item => item.text.includes('xidməti mesajı qəbul etdi'))).toBe(true);
+      expect(h.sent().some(item => item.text.includes('çatdırılma və ya oxunma təsdiqi deyil'))).toBe(true);
+    });
+
+    it('blocks compose if WhatsApp is disabled or the customer has no phone', async () => {
+      const h = harness();
+      await h.selectCar();
+      h.messaging.ready.mockReturnValueOnce(false);
+      await h.press('Müştəriyə WhatsApp yaz');
+      expect(h.state().mode).toBe('car');
+      expect(h.last().text).toContain('Admin paneldə');
+      expect(h.messaging.propose).not.toHaveBeenCalled();
+      await h.selectCar();
+      h.actions.get.mockResolvedValueOnce({ ...car, customerPhone: '' });
+      await h.press('Müştəriyə WhatsApp yaz');
+      expect(h.state().mode).toBe('car');
+      expect(h.last().text).toContain('telefon nömrəsi qeyd olunmayıb');
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+    });
+
+    it('preserves the exact draft text, including CRLF, tabs and outer whitespace', async () => {
+      const h = harness();
+      await compose(h);
+      const body = '  Salam\r\n\r\nMaşınınız\tlimana çatıb.  \r\n';
+      await h.service.handle(message(body), token);
+      expect(h.messaging.propose).toHaveBeenCalledWith('admin-1', '101', '101', car.id, body);
+      expect(h.last().text).toContain(`Mesaj:\n${body}`);
+      expect(h.last().text).toContain('razılıq vermiş müştəriyə');
+      expect(h.last().parse_mode).toBeUndefined();
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+    });
+
+    it('displays and enforces a lower provider-specific limit without clipping the draft', async () => {
+      const h = harness();
+      h.messaging.maxTextLength.mockReturnValue(1600);
+      await compose(h);
+      expect(h.last().text).toContain('1–1600 simvol');
+      await h.service.handle(message('Ə'.repeat(1601)), token);
+      expect(h.messaging.propose).not.toHaveBeenCalled();
+      expect(h.state().mode).toBe('whatsappDraft');
+      expect(h.last().text).toContain('1–1600');
+      const body = 'Ə'.repeat(1600);
+      await h.service.handle(message(body), token);
+      expect(h.messaging.propose).toHaveBeenCalledWith('admin-1', '101', '101', car.id, body);
+      expect(h.last().text).toContain(body);
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+    });
+
+    it('does not forward a forged shipment confirm or a WhatsApp confirm from the wrong state', async () => {
+      const h = harness();
+      await compose(h);
+      await h.service.handle(callback(`tg:${h.state().nonce}:whatsconfirm`), token);
+      await h.service.handle(message('Salam'), token);
+      await h.service.handle(callback(`tg:${h.state().nonce}:confirm`), token);
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+      expect(h.actions.confirm).not.toHaveBeenCalled();
+    });
+
+    it.each(['/cancel', '/menu', '/start secretPairingValueThatMustNotBeForwarded', '/start secretPairingValueThatMustNotBeForwarded\nYeni sətir'])('cancels composing safely via %s', async command => {
+      const h = harness();
+      await compose(h);
+      await h.service.handle(message(command), token);
+      expect(h.state().mode).toBe('menu');
+      expect(h.messaging.propose).not.toHaveBeenCalled();
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+      expect(h.access.pair).not.toHaveBeenCalled();
+      expect(h.last().text).toContain('Heç bir mesaj göndərilmədi');
+      expect(JSON.stringify(h.sent())).not.toContain('secretPairingValue');
+    });
+
+    it.each(['/help', '/search məlumat', '/custom-code'])('preserves slash-leading draft text %s without invoking a bot command', async body => {
+      const h = harness();
+      await compose(h);
+      const beforeSearch = h.actions.search.mock.calls.length;
+      await h.service.handle(message(body), token);
+      expect(h.messaging.propose).toHaveBeenCalledWith('admin-1', '101', '101', car.id, body);
+      expect(h.actions.search).toHaveBeenCalledTimes(beforeSearch);
+      expect(h.last().text).toContain(body);
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+    });
+
+    it('validates Unicode code points and remains in draft for empty, non-text or oversized inputs', async () => {
+      const h = harness();
+      await compose(h);
+      await h.service.handle(message('   '), token);
+      await h.service.handle(message('', { text: undefined, photo: [] }), token);
+      await h.service.handle(message('🚘'.repeat(2001)), token);
+      expect(h.messaging.propose).not.toHaveBeenCalled();
+      expect(h.state().mode).toBe('whatsappDraft');
+      const body = '🚘'.repeat(2000);
+      await h.service.handle(message(body), token);
+      expect(h.messaging.propose).toHaveBeenCalledWith('admin-1', '101', '101', car.id, body);
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+      for (const item of h.sent()) expect(item.text.length).toBeLessThanOrEqual(4096);
+      const previewParts = h.sent().filter(item => item.text.includes('tam önizləməsi') || item.text.includes('🚘🚘'));
+      expect(previewParts.map(item => item.text).join('')).toContain(body);
+    });
+
+    it('shows the entire preview, including whitespace at split boundaries, before offering send', async () => {
+      const h = harness();
+      await compose(h);
+      const preview = `Müştəri: ${car.customerName}\nTelefon: ${car.customerPhone}\nVIN: ${car.vin}\n${'x'.repeat(3700)}\n \n${'🚗'.repeat(170)}\nEND-OF-WHATSAPP-PREVIEW`;
+      h.messaging.propose.mockResolvedValueOnce({ id: 'long-wa', text: preview });
+      const previousCount = h.sent().length;
+      await h.service.handle(message('Salam'), token);
+      const delivered = h.sent().slice(previousCount);
+      expect(delivered.length).toBeGreaterThan(2);
+      expect(delivered.slice(0, -1).every(item => item.reply_markup === undefined)).toBe(true);
+      expect(delivered.slice(0, -1).map(item => item.text).join('')).toBe(`💬 WhatsApp göndərişinin tam önizləməsi\n\n${preview}`);
+      expect(h.last().reply_markup!.inline_keyboard.flat().some(item => item.text.includes('WhatsApp-a göndər'))).toBe(true);
+      for (const item of delivered) expect(item.text.length).toBeLessThanOrEqual(4096);
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+    });
+
+    it('cancels or rewrites a preview without sending and rejects its stale keyboard', async () => {
+      const h = harness();
+      await compose(h);
+      await h.service.handle(message('Birinci mesaj'), token);
+      const oldSend = h.button('WhatsApp-a göndər');
+      await h.press('Mesajı yenidən yaz');
+      expect(h.state().mode).toBe('whatsappDraft');
+      await h.service.handle(callback(oldSend), token);
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+      await h.service.handle(message('Yeni mesaj'), token);
+      const newSend = h.button('WhatsApp-a göndər');
+      await h.press('Göndərmədən maşına qayıt');
+      await h.service.handle(callback(newSend), token);
+      expect(h.messaging.confirm).not.toHaveBeenCalled();
+      expect(h.state().mode).toBe('car');
+    });
+
+    it('rechecks authorization for typed messages and confirmation', async () => {
+      const draft = harness();
+      await compose(draft);
+      draft.revoke();
+      await draft.service.handle(message('Salam'), token);
+      expect(draft.messaging.propose).not.toHaveBeenCalled();
+      const confirmed = harness();
+      await compose(confirmed);
+      await confirmed.service.handle(message('Salam'), token);
+      const send = confirmed.button('WhatsApp-a göndər');
+      confirmed.revoke();
+      await confirmed.service.handle(callback(send), token);
+      expect(confirmed.messaging.confirm).not.toHaveBeenCalled();
+    });
+
+    it('consumes a send keyboard once, including concurrent or replayed presses', async () => {
+      const h = harness();
+      await compose(h);
+      await h.service.handle(message('Salam'), token);
+      const send = h.button('WhatsApp-a göndər');
+      await Promise.all([h.service.handle(callback(send), token), h.service.handle(callback(send), token)]);
+      expect(h.messaging.confirm).toHaveBeenCalledTimes(1);
+      expect(h.state().mode).toBe('car');
+    });
+
+    it.each([
+      'WhatsApp xidməti sorğunu rədd etdi. Mesaj göndərilmədi; SMS-ə keçilmədi.',
+      'WhatsApp göndərişinin nəticəsi qeyri-müəyyəndir. Avtomatik təkrar göndərilmədi. Provayderdə yoxlayın.',
+    ])('reports the safe provider outcome verbatim without claiming delivery: %s', async text => {
+      const h = harness();
+      await compose(h);
+      await h.service.handle(message('Salam'), token);
+      h.messaging.confirm.mockResolvedValueOnce({ text, orderId: car.id });
+      await h.press('WhatsApp-a göndər');
+      expect(h.sent().some(item => item.text === text)).toBe(true);
+      expect(h.messaging.confirm).toHaveBeenCalledTimes(1);
+      expect(h.actions.confirm).not.toHaveBeenCalled();
+    });
+
+    it('hides proposal/confirmation infrastructure errors and never automatically retries', async () => {
+      const h = harness();
+      await compose(h);
+      h.messaging.propose.mockRejectedValueOnce(new Error('secret provider token'));
+      await h.service.handle(message('Salam'), token);
+      expect(h.state().mode).toBe('whatsappDraft');
+      expect(h.last().text).toContain('Heç bir mesaj göndərilmədi');
+      await h.service.handle(message('Salam'), token);
+      h.messaging.confirm.mockRejectedValueOnce(new Error('secret provider token'));
+      await h.press('WhatsApp-a göndər');
+      expect(h.sent().some(item => item.text.includes('WhatsApp göndərişi təsdiqlənmədi'))).toBe(true);
+      expect(JSON.stringify(h.sent())).not.toContain('secret provider');
+      expect(h.messaging.confirm).toHaveBeenCalledTimes(1);
+      expect(h.state().mode).toBe('car');
+    });
+
+    it('does not misreport or resend WhatsApp if its result cannot be delivered to Telegram', async () => {
+      const h = harness();
+      await compose(h);
+      await h.service.handle(message('Salam'), token);
+      const send = h.button('WhatsApp-a göndər');
+      h.http.call.mockImplementation(async (_token: string, method: string) => {
+        if (method === 'sendMessage') throw new Error('Telegram transport unavailable');
+        return {};
+      });
+      await expect(h.service.handle(callback(send), token)).rejects.toThrow('Telegram transport unavailable');
+      expect(h.messaging.confirm).toHaveBeenCalledTimes(1);
+      expect(h.state().mode).toBe('menu');
+      await h.service.handle(callback(send), token);
+      expect(h.messaging.confirm).toHaveBeenCalledTimes(1);
+      expect(h.sent().some(item => item.text.includes('WhatsApp göndərişi təsdiqlənmədi'))).toBe(false);
+    });
   });
 });

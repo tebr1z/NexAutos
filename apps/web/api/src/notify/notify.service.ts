@@ -38,6 +38,10 @@ const STATUS_AZ: Record<string, string> = {
 
 export type NotifyResult = { sent: boolean; channel?: string; error?: string };
 
+// Accepted by the provider is not a delivery/read receipt. Unknown outcomes must
+// never be retried automatically: the first request may already have been sent.
+export type CustomerWhatsAppResult = NotifyResult & { outcome: 'accepted' | 'failed' | 'unknown' };
+
 export type EmailResult = { sent: boolean; error?: string };
 
 export function normalizePhone(raw?: string | null): string | null {
@@ -55,6 +59,12 @@ export function normalizePhone(raw?: string | null): string | null {
 
 export function e164Phone(digits: string) {
   return digits.startsWith('+') ? digits : `+${digits}`;
+}
+
+export function normalizeCustomerWhatsAppPhone(raw?: string | null): string | null {
+  if (typeof raw !== 'string' || raw.length > 40 || !/^\+?[\d ().-]+$/.test(raw.trim())) return null;
+  const digits = normalizePhone(raw);
+  return digits && /^[1-9]\d{10,14}$/.test(digits) ? digits : null;
 }
 
 export function statusLabelAz(status: string) {
@@ -110,6 +120,79 @@ export function statusSmsBody(input: {
 @Injectable()
 export class NotifyService {
   private readonly log = new Logger(NotifyService.name);
+
+  customerWhatsAppReady(): boolean {
+    return Boolean((process.env.VEXIRA_WHATSAPP_KEY?.trim() || process.env.WHATSAPP_API_KEY?.trim())
+      || (process.env.WHATSAPP_TOKEN?.trim() && process.env.WHATSAPP_PHONE_NUMBER_ID?.trim())
+      || (process.env.TWILIO_WHATSAPP_FROM?.trim() && process.env.TWILIO_ACCOUNT_SID?.trim() && process.env.TWILIO_AUTH_TOKEN?.trim()));
+  }
+
+  customerWhatsAppTextLimit(): number {
+    const firstProvider = process.env.VEXIRA_WHATSAPP_KEY?.trim() || process.env.WHATSAPP_API_KEY?.trim()
+      || (process.env.WHATSAPP_TOKEN?.trim() && process.env.WHATSAPP_PHONE_NUMBER_ID?.trim());
+    return !firstProvider && process.env.TWILIO_WHATSAPP_FROM?.trim()
+      && process.env.TWILIO_ACCOUNT_SID?.trim() && process.env.TWILIO_AUTH_TOKEN?.trim() ? 1600 : 2000;
+  }
+
+  /** Explicit customer message: one WhatsApp provider, no SMS/provider fallback. */
+  async sendCustomerWhatsApp(phone: string, body: string): Promise<CustomerWhatsAppResult> {
+    const to = normalizeCustomerWhatsAppPhone(phone);
+    if (!to) return { sent: false, outcome: 'failed', error: 'no_phone' };
+    if (!body?.trim()) return { sent: false, outcome: 'failed', error: 'no_message' };
+    if ([...body].length > this.customerWhatsAppTextLimit()) return { sent: false, outcome: 'failed', error: 'message_too_long' };
+    const key = process.env.VEXIRA_WHATSAPP_KEY?.trim() || process.env.WHATSAPP_API_KEY?.trim();
+    const token = process.env.WHATSAPP_TOKEN?.trim();
+    const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
+    const from = process.env.TWILIO_WHATSAPP_FROM?.trim();
+    const sid = process.env.TWILIO_ACCOUNT_SID?.trim();
+    const twilioToken = process.env.TWILIO_AUTH_TOKEN?.trim();
+    let url: string;
+    let headers: Record<string, string>;
+    let requestBody: string | URLSearchParams;
+    let provider: 'vexira' | 'meta' | 'twilio';
+    if (key) {
+      provider = 'vexira';
+      url = process.env.VEXIRA_WHATSAPP_URL?.trim() || 'https://api.vexirahost.com/api/v1/whatsapp/messages';
+      headers = { 'Content-Type': 'application/json', 'X-API-Key': key };
+      requestBody = JSON.stringify({ phone: e164Phone(to), message: body });
+    } else if (token && phoneId) {
+      provider = 'meta';
+      url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
+      headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+      requestBody = JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body, preview_url: true } });
+    } else if (from && sid && twilioToken) {
+      provider = 'twilio';
+      url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
+      headers = { Authorization: `Basic ${Buffer.from(`${sid}:${twilioToken}`).toString('base64')}`, 'Content-Type': 'application/x-www-form-urlencoded' };
+      requestBody = new URLSearchParams({ To: `whatsapp:+${to}`, From: from.startsWith('whatsapp:') ? from : `whatsapp:${from}`, Body: body });
+    } else {
+      return { sent: false, outcome: 'failed', error: 'not_configured' };
+    }
+    try {
+      const response = await fetch(url, { method: 'POST', headers, body: requestBody, signal: AbortSignal.timeout(15000), redirect: 'error' });
+      if (!response.ok) {
+        // Do not log or return raw provider responses: they can contain keys,
+        // recipient details or message contents. A 5xx may follow acceptance.
+        const uncertain = response.status >= 500 || response.status === 408;
+        return { sent: false, outcome: uncertain ? 'unknown' : 'failed', error: uncertain ? 'provider_uncertain' : 'provider_rejected' };
+      }
+      const text = await response.text();
+      type ProviderPayload = { success?: boolean; messages?: { id?: string }[]; sid?: string; status?: string };
+      let payload: ProviderPayload | null = null;
+      try { payload = JSON.parse(text) as ProviderPayload; } catch { /* An unrecognized response cannot prove acceptance. */ }
+      if ((provider === 'vexira' && payload?.success === false)
+        || (provider === 'twilio' && ['failed', 'undelivered'].includes(payload?.status ?? ''))) {
+        return { sent: false, outcome: 'failed', error: 'provider_rejected' };
+      }
+      const accepted = provider === 'vexira' ? payload?.success === true
+        : provider === 'meta' ? typeof payload?.messages?.[0]?.id === 'string' && Boolean(payload.messages[0].id)
+          : typeof payload?.sid === 'string' && Boolean(payload.sid);
+      return accepted ? { sent: true, channel: 'whatsapp', outcome: 'accepted' }
+        : { sent: false, outcome: 'unknown', error: 'provider_uncertain' };
+    } catch {
+      return { sent: false, outcome: 'unknown', error: 'provider_uncertain' };
+    }
+  }
 
   async statusChanged(input: {
     phone?: string | null;
