@@ -7,7 +7,7 @@ import { Logo } from "@/components/brand/logo";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 import { adminHomeForRole, canAccessAdminPath, ROLE_DETAILS, type InternalRole } from "@/lib/admin-access";
-import { Archive, Bug, CarFront, Database, FileSignature, Images, LogOut, MessageSquareText, Radar, Settings, Shield, Ship, Users } from "lucide-react";
+import { Archive, Bot, Bug, CarFront, Database, FileSignature, Images, LogOut, MessageSquareText, Radar, Settings, Shield, Ship, Users } from "lucide-react";
 
 const LINKS = [
   { href: "/admin", label: "Maşınlar", icon: CarFront },
@@ -19,6 +19,7 @@ const LINKS = [
   { href: "/admin/insurance", label: "Sığorta", icon: Shield },
   { href: "/admin#arxiv", label: "Arxiv", icon: Archive },
   { href: "/admin/inquiries", label: "Müraciətlər", icon: MessageSquareText },
+  { href: "/admin/telegram", label: "Telegram bot", icon: Bot },
   { href: "/admin/settings", label: "Ayarlar", icon: Settings },
   { href: "/admin/users", label: "İstifadəçilər", icon: Users },
   { href: "/admin/extension-errors", label: "Extension xətaları", icon: Bug },

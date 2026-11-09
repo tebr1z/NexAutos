@@ -2,6 +2,7 @@ import { browserApiBase, nestApiBase } from "./nest-url";
 import type { TrackingShipment, VinRecord, AuthUser } from "./types";
 import type { RadarDealSearch, RadarMatch, RadarPlan, RadarSearch, RadarState } from "./lot-radar";
 import { calculatorAccountPath, radarAccountPath, requiredAccountId } from "./account-target";
+import { telegramLinkPath, type TelegramStatus, type TelegramConfig, type TelegramPair } from "./telegram";
 
 export type CatalogCar = {
   id: string;
@@ -740,6 +741,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  telegramStatus: () => request<TelegramStatus>("/telegram/status"),
+  saveTelegramConfig: (payload: TelegramConfig) =>
+    request<TelegramStatus>("/telegram/config", { method: "PUT", body: JSON.stringify(payload) }),
+  createTelegramPair: () => request<TelegramPair>("/telegram/pair", { method: "POST", body: JSON.stringify({}) }),
+  revokeTelegramLink: (userId?: string) => request<{ ok: boolean }>(telegramLinkPath(userId), { method: "DELETE" }),
   catalogManage: () => request<CatalogCar[]>("/catalog/manage"),
   createCatalogCar: (payload: Record<string, unknown>) =>
     request<CatalogCar>("/catalog", { method: "POST", body: JSON.stringify(payload) }),

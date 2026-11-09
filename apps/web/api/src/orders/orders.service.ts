@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { randomBytes, timingSafeEqual } from 'crypto';
-import { ShipmentStatus } from '@prisma/client';
+import { Prisma, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ContainersService } from '../containers/containers.service';
 import { VesselsService } from '../vessels/vessels.service';
@@ -162,6 +162,37 @@ function normalizeImo(raw?: string | null) {
 }
 
 type MapPin = { lat?: number; lng?: number; vesselName?: string };
+
+export type TelegramOrderChangeKind = 'status' | 'container' | 'carrier' | 'openingDate';
+
+/** Validate bot input independently of the conversation UI and persisted callbacks. */
+export function normalizeTelegramOrderChange(kind: TelegramOrderChangeKind, raw: string): string {
+  if (typeof raw !== 'string' || !raw.trim()) throw new BadRequestException('Yeni dəyəri yazın.');
+  const value = raw.trim();
+  if (kind === 'status') {
+    if (!Object.values(ShipmentStatus).includes(value as ShipmentStatus)) throw new BadRequestException('İzləmə mərhələsi düzgün deyil.');
+    return value;
+  }
+  if (kind === 'container') {
+    const container = value.replace(/\s+/g, '').toUpperCase();
+    if (!/^[A-Z]{4}\d{7}$/.test(container)) throw new BadRequestException('Konteyner kodu 4 hərf və 7 rəqəmdən ibarət olmalıdır. Məsələn: MSCU1234567.');
+    return container;
+  }
+  if (kind === 'carrier') {
+    return workflowFields({ carrierTrackingUrl: value }).carrierTrackingUrl!;
+  }
+  if (kind === 'openingDate') {
+    return workflowFields({ containerOpeningDate: value }).containerOpeningDate!;
+  }
+  throw new BadRequestException('Bu əməliyyat dəstəklənmir.');
+}
+
+type TelegramNotificationOrder = {
+  trackingCode: string;
+  currentStatus: ShipmentStatus;
+  customer: { phone: string };
+  vehicle: { make: string | null; model: string | null } | null;
+};
 
 @Injectable()
 export class OrdersService {
@@ -1000,6 +1031,64 @@ export class OrdersService {
       model: order.vehicle?.model,
     });
     return { ...mapOrder(order), notify };
+  }
+
+  /** The caller claims its one-use action in this same transaction. No network I/O here. */
+  async applyTelegramChange(tx: Prisma.TransactionClient, input: {
+    orderId: string;
+    kind: TelegramOrderChangeKind;
+    value: string;
+    expectedUpdatedAt: string;
+    userId: string;
+  }) {
+    const value = normalizeTelegramOrderChange(input.kind, input.value);
+    // Serialize against admin writes, then compare the version shown in the preview.
+    await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${input.orderId} FOR UPDATE`;
+    const existing = await tx.order.findUnique({ where: { id: input.orderId } });
+    if (!existing) throw new NotFoundException('Göndəriş tapılmadı.');
+    if (existing.updatedAt.toISOString() !== input.expectedUpdatedAt) {
+      throw new ConflictException('Bu maşının məlumatları başqa əməliyyatla yenilənib. Maşını yenidən açın və dəyişikliyi təkrar təsdiqləyin.');
+    }
+    const field = { status: 'currentStatus', container: 'containerNumber', carrier: 'carrierTrackingUrl', openingDate: 'containerOpeningDate' }[input.kind];
+    const oldValue = existing[field] ?? null;
+    if (oldValue === value) throw new BadRequestException('Bu dəyər artıq qeyd olunub. Dəyişiklik edilmədi.');
+    let data: Prisma.OrderUpdateInput;
+    if (input.kind === 'status') {
+      const status = value as ShipmentStatus;
+      const location = locationForStatus(status, existing.destinationPort);
+      const moved = (location.currentPort !== undefined && location.currentPort !== existing.currentPort)
+        || (location.currentCountry !== undefined && location.currentCountry !== existing.currentCountry);
+      const title = statusLabelAz(status);
+      data = {
+        currentStatus: status,
+        ...location,
+        ...(moved ? { mapLat: null, mapLng: null } : {}),
+        ...(status === 'DELIVERED'
+          ? { deliveredAt: existing.deliveredAt ?? new Date(), reviewToken: existing.reviewToken ?? randomBytes(24).toString('hex') }
+          : {}),
+        events: { create: { status, title, description: `Telegram vasitəsilə təsdiqlənib: ${title}`, occurredAt: new Date() } },
+      };
+    } else {
+      data = { [field]: value };
+    }
+    const order = await tx.order.update({ where: { id: input.orderId }, data, include: { customer: true, vehicle: true } });
+    await tx.auditLog.create({
+      data: {
+        userId: input.userId,
+        action: input.kind === 'status' ? 'STATUS_UPDATE' : 'VOYAGE_UPDATE',
+        entity: 'Order', entityId: input.orderId,
+        meta: { source: 'telegram', field, oldValue, value },
+      },
+    });
+    return order;
+  }
+
+  /** Only called after the action, order, event and audit have committed successfully. */
+  async notifyTelegramStatus(order: TelegramNotificationOrder): Promise<NotifyResult> {
+    return this.notify.statusChanged({
+      phone: order.customer.phone, trackingCode: order.trackingCode, status: order.currentStatus,
+      make: order.vehicle?.make, model: order.vehicle?.model,
+    });
   }
 
   async photoBinary(id: string) {

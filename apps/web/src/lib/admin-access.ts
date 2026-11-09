@@ -40,8 +40,9 @@ const MANAGER_PATHS = [
   "/admin/contracts",
   "/admin/insurance",
   "/admin/inquiries",
+  "/admin/telegram",
 ];
-const STAFF_PATHS = ["/admin", "/admin/contracts", "/admin/insurance", "/admin/inquiries"];
+const STAFF_PATHS = ["/admin", "/admin/contracts", "/admin/insurance", "/admin/inquiries", "/admin/telegram"];
 
 function pathMatches(pathname: string, allowed: string) {
   return allowed === "/admin" ? pathname === allowed : pathname === allowed || pathname.startsWith(`${allowed}/`);

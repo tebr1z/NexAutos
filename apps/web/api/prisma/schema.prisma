@@ -104,6 +104,54 @@ model User {
   lotWatches LotWatch[]
   radarPlan RadarPlan?
   radarUsage RadarUsage[]
+  telegramAccount TelegramAccount?
+  telegramActions TelegramAction[]
+}
+
+// Private operator bot. Tokens are encrypted; only hashes of one-use pairing links are stored.
+model TelegramBotConfig {
+  id String @id @default("main")
+  tokenCiphertext String?
+  botId String?
+  botUsername String?
+  botName String?
+  enabled Boolean @default(false)
+  cursor BigInt @default(0)
+  leaseOwner String?
+  leaseUntil DateTime?
+  lastPollAt DateTime?
+  lastError String?
+  updatedAt DateTime @updatedAt
+}
+
+model TelegramAccount {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  telegramUserId String? @unique
+  chatId String?
+  username String?
+  pairingTokenHash String? @unique
+  pairingExpiresAt DateTime?
+  conversation Json?
+  linkedAt DateTime?
+  updatedAt DateTime @updatedAt
+}
+
+model TelegramAction {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  telegramUserId String
+  chatId String
+  kind String
+  payload Json
+  state String @default("PENDING")
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, state])
+  @@index([expiresAt])
 }
 
 model RadarPlan {

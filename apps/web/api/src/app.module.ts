@@ -21,6 +21,7 @@ import { HealthController } from './health/health.controller';
 import { MarketSalesModule } from './market-sales/market-sales.module';
 import { AccessUsersModule } from './access-users/access-users.module';
 import { LotRadarModule } from './lot-radar/lot-radar.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { LotRadarModule } from './lot-radar/lot-radar.module';
     MarketSalesModule,
     AccessUsersModule,
     LotRadarModule,
+    TelegramModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
