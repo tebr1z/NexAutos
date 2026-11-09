@@ -39,8 +39,13 @@ function harness() {
     },
     order: {
       findUnique: jest.fn(async () => row),
+      findFirst: jest.fn().mockResolvedValue(row),
       findMany: jest.fn().mockResolvedValue([row]),
       update: jest.fn(async ({ data }) => { Object.assign(row, data); return row; }),
+    },
+    customer: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue({ id: 'customer1', name: row.customer.name, phone: row.customer.phone }),
     },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
   };
@@ -220,6 +225,205 @@ describe('Telegram confirmed order actions', () => {
     expect(JSON.stringify(h.prisma.order.findMany.mock.calls[0][0].where)).toContain('994501234567');
     await h.service.search('00123456789123456', 'all');
     expect(JSON.stringify(h.prisma.order.findMany.mock.calls[1][0].where)).toContain('00123456789123456');
+  });
+});
+
+describe('Telegram active customer reads', () => {
+  const active = { currentStatus: { notIn: ['DELIVERED', 'CANCELLED'] } };
+
+  it('paginates unique customers with a filtered active-car count and no full order fetch', async () => {
+    const h = harness();
+    h.prisma.customer.findMany.mockResolvedValue(Array.from({ length: 9 }, (_, i) => ({
+      id: `customer${i}`, name: `Müştəri ${i}`, phone: i ? '994501234567' : '', _count: { orders: i + 1 },
+    })));
+    const result = await h.service.activeCustomers('', 2);
+    expect(result.items).toHaveLength(8);
+    expect(result.hasMore).toBe(true);
+    expect(result.items[0]).toEqual({ id: 'customer0', name: 'Müştəri 0', phone: null, activeCarCount: 1 });
+    expect(result.items[7].activeCarCount).toBe(8);
+    expect(h.prisma.customer.findMany).toHaveBeenCalledWith({
+      where: { orders: { some: active } },
+      select: { id: true, name: true, phone: true, _count: { select: { orders: { where: active } } } },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }], skip: 16, take: 9,
+    });
+    expect(h.prisma.order.findMany).not.toHaveBeenCalled();
+    expect(h.orders.applyTelegramChange).not.toHaveBeenCalled();
+  });
+
+  it('includes an unregistered customer once, counts only active cars, and excludes terminal-only history', async () => {
+    const h = harness();
+    const customers = [
+      { id: 'mixed', name: 'Eyni Ad', phone: '', userId: null, orders: ['PURCHASED', 'SHIP_DEPARTED', 'DELIVERED', 'CANCELLED'] },
+      { id: 'history', name: 'Köhnə müştəri', phone: '', userId: null, orders: ['DELIVERED', 'CANCELLED'] },
+      { id: 'other', name: 'Eyni Ad', phone: '994501234567', userId: 'registered', orders: ['EXPORT_DOCUMENTS'] },
+    ];
+    h.prisma.customer.findMany.mockImplementation(async ({ where, select }) => {
+      const excluded = where.orders.some.currentStatus.notIn;
+      const countExcluded = select._count.select.orders.where.currentStatus.notIn;
+      return customers.filter((customer) => customer.orders.some((status) => !excluded.includes(status)))
+        .map((customer) => ({ ...customer, _count: { orders: customer.orders.filter((status) => !countExcluded.includes(status)).length } }));
+    });
+    const result = await h.service.activeCustomers();
+    expect(result).toEqual({
+      items: [
+        { id: 'mixed', name: 'Eyni Ad', phone: null, activeCarCount: 2 },
+        { id: 'other', name: 'Eyni Ad', phone: '994501234567', activeCarCount: 1 },
+      ],
+      hasMore: false,
+    });
+    expect(JSON.stringify(h.prisma.customer.findMany.mock.calls[0][0].where)).not.toMatch(/userId|isActive/);
+  });
+
+  it('keeps the active filter outside all customer-name search alternatives', async () => {
+    const h = harness();
+    await h.service.activeCustomers('  Ali Hasan  ');
+    expect(h.prisma.customer.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        orders: { some: active },
+        AND: [{ AND: [
+          { OR: [{ name: { contains: 'Ali', mode: 'insensitive' } }, { phone: { contains: 'Ali', mode: 'insensitive' } }] },
+          { OR: [{ name: { contains: 'Hasan', mode: 'insensitive' } }, { phone: { contains: 'Hasan', mode: 'insensitive' } }] },
+        ] }],
+      },
+    }));
+    expect(JSON.stringify(h.prisma.customer.findMany.mock.calls[0][0].where)).not.toMatch(/vin|trackingCode|vehicle/);
+  });
+
+  it.each(['050 123 45 67', '50 123 45 67', '+994 (50) 123-45-67', '00994 50 123 45 67'])('normalizes formatted customer phones: %s', async (query) => {
+    const h = harness();
+    await h.service.activeCustomers(query);
+    const where = h.prisma.customer.findMany.mock.calls[0][0].where;
+    expect(where.orders).toEqual({ some: active });
+    expect(where.AND).toEqual([expect.objectContaining({
+      OR: expect.arrayContaining([{ phone: { contains: '994501234567', mode: 'insensitive' } }]),
+    })]);
+  });
+
+  it('keeps punctuation-only input from becoming a broad phone alternative', async () => {
+    const h = harness();
+    await h.service.activeCustomers('---');
+    const where = h.prisma.customer.findMany.mock.calls[0][0].where;
+    expect(where.AND).toEqual([{ AND: [{ OR: [
+      { name: { contains: '---', mode: 'insensitive' } }, { phone: { contains: '---', mode: 'insensitive' } },
+    ] }] }]);
+  });
+
+  it.each([-1, 1001, 0.5, NaN, Infinity, null, '1'])('rejects invalid page %p before any database read', async (page) => {
+    const h = harness();
+    await expect(h.service.activeCustomers('', page as number)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(h.service.activeCustomerCars('customer1', page as number)).rejects.toBeInstanceOf(BadRequestException);
+    expect(h.prisma.customer.findMany).not.toHaveBeenCalled();
+    expect(h.prisma.customer.findUnique).not.toHaveBeenCalled();
+    expect(h.prisma.order.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each(['x'.repeat(101), null, {}, 12])('rejects invalid or overlong query %p', async (query) => {
+    const h = harness();
+    await expect(h.service.activeCustomers(query as string)).rejects.toBeInstanceOf(BadRequestException);
+    expect(h.prisma.customer.findMany).not.toHaveBeenCalled();
+  });
+
+  it('accepts the final bounded page and exact 100-character search', async () => {
+    const h = harness();
+    await h.service.activeCustomers('x'.repeat(100), 1000);
+    await h.service.activeCustomerCars('customer1', 1000);
+    expect(h.prisma.customer.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 8000, take: 9 }));
+    expect(h.prisma.order.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 8000, take: 9 }));
+  });
+
+  it('selects cars by exact customer ID with the same active filter and bounded lookahead', async () => {
+    const h = harness();
+    h.prisma.order.findMany.mockResolvedValue(Array.from({ length: 9 }, (_, i) => ({ ...h.row, id: `car${i}` })));
+    const result = await h.service.activeCustomerCars('customer1', 1);
+    expect(result.customer).toEqual({ id: 'customer1', name: 'Nümunə Müştəri', phone: '994501234567' });
+    expect(result.items).toHaveLength(8);
+    expect(result.hasMore).toBe(true);
+    expect(result.items[0]).toEqual(expect.objectContaining({ id: 'car0', status: 'PURCHASED', updatedAt: version }));
+    expect(h.prisma.customer.findUnique).toHaveBeenCalledWith({
+      where: { id: 'customer1' }, select: { id: true, name: true, phone: true },
+    });
+    expect(h.prisma.order.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { customerId: 'customer1', ...active }, orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }], skip: 8, take: 9,
+      select: expect.objectContaining({ customer: { select: { name: true, phone: true } }, vehicle: { select: { make: true, model: true, year: true } } }),
+    }));
+    expect(h.prisma.order.update).not.toHaveBeenCalled();
+    expect(h.orders.applyTelegramChange).not.toHaveBeenCalled();
+  });
+
+  it('never maps terminal cars in mixed customer history', async () => {
+    const h = harness();
+    h.prisma.order.findMany.mockImplementation(async ({ where }) => ['PURCHASED', 'DELIVERED', 'CANCELLED', 'EXPORT_DOCUMENTS']
+      .filter((status) => !where.currentStatus.notIn.includes(status))
+      .map((currentStatus, i) => ({ ...h.row, id: `car${i}`, currentStatus })));
+    const result = await h.service.activeCustomerCars('customer1');
+    expect(result.items.map((item) => item.status)).toEqual(['PURCHASED', 'EXPORT_DOCUMENTS']);
+  });
+
+  it('keeps an existing customer identity when its last active car has become terminal', async () => {
+    const h = harness();
+    h.prisma.customer.findUnique.mockResolvedValue({ id: 'customer1', name: 'Müştəri', phone: '' });
+    h.prisma.order.findMany.mockResolvedValue([]);
+    expect(await h.service.activeCustomerCars('customer1')).toEqual({
+      customer: { id: 'customer1', name: 'Müştəri', phone: null }, items: [], hasMore: false,
+    });
+  });
+
+  it.each([null, 123, '', '   ', ' customer1 ', 'x'.repeat(129)])('does not query invalid customer ID %p', async (id) => {
+    const h = harness();
+    expect(await h.service.activeCustomerCars(id as string)).toEqual({ customer: null, items: [], hasMore: false });
+    expect(h.prisma.customer.findUnique).not.toHaveBeenCalled();
+    expect(h.prisma.order.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns a missing customer without searching any car or changing data', async () => {
+    const h = harness();
+    h.prisma.customer.findUnique.mockResolvedValue(null);
+    expect(await h.service.activeCustomerCars('missing-customer')).toEqual({ customer: null, items: [], hasMore: false });
+    expect(h.prisma.order.findMany).not.toHaveBeenCalled();
+    expect(h.prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  it('looks up the selected active car by exact customer and order in a single read', async () => {
+    const h = harness();
+    expect(await h.service.activeCustomerCar('customer1', 'order1')).toEqual(expect.objectContaining({
+      id: 'order1', status: 'PURCHASED', customerName: 'Nümunə Müştəri', updatedAt: version,
+    }));
+    expect(h.prisma.order.findFirst).toHaveBeenCalledTimes(1);
+    expect(h.prisma.order.findFirst).toHaveBeenCalledWith({
+      where: { id: 'order1', customerId: 'customer1', ...active },
+      select: expect.objectContaining({ id: true, currentStatus: true, customer: { select: { name: true, phone: true } } }),
+    });
+    expect(h.prisma.order.findUnique).not.toHaveBeenCalled();
+    expect(h.prisma.customer.findUnique).not.toHaveBeenCalled();
+    expect(h.prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  it('returns null if the selected car was reassigned, delivered, cancelled or deleted', async () => {
+    const h = harness();
+    h.prisma.order.findFirst.mockResolvedValue(null);
+    expect(await h.service.activeCustomerCar('customer1', 'order1')).toBeNull();
+    expect(h.prisma.order.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'order1', customerId: 'customer1', ...active },
+    }));
+  });
+
+  it('maps nullable vehicle and logistics fields on a selected active car', async () => {
+    const h = harness();
+    h.prisma.order.findFirst.mockResolvedValue({ ...h.row, vehicle: null, customer: { name: 'Müştəri', phone: '' } });
+    expect(await h.service.activeCustomerCar('customer1', 'order1')).toEqual(expect.objectContaining({
+      make: null, model: null, year: null, customerPhone: null,
+      containerNumber: null, containerOpeningDate: null, carrierTrackingUrl: null,
+    }));
+  });
+
+  it('rejects invalid customer or order identities before querying the selected car', async () => {
+    const h = harness();
+    for (const invalid of [null, undefined, 123, '', '   ', ' identity ', 'x'.repeat(129)]) {
+      expect(await h.service.activeCustomerCar(invalid as string, 'order1')).toBeNull();
+      expect(await h.service.activeCustomerCar('customer1', invalid as string)).toBeNull();
+    }
+    expect(h.prisma.order.findFirst).not.toHaveBeenCalled();
+    expect(h.prisma.order.findUnique).not.toHaveBeenCalled();
   });
 });
 

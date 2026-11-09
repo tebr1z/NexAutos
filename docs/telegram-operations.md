@@ -15,6 +15,7 @@ Botun tokenini dəyişmək yalnız `SUPER_ADMIN` və `ADMIN` rollarına açıqd�
 ## Botda işləmək
 
 - `/menu` — əsas menyu.
+- `/active` — yolda/prosesdə olan aktiv müştərilər; müştərini seçərək yalnız onun aktiv maşınlarını görmək. Ad/telefon axtarışı və səhifələmə var. Alışdan təhvilə qədər bütün mərhələlər daxildir; `DELIVERED` və `CANCELLED` sifarişləri göstərilmir.
 - `/search` — VIN, izləmə/lot kodu, marka/model və ya müştəri ilə axtarış.
 - `/customers` — müştərinin adı və ya telefonu ilə onun maşınlarını tapmaq.
 - `/containers` — konteynerə bağlı maşınları tapmaq.

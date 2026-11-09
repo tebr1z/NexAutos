@@ -23,6 +23,22 @@ export type TelegramCar = {
 
 export type TelegramActionKind = TelegramOrderChangeKind;
 
+export type TelegramActiveCustomer = {
+  id: string;
+  name: string;
+  phone: string | null;
+  activeCarCount: number;
+};
+
+const ACTIVE_ORDER_WHERE = {
+  currentStatus: { notIn: ['DELIVERED', 'CANCELLED'] },
+} satisfies Prisma.OrderWhereInput;
+
+const ACTIVE_CUSTOMER_SELECT = {
+  id: true, name: true, phone: true,
+  _count: { select: { orders: { where: ACTIVE_ORDER_WHERE } } },
+} satisfies Prisma.CustomerSelect;
+
 const CAR_SELECT = {
   id: true, trackingCode: true, vin: true, containerNumber: true, carrierTrackingUrl: true,
   containerOpeningDate: true, currentStatus: true, updatedAt: true,
@@ -76,6 +92,70 @@ function notificationText(result: NotifyResult) {
 @Injectable()
 export class TelegramActionsService {
   constructor(private readonly prisma: PrismaService, private readonly orders: OrdersService) {}
+
+  async activeCustomers(query = '', page = 0): Promise<{ items: TelegramActiveCustomer[]; hasMore: boolean }> {
+    if (typeof query !== 'string' || query.trim().length > 100) throw new BadRequestException('Axtarışı 100 simvoldan qısa yazın.');
+    if (!Number.isInteger(page) || page < 0 || page > 1000) throw new BadRequestException('Axtarış səhifəsi düzgün deyil.');
+    const text = query.trim();
+    const contains = (term: string) => ({ contains: term, mode: 'insensitive' as const });
+    const phoneDigits = text.replace(/\D/g, '');
+    const terms: Prisma.CustomerWhereInput = {
+      AND: text.split(/\s+/).slice(0, 10).map((term) => ({
+        OR: [{ name: contains(term) }, { phone: contains(term.replace(/\D/g, '') || term) }],
+      })),
+    };
+    const phoneSearch = /^[+\d\s().-]+$/.test(text) && phoneDigits.length >= 7;
+    const matching: Prisma.CustomerWhereInput | null = !text ? null : phoneSearch
+      ? { OR: [terms, { phone: contains(normalizePhone(text) ?? phoneDigits) }] }
+      : terms;
+    const where: Prisma.CustomerWhereInput = {
+      orders: { some: ACTIVE_ORDER_WHERE },
+      ...(matching ? { AND: [matching] } : {}),
+    };
+    // Fetch customers once, not one result per car. Count only their unfinished
+    // shipments, and never require a login account for a physical customer.
+    const rows = await this.prisma.customer.findMany({
+      where, select: ACTIVE_CUSTOMER_SELECT,
+      orderBy: [{ name: 'asc' }, { id: 'asc' }], skip: page * 8, take: 9,
+    });
+    return {
+      items: rows.slice(0, 8).map((row) => ({ id: row.id, name: row.name, phone: row.phone || null, activeCarCount: row._count.orders })),
+      hasMore: rows.length > 8,
+    };
+  }
+
+  async activeCustomerCars(customerId: string, page = 0): Promise<{
+    customer: { id: string; name: string; phone: string | null } | null;
+    items: TelegramCar[];
+    hasMore: boolean;
+  }> {
+    if (!Number.isInteger(page) || page < 0 || page > 1000) throw new BadRequestException('Axtarış səhifəsi düzgün deyil.');
+    if (typeof customerId !== 'string' || !customerId || customerId.length > 128 || customerId.trim() !== customerId) {
+      return { customer: null, items: [], hasMore: false };
+    }
+    const row = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true, phone: true } });
+    if (!row) return { customer: null, items: [], hasMore: false };
+    // Use exact identity, never an ambiguous name. Direct Prisma reads avoid
+    // OrdersService helpers whose archived-order reads can delete old records.
+    const rows = await this.prisma.order.findMany({
+      where: { customerId, ...ACTIVE_ORDER_WHERE }, select: CAR_SELECT,
+      orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }], skip: page * 8, take: 9,
+    });
+    return {
+      customer: { id: row.id, name: row.name, phone: row.phone || null },
+      items: rows.slice(0, 8).map(car), hasMore: rows.length > 8,
+    };
+  }
+
+  async activeCustomerCar(customerId: string, orderId: string): Promise<TelegramCar | null> {
+    const validId = (value: unknown): value is string => typeof value === 'string'
+      && value.length > 0 && value.length <= 128 && value.trim() === value;
+    if (!validId(customerId) || !validId(orderId)) return null;
+    const row = await this.prisma.order.findFirst({
+      where: { id: orderId, customerId, ...ACTIVE_ORDER_WHERE }, select: CAR_SELECT,
+    });
+    return row ? car(row) : null;
+  }
 
   async search(query: string, mode: 'all' | 'customer' | 'container' = 'all', page = 0): Promise<{ items: TelegramCar[]; hasMore: boolean }> {
     if (!['all', 'customer', 'container'].includes(mode)) throw new BadRequestException('Axtarış növü düzgün deyil.');

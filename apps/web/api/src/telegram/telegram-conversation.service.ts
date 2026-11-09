@@ -13,6 +13,9 @@ type Button = { text: string; callback_data?: string; url?: string };
 type State = { nonce: string } & (
   | { mode: 'menu' }
   | { mode: 'search'; searchMode: SearchMode }
+  | { mode: 'activeSearch' }
+  | { mode: 'activeCustomers'; query: string; page: number; ids: string[]; hasMore: boolean }
+  | { mode: 'customerCars'; customerId: string; query: string; customerPage: number; page: number; ids: string[]; hasMore: boolean }
   | { mode: 'results'; searchMode: SearchMode; query: string; page: number; ids: string[]; hasMore: boolean }
   | { mode: 'car'; orderId: string }
   | { mode: 'groups'; orderId: string }
@@ -54,12 +57,19 @@ function identifier(value: unknown): value is string {
 }
 function searchMode(value: unknown): value is SearchMode { return SEARCH_MODES.includes(value as SearchMode); }
 function editKind(value: unknown): value is EditKind { return EDIT_KINDS.includes(value as EditKind); }
+function pageNumber(value: unknown) { return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 1000; }
+function resultIds(value: unknown) { return Array.isArray(value) && value.length <= 8 && value.every(identifier); }
 function conversation(value: unknown): State | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const state = value as Record<string, unknown>;
   if (typeof state.nonce !== 'string' || !/^[a-f0-9]{16}$/.test(state.nonce)) return null;
   switch (state.mode) {
-    case 'menu': return state as State;
+    case 'menu': case 'activeSearch': return state as State;
+    case 'activeCustomers': return typeof state.query === 'string' && state.query.length <= 100 && pageNumber(state.page)
+      && resultIds(state.ids) && typeof state.hasMore === 'boolean' ? state as State : null;
+    case 'customerCars': return identifier(state.customerId) && typeof state.query === 'string' && state.query.length <= 100
+      && pageNumber(state.customerPage) && pageNumber(state.page) && resultIds(state.ids)
+      && typeof state.hasMore === 'boolean' ? state as State : null;
     case 'search': return searchMode(state.searchMode) ? state as State : null;
     case 'results': return searchMode(state.searchMode) && typeof state.query === 'string' && state.query.length <= 100
       && Number.isInteger(state.page) && Number(state.page) >= 0 && Number(state.page) <= 1000
@@ -132,11 +142,17 @@ export class TelegramConversationService {
     }
     const command = /^\/([a-z]+)(?:@[A-Za-z0-9_]+)?(?:\s.*)?$/i.exec(text)?.[1]?.toLowerCase();
     if (command) {
-      if (command === 'search') await this.promptSearch(ctx, 'all');
+      if (command === 'active') await this.activeCustomers(ctx, '', 0);
+      else if (command === 'search') await this.promptSearch(ctx, 'all');
       else if (command === 'customers') await this.promptSearch(ctx, 'customer');
       else if (command === 'containers') await this.promptSearch(ctx, 'container');
       else if (command === 'help') await this.help(ctx);
       else await this.menu(ctx, start ? '✅ Telegram hesabınız uğurla qoşuldu.\n\n' : command === 'cancel' ? 'Əməliyyat ləğv edildi. Heç bir dəyişiklik edilmədi.\n\n' : '');
+      return;
+    }
+    if (state?.mode === 'activeSearch' || state?.mode === 'activeCustomers') {
+      if (text.length < 2 || text.length > 100) await this.send(ctx, 'Aktiv müştərini tapmaq üçün 2–100 simvolluq ad və ya telefon yazın. Tam siyahı üçün /active.');
+      else await this.activeCustomers(ctx, text, 0);
       return;
     }
     if (state?.mode === 'search') {
@@ -159,6 +175,42 @@ export class TelegramConversationService {
 
   private async handleCallback(ctx: Context, state: State, verb: string, arg?: string) {
     if (verb === 'menu' || verb === 'cancel') { await this.menu(ctx); return; }
+    if (verb === 'active') { await this.activeCustomers(ctx, '', 0); return; }
+    if (verb === 'activefind' && state.mode === 'activeCustomers') {
+      const next: State = { mode: 'activeSearch', nonce: nonce() };
+      await this.save(ctx, next);
+      await this.send(ctx, '👤 Aktiv müştərinin adını və ya telefon nömrəsini yazın.\n\nYalnız təhvil verilməmiş və ləğv olunmamış maşını olan müştərilər axtarılır.', [[this.button(next, '← Bütün aktiv müştərilər', 'active')], [this.button(next, 'Əsas menyu', 'menu')]]);
+      return;
+    }
+    if (verb === 'activepage' && state.mode === 'activeCustomers') {
+      const page = integer(arg, 1000);
+      if (page !== null && (page === state.page - 1 || page === state.page + 1 && state.hasMore)) await this.activeCustomers(ctx, state.query, page);
+      return;
+    }
+    if (verb === 'customer' && state.mode === 'activeCustomers') {
+      const index = integer(arg, state.ids.length - 1);
+      if (index !== null) await this.customerCars(ctx, state.ids[index], state.query, state.page, 0);
+      return;
+    }
+    if (verb === 'customersback' && state.mode === 'customerCars') {
+      await this.activeCustomers(ctx, state.query, state.customerPage); return;
+    }
+    if (verb === 'customerpage' && state.mode === 'customerCars') {
+      const page = integer(arg, 1000);
+      if (page !== null && (page === state.page - 1 || page === state.page + 1 && state.hasMore)) await this.customerCars(ctx, state.customerId, state.query, state.customerPage, page);
+      return;
+    }
+    if (verb === 'activecar' && state.mode === 'customerCars') {
+      const index = integer(arg, state.ids.length - 1);
+      if (index !== null) {
+        const car = await this.actions.activeCustomerCar(state.customerId, state.ids[index]);
+        if (!car || car.status === 'DELIVERED' || car.status === 'CANCELLED') {
+          await this.send(ctx, 'Bu maşın artıq aktiv siyahıda deyil. Müştərinin cari maşınları yenilənir.');
+          await this.customerCars(ctx, state.customerId, state.query, state.customerPage, state.page);
+        } else await this.car(ctx, car.id, car);
+      }
+      return;
+    }
     if (verb === 'help' && state.mode === 'menu') { await this.help(ctx); return; }
     if (verb === 'search' && state.mode === 'menu' && searchMode(arg)) { await this.promptSearch(ctx, arg); return; }
     if (verb === 'page' && state.mode === 'results') {
@@ -218,6 +270,7 @@ export class TelegramConversationService {
     const state: State = { mode: 'menu', nonce: nonce() };
     await this.save(ctx, state);
     await this.send(ctx, `${prefix}🚘 Auto Nex · Daşınma idarəetməsi\n\n1. Müştəri, VIN, izləmə/lot kodu və ya konteynerlə maşını tapın.\n2. Dəqiq maşını seçin.\n3. Mərhələni və ya logistika məlumatını dəyişib təsdiqləyin.\n\nDəyişiklik saytın izləmə səhifəsində görünəcək. Bütün əməliyyatlar sizin admin hesabınızla qeydə alınır.`, [
+      [this.button(state, '🚚 Yolda olan aktiv müştərilər', 'active')],
       [this.button(state, '🔎 Avtomobil tap', 'search', 'all')],
       [this.button(state, '👤 Müştəriyə görə', 'search', 'customer'), this.button(state, '📦 Konteynerə görə', 'search', 'container')],
       [this.button(state, 'ℹ️ İstifadə qaydası', 'help')],
@@ -227,7 +280,7 @@ export class TelegramConversationService {
   private async help(ctx: Context) {
     const state: State = { mode: 'menu', nonce: nonce() };
     await this.save(ctx, state);
-    await this.send(ctx, 'ℹ️ Necə istifadə etməli?\n\n/search — VIN, izləmə/lot kodu, marka/model və ya müştəri ilə axtarış\n/customers — müştərinin adı və ya telefonu ilə axtarış\n/containers — konteyner nömrəsi ilə axtarış\n/menu — əsas menyu\n/cancel — cari əməliyyatı ləğv et\n\nNəticədə maşının VIN-i, müştərisi və izləmə kodunu yoxlayın. Dəyişiklik yalnız “Təsdiqlə” düyməsindən sonra saxlanır. Bir konteynerdə bir neçə maşın varsa, hər maşın ayrıca seçilib yenilənir.\n\nMüştəri bildirişləri saytın mövcud mərhələ qaydalarına və aktiv WhatsApp/SMS xidmətinə bağlıdır. Bildiriş göndərilməsi saxlanma ilə eyni şey deyil.\n\nTəhlükəsizlik: botu şəxsi söhbətdə istifadə edin. Giriş admin paneldən ləğv edilə bilər; köhnə mesajlardakı düymələr yenidən istifadə edilmir.', [[this.button(state, '← Əsas menyu', 'menu')]]);
+    await this.send(ctx, 'ℹ️ Necə istifadə etməli?\n\n/active — yolda/prosesdə olan aktiv müştərilər və onların maşınları\n/search — VIN, izləmə/lot kodu, marka/model və ya müştəri ilə axtarış\n/customers — müştərinin adı və ya telefonu ilə axtarış\n/containers — konteyner nömrəsi ilə axtarış\n/menu — əsas menyu\n/cancel — cari əməliyyatı ləğv et\n\nAktiv siyahı alışdan təhvilə qədər davam edən sifarişlərdir; təhvil verilmiş və ləğv edilmiş maşınlar daxil deyil.\n\nNəticədə maşının VIN-i, müştərisi və izləmə kodunu yoxlayın. Dəyişiklik yalnız “Təsdiqlə” düyməsindən sonra saxlanır. Bir konteynerdə bir neçə maşın varsa, hər maşın ayrıca seçilib yenilənir.\n\nMüştəri bildirişləri saytın mövcud mərhələ qaydalarına və aktiv WhatsApp/SMS xidmətinə bağlıdır. Bildiriş göndərilməsi saxlanma ilə eyni şey deyil.\n\nTəhlükəsizlik: botu şəxsi söhbətdə istifadə edin. Giriş admin paneldən ləğv edilə bilər; köhnə mesajlardakı düymələr yenidən istifadə edilmir.', [[this.button(state, '← Əsas menyu', 'menu')]]);
   }
 
   private async promptSearch(ctx: Context, mode: SearchMode) {
@@ -237,6 +290,41 @@ export class TelegramConversationService {
       : mode === 'container' ? '📦 Konteyner nömrəsini və ya onun bir hissəsini yazın.'
         : '🔎 VIN, izləmə/lot kodu, müştəri adı/telefonu, konteyner və ya marka/model yazın.';
     await this.send(ctx, `${prompt}\n\nƏn azı 2 simvol. Nəticədən dəqiq maşını seçəcəksiniz.`, [[this.button(state, '← Əsas menyu', 'menu')]]);
+  }
+
+  private async activeCustomers(ctx: Context, query: string, page: number) {
+    let result: Awaited<ReturnType<TelegramActionsService['activeCustomers']>>;
+    try { result = await this.actions.activeCustomers(query, page); }
+    catch { await this.send(ctx, 'Aktiv müştərilərin siyahısı hazırda alınmadı. /active ilə yenidən cəhd edin.'); return; }
+    const state: State = { mode: 'activeCustomers', nonce: nonce(), query, page, ids: result.items.map(item => item.id), hasMore: result.hasMore };
+    await this.save(ctx, state);
+    const rows: Button[][] = result.items.map((item, index) => [this.button(state, `${index + 1}. ${clip(item.name, 38)} · ${item.activeCarCount} maşın`, 'customer', String(index))]);
+    const navigation: Button[] = [];
+    if (page > 0) navigation.push(this.button(state, '← Əvvəlki', 'activepage', String(page - 1)));
+    if (result.hasMore && page < 1000) navigation.push(this.button(state, 'Növbəti →', 'activepage', String(page + 1)));
+    if (navigation.length) rows.push(navigation);
+    rows.push([this.button(state, '🔎 Ad və ya telefonla tap', 'activefind')]);
+    if (query) rows.push([this.button(state, 'Bütün aktiv müştərilər', 'active')]);
+    rows.push([this.button(state, '← Əsas menyu', 'menu')]);
+    const details = result.items.map((item, index) => `${index + 1}. ${clip(item.name, 100)}\nTelefon: ${clip(item.phone || 'Qeyd olunmayıb', 35)} · Aktiv maşın: ${item.activeCarCount}`).join('\n\n');
+    await this.send(ctx, `🚚 Yolda olan aktiv müştərilər · səhifə ${page + 1}\n\nAlışdan təhvilə qədər prosesi davam edən maşınlar göstərilir. Təhvil verilmiş və ləğv olunmuş sifarişlər daxil deyil.${query ? `\nAxtarış: ${clip(query, 100)}` : ''}\n\n${details || (query ? 'Bu axtarışa uyğun aktiv müştəri tapılmadı.' : 'Hazırda aktiv daşınması olan müştəri yoxdur.')}\n\nMüştərini seçərək yalnız onun aktiv maşınlarını görün.`, rows);
+  }
+
+  private async customerCars(ctx: Context, customerId: string, query: string, customerPage: number, page: number) {
+    let result: Awaited<ReturnType<TelegramActionsService['activeCustomerCars']>>;
+    try { result = await this.actions.activeCustomerCars(customerId, page); }
+    catch { await this.send(ctx, 'Müştərinin maşınları hazırda alınmadı. /active ilə yenidən cəhd edin.'); return; }
+    if (!result.customer) { await this.activeCustomers(ctx, query, customerPage); return; }
+    const state: State = { mode: 'customerCars', nonce: nonce(), customerId, query, customerPage, page, ids: result.items.map(item => item.id), hasMore: result.hasMore };
+    await this.save(ctx, state);
+    const rows: Button[][] = result.items.map((item, index) => [this.button(state, `${index + 1}. ${clip(this.vehicle(item), 32)} · ${clip(item.trackingCode, 20)}`, 'activecar', String(index))]);
+    const navigation: Button[] = [];
+    if (page > 0) navigation.push(this.button(state, '← Əvvəlki maşınlar', 'customerpage', String(page - 1)));
+    if (result.hasMore && page < 1000) navigation.push(this.button(state, 'Növbəti maşınlar →', 'customerpage', String(page + 1)));
+    if (navigation.length) rows.push(navigation);
+    rows.push([this.button(state, '← Aktiv müştərilərə qayıt', 'customersback')], [this.button(state, 'Əsas menyu', 'menu')]);
+    const details = result.items.map((item, index) => `${index + 1}. ${this.vehicle(item)}\nVIN: ${clip(item.vin, 32)} · Kod: ${clip(item.trackingCode, 40)}\nMərhələ: ${clip(statusLabelAz(item.status), 140)}\nKonteyner: ${clip(item.containerNumber || 'Əlavə edilməyib', 25)}`).join('\n\n');
+    await this.send(ctx, `👤 ${clip(result.customer.name, 120)}\n📞 ${clip(result.customer.phone || 'Telefon qeyd olunmayıb', 35)}\n🚘 Aktiv maşınlar · səhifə ${page + 1}\n\n${details || 'Bu səhifədə aktiv maşın yoxdur. Siyahını yeniləyin və ya əvvəlki səhifəyə qayıdın.'}\n\nYeniləmək üçün dəqiq maşını seçin.`, rows);
   }
 
   private async results(ctx: Context, query: string, mode: SearchMode, page: number) {
@@ -261,8 +349,8 @@ export class TelegramConversationService {
       : `“${clip(query, 100)}” üçün maşın tapılmadı.\n\nMəlumatın bir hissəsi ilə və ya başqa VIN/müştəri/konteynerlə yenidən axtarın.`, rows);
   }
 
-  private async car(ctx: Context, orderId: string) {
-    const car = await this.actions.get(orderId);
+  private async car(ctx: Context, orderId: string, selected?: TelegramCar) {
+    const car = selected ?? await this.actions.get(orderId);
     if (!car) { await this.menu(ctx, 'Bu maşın artıq mövcud deyil. Yenidən axtarın.\n\n'); return; }
     const state: State = { mode: 'car', nonce: nonce(), orderId };
     await this.save(ctx, state);
@@ -270,6 +358,7 @@ export class TelegramConversationService {
       [this.button(state, '📍 Mərhələni yenilə', 'groups')],
       [this.button(state, '📦 Konteyner nömrəsi', 'edit', 'container'), this.button(state, '🔗 Canlı izləmə linki', 'edit', 'carrier')],
       [this.button(state, '🗓 Konteyner açılma tarixi', 'edit', 'openingDate')],
+      [this.button(state, '🚚 Aktiv müştərilər', 'active')],
       [this.button(state, '← Əsas menyu / yeni axtarış', 'menu')],
     ];
     await this.send(ctx, `🚘 ${this.vehicle(car)}\n👤 Müştəri: ${clip(car.customerName, 150)}\n📞 Telefon: ${clip(car.customerPhone || 'Əlavə edilməyib', 35)}\n🔢 VIN: ${clip(car.vin, 32)}\n🔎 İzləmə kodu: ${clip(car.trackingCode, 80)}\n📍 Mərhələ: ${clip(statusLabelAz(car.status), 180)}\n📦 Konteyner: ${clip(car.containerNumber || 'Əlavə edilməyib', 40)}\n🗓 Açılma tarixi: ${clip(car.containerOpeningDate || 'Əlavə edilməyib', 40)}\n🔗 Daşıyıcı linki: ${clip(car.carrierTrackingUrl || 'Əlavə edilməyib', 900)}\n\nNəyi yeniləmək istəyirsiniz? Dəyişiklik yalnız bu maşına tətbiq olunur.`, rows);

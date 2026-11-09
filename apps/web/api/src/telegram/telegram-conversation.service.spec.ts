@@ -9,6 +9,7 @@ const car = {
   carrierTrackingUrl: null, containerOpeningDate: null, status: 'PURCHASED', updatedAt: '2026-11-09T10:00:00Z',
 };
 const token = 'test-token-not-sent-to-users';
+const customer = { id: 'customer-1', name: 'Test Müştəri', phone: '+994501234567', activeCarCount: 2 };
 const message = (text: string, extra: Record<string, unknown> = {}) => ({
   update_id: 1,
   message: { message_id: 10, from: { id: 101, is_bot: false, username: 'admin_test' }, chat: { id: 101, type: 'private' }, text, ...extra },
@@ -32,6 +33,9 @@ function harness() {
   const http = { call: jest.fn().mockResolvedValue({}) };
   const actions = {
     search: jest.fn().mockResolvedValue({ items: [car], hasMore: false }),
+    activeCustomers: jest.fn().mockResolvedValue({ items: [customer], hasMore: false }),
+    activeCustomerCars: jest.fn().mockResolvedValue({ customer, items: [car], hasMore: false }),
+    activeCustomerCar: jest.fn().mockResolvedValue(car),
     get: jest.fn().mockResolvedValue(car),
     propose: jest.fn().mockResolvedValue({ id: 'action-1', text: 'Honda Accord · NEX-1234\nMüştəri: Test Müştəri\nƏvvəl: Maşın alındı\nSonra: Gəmi yola düşüb' }),
     confirm: jest.fn().mockResolvedValue({ text: 'Dəyişiklik saxlanıldı. Bildiriş: göndərilmədi.', orderId: car.id }),
@@ -99,10 +103,129 @@ describe('Telegram private conversation', () => {
     expect(h.last().text).toContain('Dəqiq maşını seçin');
     expect(h.last().parse_mode).toBeUndefined();
     const buttons = h.last().reply_markup!.inline_keyboard.flat();
-    expect(buttons.length).toBe(4);
+    expect(buttons.length).toBe(5);
     for (const button of buttons) {
       expect(Buffer.byteLength(button.callback_data, 'utf8')).toBeLessThanOrEqual(64);
       expect(button.callback_data).toMatch(/^tg:[a-f0-9]{16}:/);
+    }
+  });
+
+  it('opens active customers from the menu, then exact customer cars without mutating anything', async () => {
+    const h = harness();
+    await h.service.handle(message('/menu'), token);
+    await h.press('Yolda olan aktiv');
+    expect(h.actions.activeCustomers).toHaveBeenCalledWith('', 0);
+    expect(h.last().text).toContain('Aktiv maşın: 2');
+    expect(h.last().text).toContain('Alışdan təhvilə');
+    expect(h.last().text).toContain('Təhvil verilmiş və ləğv olunmuş');
+    await h.press('Test Müştəri');
+    expect(h.actions.activeCustomerCars).toHaveBeenCalledWith('customer-1', 0);
+    expect(h.last().text).toContain(car.vin);
+    expect(h.last().text).toContain(statusLabelAz(car.status));
+    await h.press('Honda');
+    expect(h.state()).toMatchObject({ mode: 'car', orderId: car.id });
+    expect(h.actions.activeCustomerCar).toHaveBeenCalledWith('customer-1', car.id);
+    expect(h.actions.get).not.toHaveBeenCalled();
+    expect(h.actions.propose).not.toHaveBeenCalled();
+    expect(h.actions.confirm).not.toHaveBeenCalled();
+  });
+
+  it('filters active customers by text and preserves the filter and pagination when going back', async () => {
+    const h = harness();
+    h.actions.activeCustomers.mockResolvedValue({ items: [customer], hasMore: true });
+    h.actions.activeCustomerCars.mockResolvedValue({ customer, items: [car], hasMore: true });
+    await h.service.handle(message('/active'), token);
+    await h.press('Ad və ya telefonla');
+    await h.service.handle(message('Test Müştəri'), token);
+    expect(h.actions.activeCustomers).toHaveBeenLastCalledWith('Test Müştəri', 0);
+    await h.press('Növbəti');
+    expect(h.actions.activeCustomers).toHaveBeenLastCalledWith('Test Müştəri', 1);
+    await h.press('Test Müştəri');
+    await h.press('Növbəti maşınlar');
+    expect(h.actions.activeCustomerCars).toHaveBeenLastCalledWith('customer-1', 1);
+    await h.press('Aktiv müştərilərə qayıt');
+    expect(h.actions.activeCustomers).toHaveBeenLastCalledWith('Test Müştəri', 1);
+    await h.press('Bütün aktiv');
+    expect(h.actions.activeCustomers).toHaveBeenLastCalledWith('', 0);
+    expect(h.actions.search).not.toHaveBeenCalled();
+  });
+
+  it('supports direct typing while browsing active customers and validates search input', async () => {
+    const h = harness();
+    await h.service.handle(message('/active'), token);
+    await h.service.handle(message('x'), token);
+    expect(h.actions.activeCustomers).toHaveBeenCalledTimes(1);
+    await h.service.handle(message('050 123 45 67'), token);
+    expect(h.actions.activeCustomers).toHaveBeenLastCalledWith('050 123 45 67', 0);
+  });
+
+  it('does not execute forged, out-of-range or stale active customer callbacks', async () => {
+    const h = harness();
+    await h.service.handle(message('/active'), token);
+    const old = h.button('Test Müştəri');
+    const current = h.state().nonce;
+    await h.service.handle(callback(`tg:${current}:customer:8`), token);
+    await h.service.handle(callback(`tg:${current}:activepage:10`), token);
+    expect(h.actions.activeCustomerCars).not.toHaveBeenCalled();
+    await h.press('Test Müştəri');
+    await h.service.handle(callback(old), token);
+    const carsNonce = h.state().nonce;
+    await h.service.handle(callback(`tg:${carsNonce}:activecar:8`), token);
+    await h.service.handle(callback(`tg:${carsNonce}:customerpage:1`), token);
+    expect(h.actions.activeCustomerCars).toHaveBeenCalledTimes(1);
+    expect(h.actions.get).not.toHaveBeenCalled();
+  });
+
+  it.each(['DELIVERED', 'CANCELLED'])('refreshes a stale active car selection that is now %s', async status => {
+    const h = harness();
+    await h.service.handle(message('/active'), token);
+    await h.press('Test Müştəri');
+    h.actions.activeCustomerCar.mockResolvedValueOnce({ ...car, status });
+    h.actions.activeCustomerCars.mockResolvedValueOnce({ customer, items: [], hasMore: false });
+    await h.press('Honda');
+    expect(h.state()).toMatchObject({ mode: 'customerCars', ids: [] });
+    expect(h.sent().some(item => item.text.includes('artıq aktiv siyahıda deyil'))).toBe(true);
+    expect(h.actions.propose).not.toHaveBeenCalled();
+  });
+
+  it('shows honest empty states and hides active query infrastructure failures', async () => {
+    const h = harness();
+    h.actions.activeCustomers.mockResolvedValueOnce({ items: [], hasMore: false });
+    await h.service.handle(message('/active'), token);
+    expect(h.last().text).toContain('aktiv daşınması olan müştəri yoxdur');
+    h.actions.activeCustomers.mockRejectedValueOnce(new Error('database password secret'));
+    await h.service.handle(message('/active'), token);
+    expect(h.last().text).toContain('hazırda alınmadı');
+    expect(JSON.stringify(h.sent())).not.toContain('database password');
+    await h.service.handle(message('/active'), token);
+    h.actions.activeCustomerCars.mockResolvedValueOnce({ customer: null as never, items: [], hasMore: false });
+    await h.press('Test Müştəri');
+    expect(h.state()).toMatchObject({ mode: 'activeCustomers' });
+  });
+
+  it('never exposes active customers after authorization is revoked', async () => {
+    const h = harness();
+    await h.service.handle(message('/active'), token);
+    const selected = h.button('Test Müştəri');
+    h.revoke();
+    await h.service.handle(callback(selected), token);
+    await h.service.handle(message('/active'), token);
+    expect(h.actions.activeCustomerCars).not.toHaveBeenCalled();
+    expect(h.actions.activeCustomers).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps eight long active customer/car results within Telegram size and callback byte limits', async () => {
+    const h = harness();
+    h.actions.activeCustomers.mockResolvedValue({ items: Array.from({ length: 8 }, (_, i) => ({ ...customer, id: `customer-${i}`, name: '<\n>' + 'Ə'.repeat(300) })), hasMore: true });
+    h.actions.activeCustomerCars.mockResolvedValue({ customer, items: Array.from({ length: 8 }, (_, i) => ({ ...car, id: `car-${i}`, make: 'M'.repeat(200), model: 'N'.repeat(200) })), hasMore: true });
+    await h.service.handle(message('/active'), token);
+    const selected = h.last().reply_markup!.inline_keyboard[0][0].callback_data;
+    await h.service.handle(callback(selected), token);
+    expect(h.last().text).toContain('8.');
+    for (const sent of h.sent()) {
+      expect([...sent.text].length).toBeLessThanOrEqual(4096);
+      expect(sent.parse_mode).toBeUndefined();
+      for (const button of sent.reply_markup?.inline_keyboard.flat() ?? []) expect(Buffer.byteLength(button.callback_data)).toBeLessThanOrEqual(64);
     }
   });
 
