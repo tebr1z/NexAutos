@@ -82,7 +82,21 @@ function readPayload(value: Prisma.JsonValue): ActionPayload {
 }
 
 function notificationText(result: NotifyResult) {
-  if (result.sent) return `Müştəriyə bildiriş göndərildi (${result.channel === 'whatsapp' ? 'WhatsApp' : result.channel === 'sms' ? 'SMS' : 'bildiriş xidməti'}).`;
+  if (result.channelResults) {
+    const lines = (['whatsapp', 'sms'] as const).flatMap((channel) => {
+      const outcome = result.channelResults?.[channel];
+      if (!outcome) return [];
+      if (channel === 'sms' && outcome.error === 'disabled') return [];
+      const name = channel === 'whatsapp' ? 'WhatsApp' : 'SMS';
+      if (outcome.sent) return [`${name}: xidmət bildirişi göndərilmək üçün qəbul etdi.`];
+      if (outcome.outcome === 'unknown') return [`${name}: nəticə qeyri-müəyyəndir; avtomatik təkrar göndərilmir.`];
+      if (outcome.error === 'not_configured') return [`${name}: xidmət sazlanmayıb, bu kanalla bildiriş getmədi.`];
+      if (outcome.error === 'disabled') return [`${name}: bu kanal deaktivdir.`];
+      return [`${name}: xidmət bildirişi qəbul etmədi; admin paneldən yoxlayın.`];
+    });
+    return `${lines.join('\n')}\nXidmətin qəbulu müştəriyə çatdırılma və ya oxunma təsdiqi deyil.`;
+  }
+  if (result.sent) return `${result.channel === 'whatsapp' ? 'WhatsApp' : result.channel === 'sms' ? 'SMS' : 'Bildiriş'} xidməti bildirişi göndərilmək üçün qəbul etdi. Bu, çatdırılma təsdiqi deyil.`;
   if (result.error === 'skipped') return 'Bu mərhələ üçün avtomatik müştəri bildirişi nəzərdə tutulmayıb.';
   if (result.error === 'no_phone') return 'Müştərinin düzgün telefon nömrəsi yoxdur; bildiriş göndərilmədi.';
   if (result.error === 'not_configured') return 'Bildiriş xidməti sazlanmayıb; müştəriyə bildiriş göndərilmədi.';

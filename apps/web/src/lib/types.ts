@@ -25,6 +25,26 @@ export type TrackingPhoto = {
   category?: string;
 };
 
+export type NotifyChannelResult = {
+  sent: boolean;
+  outcome?: "accepted" | "failed" | "unknown";
+  error?: string;
+};
+
+export type NotifyInfo = {
+  sent: boolean;
+  channel?: string;
+  error?: string;
+  channelResults?: { whatsapp?: NotifyChannelResult; sms?: NotifyChannelResult };
+};
+
+export type PhotoNotificationInfo = {
+  queued: boolean;
+  pendingPhotos?: number;
+  dueAt?: string;
+  error?: "enqueue_failed";
+};
+
 export type TransitStop = {
   place: string;
   occurredAt?: string;

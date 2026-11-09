@@ -34,14 +34,20 @@ export const TRACKING_STEPS = [
 
 export type ShipmentStatus = (typeof TRACKING_STEPS)[number]["key"] | "CANCELLED";
 
-/** WhatsApp/SMS yalnız bu mərhələlərdə — qalanları izləmə səhifəsində görünür, mesaj getmir. */
+/** Əsas WhatsApp bildiriş mərhələləri; adi SMS yalnız ayrıca aktivləşdirildikdə işləyir. */
 export const SMS_NOTIFY_STATUSES = [
   "PURCHASED",
+  "PAYMENT_RECEIVED",
   "EXPORT_DOCUMENTS",
   "EXPORT_READY",
+  "PICKED_UP",
   "LOADED_CONTAINER",
   "SHIP_DEPARTED",
   "DESTINATION_PORT",
+  "CONTAINER_OPENED",
+  "TIR_LOADED",
+  "CUSTOMS_DOCUMENTS_READY",
+  "TIR_DEPARTED",
   "TIR_BAKU_CUSTOMS",
   "READY_FOR_DELIVERY",
   "DELIVERED",

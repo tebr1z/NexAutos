@@ -12,7 +12,7 @@ import {
   replaceLocalOrder,
   mergeRemotePreserveLocal,
 } from "@/lib/local-orders";
-import type { TrackingShipment } from "@/lib/types";
+import type { TrackingShipment, NotifyInfo, NotifyChannelResult, PhotoNotificationInfo } from "@/lib/types";
 import { TRACKING_STEPS, locationForStatus, isLiveVesselMapStatus, type ShipmentStatus } from "@/lib/constants";
 import { normalizePhone } from "@/lib/sms";
 import { buildJourney, journeyPosition, selectedJourneyValue, transitLabel, normalizeTransits } from "@/lib/journey";
@@ -22,7 +22,6 @@ import { emptyPhotos, flattenPhotos, photosFromList, type PhotosByCategory } fro
 import { fitDataUrl } from "@/lib/fit-image";
 import { daysLeftInArchive, isDelivered, normalizeTrackingCode } from "@/lib/archive";
 
-type NotifyInfo = { sent?: boolean; channel?: string; error?: string };
 type Screen = "list" | "create" | "edit";
 
 const inp =
@@ -117,11 +116,12 @@ function createOrderBody(shipment: TrackingShipment) {
   };
 }
 
-async function pushOrderPhotos(orderId: string, photos: TrackingShipment["photos"]) {
+async function pushOrderPhotos(orderId: string, photos: TrackingShipment["photos"]): Promise<TrackingShipment & { photoNotification?: PhotoNotificationInfo }> {
   const keepIds: string[] = [];
   const keepUrls: string[] = [];
   let last: TrackingShipment | null = null;
   const failed: string[] = [];
+  let photoNotification: PhotoNotificationInfo | undefined;
 
   if (!photos.length) {
     return api.pruneOrderPhotos(orderId, [], []);
@@ -154,6 +154,14 @@ async function pushOrderPhotos(orderId: string, photos: TrackingShipment["photos
         caption: photo.caption,
       });
       last = uploaded;
+      if (uploaded.photoNotification) {
+        photoNotification = photoNotification?.error || uploaded.photoNotification.error
+          ? { queued: false, error: "enqueue_failed" }
+          : uploaded.photoNotification;
+      } else {
+        // Older API responses do not prove that an automatic job was queued.
+        photoNotification = { queued: false, error: "enqueue_failed" };
+      }
       const added = uploaded.photos?.find((row) => row.id === uploaded.uploadedPhotoId);
       const id = uploaded.uploadedPhotoId;
       if (id) keepIds.push(id);
@@ -170,17 +178,51 @@ async function pushOrderPhotos(orderId: string, photos: TrackingShipment["photos
     throw new Error(failed[0] || "Şəkillər Cloudflare R2-yə yazılmadı. Yenidən Yadda saxla basın.");
   }
   last = await api.pruneOrderPhotos(orderId, keepIds, keepUrls);
-  return last;
+  return { ...last, photoNotification };
+}
+
+function channelNotice(label: string, result: NotifyChannelResult) {
+  if (result.sent && result.outcome !== "failed" && result.outcome !== "unknown") return `${label}: xidmət göndərmə üçün qəbul etdi.`;
+  if (result.outcome === "unknown") return `${label}: nəticə qeyri-müəyyəndir; təkrar göndərməzdən əvvəl xidmətdə yoxlayın.`;
+  if (result.error === "not_configured") return `${label}: xidmət qurulmayıb.`;
+  if (result.error === "disabled") return `${label}: bu bildirişlər söndürülüb.`;
+  if (result.error === "no_phone") return `${label}: düzgün telefon nömrəsi yoxdur.`;
+  return `${label}: xidmət göndərişi qəbul etmədi.`;
+}
+
+function notificationNotice(phone: string | undefined, notify?: NotifyInfo) {
+  if (notify?.error === "skipped") return "Bu mərhələdə avtomatik WhatsApp bildirişi nəzərdə tutulmayıb.";
+  if (notify?.error === "unchanged") return "Mərhələ dəyişməyib; təkrar bildiriş göndərilmədi.";
+  if (notify?.error === "no_new_photos" || notify?.error === "photos_no_new") return "Növbədə yeni şəkil yoxdur; əvvəlki şəkillər üçün təkrar bildiriş göndərilmədi.";
+  if (notify?.error === "already_processed" || notify?.error === "photos_already_notified") return "Bu şəkillərin bildirişi artıq emal olunub; təkrar göndərilmədi.";
+  if (notify?.error === "in_progress" || notify?.error === "photos_processing") return "Şəkil bildirişi hazırda emal olunur; əlavə göndəriş başladılmadı.";
+  if (!normalizePhone(phone) || notify?.error === "no_phone") return "Düzgün telefon nömrəsi yoxdur — bildiriş göndərilmədi.";
+  if (notify?.channelResults) {
+    const results = notify.channelResults;
+    return [
+      results.whatsapp ? channelNotice("WhatsApp", results.whatsapp) : "WhatsApp: göndəriş nəticəsi yoxdur.",
+      results.sms?.error === "disabled" ? null : results.sms ? channelNotice("SMS", results.sms) : "SMS: göndəriş nəticəsi yoxdur.",
+      "Xidmətin qəbulu müştəriyə çatdırılma təsdiqi deyil.",
+    ].filter(Boolean).join(" ");
+  }
+  // Backwards-compatible feedback must not relabel a WhatsApp acceptance as SMS.
+  if (notify?.sent) {
+    const channel = notify.channel === "sms" ? "SMS" : notify.channel === "whatsapp" ? "WhatsApp" : "Bildiriş";
+    return `${channel}: xidmət göndərmə üçün qəbul etdi. Müştəriyə çatdırılma təsdiqi yoxdur.`;
+  }
+  if (notify?.error === "not_configured") return "WhatsApp bildiriş xidməti qurulmayıb — ayarları administrator yoxlamalıdır.";
+  if (notify?.error === "unknown") return "Göndəriş nəticəsi qeyri-müəyyəndir; təkrar göndərməzdən əvvəl xidmətdə yoxlayın.";
+  return "Bildiriş göndərilməsi təsdiqlənmədi. WhatsApp ayarlarını yoxlayın.";
 }
 
 function stageNotice(label: string, phone: string | undefined, notify?: NotifyInfo) {
-  if (notify?.error === "skipped") return `${label} yeniləndi. Bu mərhələ üçün WhatsApp/SMS getmir.`;
-  if (!normalizePhone(phone)) return `${label} yeniləndi. WhatsApp nömrəsi yoxdur — SMS getmədi.`;
-  if (notify?.sent) return `${label} yeniləndi. Müştəriyə SMS göndərildi.`;
-  if (notify?.error === "not_configured") {
-    return `${label} yeniləndi. SMS xidməti qurulmayıb — Twilio və ya WhatsApp açarını .env-ə yazın.`;
-  }
-  return `${label} yeniləndi. SMS göndərilmədi.`;
+  return `${label} yeniləndi. ${notificationNotice(phone, notify)}`;
+}
+
+function photoQueueNotice(info?: PhotoNotificationInfo) {
+  return info?.queued && !info.error
+    ? "Yeni şəkillər saxlanıldı. WhatsApp bildirişi avtomatik növbəyə alındı; əlavə klik lazım deyil."
+    : "Şəkillər saxlanıldı, amma WhatsApp bildirişinin avtomatik növbəyə alınması təsdiqlənmədi. Administrator bildiriş növbəsini yoxlamalıdır.";
 }
 
 function stageLabel(order: TrackingShipment) {
@@ -355,7 +397,7 @@ export default function AdminHomePage() {
     setPhotos(photosFromList(order.photos ?? []));
     setNotice("");
     setSmsText("");
-    setPhotoSmsReady(Boolean(order.photos?.length));
+    setPhotoSmsReady(false);
     const linked = contracts.find((row) => row.trackingCode === order.trackingCode && row.status === "SIGNED");
     setContractId(linked?.id ?? "");
   }
@@ -404,11 +446,11 @@ export default function AdminHomePage() {
 
   async function sendCustomerSms(order: TrackingShipment, kind: "photos" | "custom") {
     if (!order.id) {
-      setNotice("Əvvəl maşını Yadda saxla, sonra SMS göndər.");
+      setNotice("Əvvəl maşını yadda saxlayın, sonra bildiriş göndərin.");
       return;
     }
     if (kind === "custom" && !smsText.trim()) {
-      setNotice("SMS mətnini yazın.");
+      setNotice("Bildiriş mətnini yazın.");
       return;
     }
     setSaving(true);
@@ -418,27 +460,17 @@ export default function AdminHomePage() {
         text: kind === "custom" ? smsText.trim() : undefined,
         phone: form.phone.trim() || order.customerPhone,
       });
-      if (saved.notify?.sent) {
-        setNotice(
-          kind === "photos"
-            ? "Yeni şəkillər haqqında SMS/WhatsApp getdi (marka, model və track linki daxil)."
-            : "Müştəriyə SMS/WhatsApp getdi (marka, model və track linki avtomatik əlavə olundu).",
-        );
-        if (kind === "photos") setPhotoSmsReady(false);
-        if (kind === "custom") setSmsText("");
-      } else if (saved.notify?.error === "no_phone") {
-        setNotice("WhatsApp nömrəsi yoxdur — SMS getmədi.");
-      } else {
-        setNotice(saved.notify?.error ? `SMS getmədi: ${saved.notify.error}` : "SMS getmədi.");
-      }
+      setNotice(notificationNotice(saved.customerPhone || form.phone.trim() || order.customerPhone, saved.notify));
+      if (kind === "photos") setPhotoSmsReady(false);
+      if (kind === "custom" && saved.notify?.sent) setSmsText("");
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "SMS göndərilmədi.");
+      setNotice(err instanceof Error ? err.message : "Bildiriş göndərilməsi təsdiqlənmədi.");
     } finally {
       setSaving(false);
     }
   }
 
-  async function applyStage(order: TrackingShipment, status: ShipmentStatus, currentTransitIndex = -1) {
+  async function applyStage(order: TrackingShipment, status: ShipmentStatus, currentTransitIndex = -1): Promise<TrackingShipment & { notify?: NotifyInfo }> {
     if (status === order.currentStatus && currentTransitIndex === (order.currentTransitIndex ?? -1)) {
       return order;
     }
@@ -493,7 +525,7 @@ export default function AdminHomePage() {
       const next = mergeRemotePreserveLocal(localNext, remote);
       persist(next, order.trackingCode);
       setNotice(stageNotice(label, next.customerPhone, notify));
-      return next;
+      return { ...next, notify };
     }
     const saved = updateLocalOrder(order.trackingCode, { ...patch, customerPhone: phone }) ?? localNext;
     persist(saved, order.trackingCode);
@@ -572,6 +604,8 @@ export default function AdminHomePage() {
     let saved = next;
     let serverOk = Boolean(order.id);
     let metadataSaved = false;
+    let uploadedNotification: PhotoNotificationInfo | undefined;
+    let stageFeedback = "";
 
     try {
       if (order.id) {
@@ -610,6 +644,7 @@ export default function AdminHomePage() {
         serverOk = true;
       } else {
         const remote = await api.createOrder(createOrderBody(next));
+        stageFeedback = stageNotice("Maşın alınıb", remote.customerPhone, remote.notify);
         saved = mergeRemotePreserveLocal(next, remote);
         persist(saved, trackingCode);
         metadataSaved = true;
@@ -617,6 +652,7 @@ export default function AdminHomePage() {
       }
       if (saved.id) {
         const withPhotos = await pushOrderPhotos(saved.id, flattenPhotos(photos));
+        uploadedNotification = withPhotos.photoNotification;
         saved = mergeRemotePreserveLocal(saved, withPhotos);
         persist(saved, trackingCode);
         setPhotos(photosFromList(saved.photos ?? []));
@@ -632,7 +668,9 @@ export default function AdminHomePage() {
 
     if (serverOk && (status !== saved.currentStatus || transitIndex !== (saved.currentTransitIndex ?? -1))) {
       try {
-        await applyStage(saved, status, transitIndex);
+        const staged = await applyStage(saved, status, transitIndex);
+        saved = staged;
+        stageFeedback = [stageFeedback, stageNotice(stageLabel(staged), staged.customerPhone, staged.notify)].filter(Boolean).join(" ");
       } catch (err) {
         setSaving(false);
         setEditingCode(trackingCode);
@@ -645,16 +683,15 @@ export default function AdminHomePage() {
     if (serverOk) {
       const localCount = flattenPhotos(photos).length;
       const remoteCount = saved.photos?.filter((p) => !p.url.startsWith("data:")).length ?? 0;
-      if (hadNewPhotos && remoteCount > 0) setPhotoSmsReady(true);
-      setNotice(
-        localCount && remoteCount < localCount
+      if (hadNewPhotos && remoteCount > 0) setPhotoSmsReady(Boolean(uploadedNotification?.queued));
+      const saveFeedback = localCount && remoteCount < localCount
           ? `Maşın yazıldı, amma ${localCount - remoteCount} şəkil müştəri səhifəsinə düşmədi. Yenidən Yadda saxla basın.`
           : hadNewPhotos
-            ? "Yadda saxlanıldı. Aşağıda «Yeni şəkillər SMS» ilə müştəriyə xəbər verin."
+            ? photoQueueNotice(uploadedNotification)
             : localCount
               ? "Yadda saxlanıldı. Şəkillər müştəri izləmə səhifəsində görünməlidir."
-              : "Yadda saxlanıldı. Müştəri izləmə linkindən görə bilər.",
-      );
+              : "Yadda saxlanıldı. Müştəri izləmə linkindən görə bilər.";
+      setNotice([stageFeedback, saveFeedback].filter(Boolean).join(" "));
     }
     setEditingCode(trackingCode);
   }
@@ -706,24 +743,30 @@ export default function AdminHomePage() {
     setCreated(trackingCode);
 
     let saved = shipment;
+    let purchaseFeedback = "";
     try {
       const remote = await api.createOrder({
         ...createOrderBody(shipment),
         phone: form.phone.trim() || shipment.customerPhone,
       });
+      purchaseFeedback = stageNotice("Maşın alınıb", remote.customerPhone, remote.notify);
+      setNotice(purchaseFeedback);
       saved = mergeRemotePreserveLocal(shipment, remote);
       persist(saved, trackingCode);
       if (saved.id) {
-        saved = mergeRemotePreserveLocal(saved, await pushOrderPhotos(saved.id, flattenPhotos(photos)));
+        const withPhotos = await pushOrderPhotos(saved.id, flattenPhotos(photos));
+        saved = mergeRemotePreserveLocal(saved, withPhotos);
         persist(saved, trackingCode);
+        if (flattenPhotos(photos).some((row) => row.url.startsWith("data:image/"))) {
+          setNotice([purchaseFeedback, photoQueueNotice(withPhotos.photoNotification)].filter(Boolean).join(" "));
+        }
       }
       setCreated(saved.trackingCode);
     } catch (err) {
-      setNotice(
-        saved.id
+      const saveError = saved.id
           ? `Maşın serverə yazıldı, amma şəkillər tam yüklənmədi. Redaktədən yenidən yadda saxlayın.${err instanceof Error ? ` ${err.message}` : ""}`
-          : `Bu, yalnız brauzerdəki qaralamadır; müştəri izləyə bilmir. Qaralamanı açıb yenidən yadda saxlayın.${err instanceof Error ? ` ${err.message}` : ""}`,
-      );
+          : `Bu, yalnız brauzerdəki qaralamadır; müştəri izləyə bilmir. Qaralamanı açıb yenidən yadda saxlayın.${err instanceof Error ? ` ${err.message}` : ""}`;
+      setNotice([purchaseFeedback, saveError].filter(Boolean).join(" "));
     }
 
     if (contract) {
@@ -962,22 +1005,23 @@ export default function AdminHomePage() {
           <section className="rounded-2xl border border-white/10 p-5"><h2 className="text-base font-medium">Marşrut və xəritə</h2><p className="mb-5 mt-1 text-xs text-zinc-500">Məlumatlar məlum olduqca əlavə edin. Xəritə son təsdiqlənmiş yeri göstərir; daşıyıcının linki ayrıca açılır.</p><VoyageFields value={voyage} onChange={setVoyage} /></section>
           <PhotoFields value={photos} onChange={setPhotos} />
 
-          {photoSmsReady ? (
+          {editingOrder.id && editingOrder.photos.length > 0 ? (
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-              <p className="text-sm text-emerald-200">Yeni şəkillər yükləndi. Müştəriyə track linki + marka/model ilə SMS getsin?</p>
+              <p className="text-sm text-emerald-200">{photoSmsReady ? "Yeni şəkillərin WhatsApp bildirişi avtomatik növbəyə alınıb; əlavə klik lazım deyil." : "Yeni yüklənən şəkillər üçün WhatsApp bildirişi avtomatik hazırlanır. Yalnız növbədə yeni şəkil varsa aşağıdakı düymə onu indi emal edir; əvvəlki bildirişləri təkrarlamır."}</p>
+              <p className="mt-2 text-xs text-emerald-100/70">WhatsApp xidmətinin qəbulu müştəriyə çatdırılma təsdiqi deyil.</p>
               <button
                 type="button"
                 disabled={saving}
                 onClick={() => void sendCustomerSms(editingOrder, "photos")}
                 className="mt-3 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-medium text-black disabled:opacity-50"
               >
-                Yeni şəkillər haqqında SMS göndər
+                WhatsApp bildirişini indi göndər
               </button>
             </div>
           ) : null}
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Müştəriyə SMS</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Müştəriyə bildiriş</p>
             <p className="mt-2 text-sm text-zinc-400">
               Mətnə avtomatik marka, model və track linki əlavə olunur. Nömrə: {form.phone || editingOrder.customerPhone || "yoxdur"}
             </p>
@@ -994,7 +1038,7 @@ export default function AdminHomePage() {
               onClick={() => void sendCustomerSms(editingOrder, "custom")}
               className="mt-3 rounded-xl bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-50"
             >
-              Sistemdən SMS göndər
+              Bildiriş göndər
             </button>
           </div>
 

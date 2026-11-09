@@ -36,7 +36,18 @@ const STATUS_AZ: Record<string, string> = {
   CANCELLED: 'Ləğv edilib',
 };
 
-export type NotifyResult = { sent: boolean; channel?: string; error?: string };
+export type NotifyChannelResult = {
+  sent: boolean;
+  outcome?: 'accepted' | 'failed' | 'unknown';
+  error?: string;
+};
+
+export type NotifyResult = {
+  sent: boolean;
+  channel?: string;
+  error?: string;
+  channelResults?: { whatsapp: NotifyChannelResult; sms: NotifyChannelResult };
+};
 
 // Accepted by the provider is not a delivery/read receipt. Unknown outcomes must
 // never be retried automatically: the first request may already have been sent.
@@ -73,11 +84,17 @@ export function statusLabelAz(status: string) {
 
 const SMS_NOTIFY_STATUSES = new Set([
   'PURCHASED',
+  'PAYMENT_RECEIVED',
+  'PICKED_UP',
   'EXPORT_DOCUMENTS',
   'EXPORT_READY',
   'LOADED_CONTAINER',
   'SHIP_DEPARTED',
   'DESTINATION_PORT',
+  'CONTAINER_OPENED',
+  'TIR_LOADED',
+  'TIR_DEPARTED',
+  'CUSTOMS_DOCUMENTS_READY',
   'TIR_BAKU_CUSTOMS',
   'READY_FOR_DELIVERY',
   'DELIVERED',
@@ -202,19 +219,86 @@ export class NotifyService {
     model?: string | null;
   }): Promise<NotifyResult> {
     if (!shouldNotifyStatus(input.status)) return { sent: false, error: 'skipped' };
-    const to = normalizePhone(input.phone);
-    if (!to) return { sent: false, error: 'no_phone' };
     const body = statusSmsBody({ ...input, siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? process.env.CORS_ORIGIN });
+    return this.sendImportantShipmentMessage(input.phone, body);
+  }
+
+  async photosAdded(input: {
+    phone?: string | null;
+    trackingCode: string;
+    make?: string | null;
+    model?: string | null;
+  }): Promise<NotifyResult> {
+    const body = [
+      'Auto Nex: maşınınıza yeni şəkillər əlavə olundu. Şəkillərə izləmə linkindən baxın.',
+      trackSmsFooter(input),
+    ].join('\n');
+    return this.sendImportantShipmentMessage(input.phone, body);
+  }
+
+  /** Important shipment events intentionally try both channels once. API
+   * acceptance is not a delivery receipt, and uncertain requests are not retried. */
+  private async sendImportantShipmentMessage(phone: string | null | undefined, body: string): Promise<NotifyResult> {
+    const to = normalizeCustomerWhatsAppPhone(phone);
+    if (!to) return { sent: false, error: 'no_phone' };
+    const whatsappAttempt = async (): Promise<NotifyChannelResult> => {
+      try {
+        const result = await this.sendCustomerWhatsApp(to, body);
+        return { sent: result.sent, outcome: result.outcome, ...(result.error ? { error: result.error } : {}) };
+      } catch {
+        return { sent: false, outcome: 'unknown', error: 'provider_uncertain' };
+      }
+    };
+    const [whatsapp, sms] = await Promise.all([whatsappAttempt(), this.sendShipmentSms(to, body)]);
+    const channelResults = { whatsapp, sms };
+    if (whatsapp.sent && sms.sent) return { sent: true, channel: 'whatsapp+sms', channelResults };
+    if (whatsapp.sent) return { sent: true, channel: 'whatsapp', channelResults };
+    if (sms.sent) return { sent: true, channel: 'sms', channelResults };
+    const error = whatsapp.outcome === 'unknown' || sms.outcome === 'unknown' ? 'provider_uncertain'
+      : sms.error && !['disabled', 'not_configured'].includes(sms.error) ? sms.error
+        : whatsapp.error && whatsapp.error !== 'not_configured' ? whatsapp.error
+          : sms.error ?? whatsapp.error ?? 'notify_failed';
+    return { sent: false, error, channelResults };
+  }
+
+  /** This SMS path is separate from the legacy fallback sender: a WhatsApp
+   * exception or acceptance must not suppress an important shipment SMS. */
+  private async sendShipmentSms(to: string, body: string): Promise<NotifyChannelResult> {
+    if (process.env.SHIPMENT_SMS_ENABLED?.trim().toLowerCase() !== 'true') {
+      return { sent: false, outcome: 'failed', error: 'disabled' };
+    }
+    const from = process.env.TWILIO_FROM?.trim();
+    const sid = process.env.TWILIO_ACCOUNT_SID?.trim();
+    const token = process.env.TWILIO_AUTH_TOKEN?.trim();
+    if (!from || !sid || !token) return { sent: false, outcome: 'failed', error: 'not_configured' };
+    if ([...body].length > 1600) return { sent: false, outcome: 'failed', error: 'message_too_long' };
     try {
-      const wa = await this.sendWhatsApp(to, body);
-      if (wa.sent) return wa;
-      const sms = await this.sendSms(to, body);
-      if (sms.sent) return sms;
-      return wa.error && wa.error !== 'not_configured' ? wa : sms;
-    } catch (err) {
-      const error = err instanceof Error ? err.message : 'notify_failed';
-      this.log.warn(`Status SMS failed for ${input.trackingCode}: ${error}`);
-      return { sent: false, error };
+      const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        signal: AbortSignal.timeout(15000),
+        redirect: 'error',
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString('base64')}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ To: e164Phone(to), From: from, Body: body }),
+      });
+      if (!response.ok) {
+        const uncertain = response.status >= 500 || response.status === 408;
+        return { sent: false, outcome: uncertain ? 'unknown' : 'failed', error: uncertain ? 'provider_uncertain' : 'provider_rejected' };
+      }
+      const text = await response.text();
+      let payload: { sid?: unknown; status?: unknown; error_code?: unknown } | null = null;
+      try { payload = JSON.parse(text); } catch { /* HTTP 2xx alone cannot prove acceptance. */ }
+      if ((typeof payload?.status === 'string' && ['failed', 'undelivered', 'canceled'].includes(payload.status))
+        || (payload?.error_code != null && payload.error_code !== 0 && payload.error_code !== '0')) {
+        return { sent: false, outcome: 'failed', error: 'provider_rejected' };
+      }
+      return typeof payload?.sid === 'string' && Boolean(payload.sid.trim())
+        ? { sent: true, outcome: 'accepted' }
+        : { sent: false, outcome: 'unknown', error: 'provider_uncertain' };
+    } catch {
+      return { sent: false, outcome: 'unknown', error: 'provider_uncertain' };
     }
   }
 

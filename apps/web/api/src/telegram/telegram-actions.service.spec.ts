@@ -189,6 +189,22 @@ describe('Telegram confirmed order actions', () => {
     expect(result.text).not.toContain('bildiriş göndərildi');
   });
 
+  it.each([
+    [{ whatsapp: { sent: true, outcome: 'accepted' }, sms: { sent: true, outcome: 'accepted' } }, ['WhatsApp: xidmət', 'SMS: xidmət']],
+    [{ whatsapp: { sent: true, outcome: 'accepted' }, sms: { sent: false, outcome: 'failed', error: 'not_configured' } }, ['WhatsApp: xidmət', 'SMS: xidmət sazlanmayıb']],
+    [{ whatsapp: { sent: false, outcome: 'unknown' }, sms: { sent: true, outcome: 'accepted' } }, ['WhatsApp: nəticə qeyri-müəyyəndir', 'SMS: xidmət']],
+    [{ whatsapp: { sent: false, outcome: 'failed' }, sms: { sent: false, outcome: 'failed', error: 'disabled' } }, ['WhatsApp: xidmət bildirişi qəbul etmədi']],
+  ])('reports independent channel outcomes without implying delivery: %j', async (channelResults, phrases) => {
+    const h = harness();
+    h.orders.notifyTelegramStatus.mockResolvedValue({ sent: true, channelResults } as never);
+    await h.service.propose('admin', '111', '111', 'order1', 'status', 'SHIP_DEPARTED');
+    const result = await h.service.confirm('action1', 'admin', '111', '111');
+    for (const phrase of phrases) expect(result.text).toContain(phrase);
+    expect(result.text).toContain('çatdırılma və ya oxunma təsdiqi deyil');
+    expect(result.text).not.toContain('bildiriş göndərildi');
+    expect(h.orders.notifyTelegramStatus).toHaveBeenCalledTimes(1);
+  });
+
   it('shows a saved change even if the postcommit notification provider throws', async () => {
     const h = harness();
     h.orders.notifyTelegramStatus.mockRejectedValue(new Error('provider secret') as never);

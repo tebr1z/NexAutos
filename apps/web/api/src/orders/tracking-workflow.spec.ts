@@ -44,10 +44,61 @@ function harness(extra: Record<string, unknown> = {}) {
   prisma.$transaction.mockImplementation(async (fn) => fn(prisma));
   const notify = { statusChanged: jest.fn().mockResolvedValue({ sent: false, error: 'skipped' }) };
   const service = new OrdersService(prisma as never, {} as never, {} as never, notify as never, {} as never);
-  return { order, prisma, service };
+  return { order, prisma, service, notify };
 }
 
 describe('Tracking workflow', () => {
+  it('notifies PURCHASED exactly once for a genuinely new order and audits its per-channel result', async () => {
+    const { prisma, service, notify } = harness();
+    prisma.order.findUnique.mockResolvedValue(null as never);
+    notify.statusChanged.mockResolvedValueOnce({ sent: true, channel: 'whatsapp', channelResults: {
+      whatsapp: { sent: true, outcome: 'accepted' }, sms: { sent: false, outcome: 'failed', error: 'not_configured' },
+    } } as never);
+    const saved = await service.create({ vin: 'FIRSTVIN', trackingCode: 'TRACK-111', phone: '0501234567' }, 'admin');
+    expect(notify.statusChanged).toHaveBeenCalledTimes(1);
+    expect(notify.statusChanged).toHaveBeenCalledWith(expect.objectContaining({ status: 'PURCHASED', trackingCode: 'TRACK-111' }));
+    expect(saved.notify?.sent).toBe(true);
+    expect(prisma.auditLog.create).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      action: 'CUSTOMER_STATUS_NOTIFICATION', meta: expect.objectContaining({ status: 'PURCHASED', notify: expect.objectContaining({ channelResults: {
+        whatsapp: { sent: true, outcome: 'accepted' }, sms: { sent: false, outcome: 'failed', error: 'not_configured' },
+      } }) }),
+    }) }));
+  });
+
+  it('returns an existing matching order without notifying PURCHASED again', async () => {
+    const { service, notify, prisma } = harness();
+    await service.create({ vin: '1HGCM82633A004352', trackingCode: 'TRACK-123' });
+    expect(prisma.order.create).not.toHaveBeenCalled();
+    expect(notify.statusChanged).not.toHaveBeenCalled();
+  });
+
+  it('retains a new order if the provider or notification-result audit fails', async () => {
+    const { service, notify, prisma } = harness();
+    prisma.order.findUnique.mockResolvedValue(null as never);
+    notify.statusChanged.mockRejectedValueOnce(new Error('private provider details'));
+    prisma.auditLog.create.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('audit unavailable'));
+    const saved = await service.create({ vin: 'FIRSTVIN', trackingCode: 'TRACK-111' });
+    expect(saved.notify).toEqual({ sent: false, error: 'notify_failed' });
+    expect(prisma.order.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not notify again for the same stage, but preserves its note/event save', async () => {
+    const { service, notify, prisma } = harness({ currentStatus: 'TIR_BAKU_CUSTOMS' });
+    const saved = await service.updateStatus('order', { status: 'TIR_BAKU_CUSTOMS', note: 'Additional note' });
+    expect(saved.notify).toEqual({ sent: false, error: 'skipped' });
+    expect(notify.statusChanged).not.toHaveBeenCalled();
+    expect(prisma.order.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      events: { create: expect.objectContaining({ description: 'Additional note' }) },
+    }) }));
+    expect(prisma.$queryRaw).toHaveBeenCalled();
+  });
+
+  it('returns an already saved stage even if its notification-result audit fails', async () => {
+    const { service, notify, prisma } = harness();
+    notify.statusChanged.mockResolvedValueOnce({ sent: true, channel: 'whatsapp' } as never);
+    prisma.auditLog.create.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('audit unavailable'));
+    expect((await service.updateStatus('order', { status: 'TIR_BAKU_CUSTOMS' })).notify?.sent).toBe(true);
+  });
   it('creates a minimal vehicle before logistics/customer details exist', async () => {
     const { prisma, service } = harness();
     prisma.order.findUnique.mockResolvedValue(null as never);

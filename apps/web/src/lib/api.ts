@@ -1,5 +1,5 @@
 import { browserApiBase, nestApiBase } from "./nest-url";
-import type { TrackingShipment, VinRecord, AuthUser } from "./types";
+import type { TrackingShipment, VinRecord, AuthUser, NotifyInfo, PhotoNotificationInfo } from "./types";
 import type { RadarDealSearch, RadarMatch, RadarPlan, RadarSearch, RadarState } from "./lot-radar";
 import { calculatorAccountPath, radarAccountPath, requiredAccountId } from "./account-target";
 import { telegramLinkPath, type TelegramStatus, type TelegramConfig, type TelegramPair } from "./telegram";
@@ -342,9 +342,9 @@ export const api = {
   orders: () => request<TrackingShipment[]>("/orders"),
   myOrders: () => request<TrackingShipment[]>("/orders/mine"),
   createOrder: (payload: Record<string, unknown>) =>
-    request<TrackingShipment>("/orders", { method: "POST", body: JSON.stringify(payload) }),
+    request<TrackingShipment & { notify?: NotifyInfo }>("/orders", { method: "POST", body: JSON.stringify(payload) }),
   updateOrderStatus: (id: string, status: string, note?: string, currentTransitIndex?: number, phone?: string) =>
-    request<TrackingShipment & { notify?: { sent: boolean; channel?: string; error?: string } }>(
+    request<TrackingShipment & { notify?: NotifyInfo }>(
       `/orders/${id}/status`,
       {
         method: "PATCH",
@@ -404,12 +404,12 @@ export const api = {
       message: string;
     }>(`/insurance/receipt/${encodeURIComponent(token)}`),
   confirmInsurancePayout: (id: string) =>
-    request<TrackingShipment & { notify?: { sent: boolean; channel?: string; error?: string }; receiptUrl: string }>(
+    request<TrackingShipment & { notify?: NotifyInfo; receiptUrl: string }>(
       `/orders/${id}/insurance/payout`,
       { method: "POST" },
     ),
   sendCustomerSms: (id: string, payload: { kind?: string; text?: string; phone?: string }) =>
-    request<TrackingShipment & { notify?: { sent: boolean; channel?: string; error?: string } }>(
+    request<TrackingShipment & { notify?: NotifyInfo }>(
       `/orders/${id}/sms`,
       { method: "POST", body: JSON.stringify(payload) },
     ),
@@ -429,7 +429,7 @@ export const api = {
       notify?: boolean;
     },
   ) =>
-    request<TrackingShipment & { notify?: { sent: boolean; channel?: string; error?: string } }>(
+    request<TrackingShipment & { notify?: NotifyInfo }>(
       `/orders/${id}/insurance`,
       { method: "PATCH", body: JSON.stringify(payload) },
     ),
@@ -439,7 +439,7 @@ export const api = {
       body: JSON.stringify({ keepIds, keepUrls }),
     }),
   addOrderPhoto: (id: string, payload: { url: string; category?: string; caption?: string }) =>
-    request<TrackingShipment & { uploadedPhotoId: string }>(`/orders/${id}/photos`, {
+    request<TrackingShipment & { uploadedPhotoId: string; photoNotification?: PhotoNotificationInfo }>(`/orders/${id}/photos`, {
       method: "POST",
       body: JSON.stringify({
         url: payload.url,

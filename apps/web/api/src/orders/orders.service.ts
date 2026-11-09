@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException, Logger, Optional } from '@nestjs/common';
 import { randomBytes, timingSafeEqual } from 'crypto';
 import { Prisma, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -9,6 +9,7 @@ import { CreateInsuranceDto, CreateOrderDto, CreateOrderReviewDto, TrackingDetai
 import { generateTrackingCode, hasInsuranceRecord, mapContractSummary, mapOrder, ORDER_INCLUDE, parseTransitRoute } from './order.mapper';
 import { NotifyService, normalizePhone, siteBase, statusLabelAz, type NotifyResult } from '../notify/notify.service';
 import { CloudinaryStorage } from '../storage/cloudinary.storage';
+import { PhotoNotificationsService, safeShipmentNotifyResult, type PhotoNotificationQueueResult } from './photo-notifications.service';
 
 function opt(value?: string | null) {
   if (value === undefined) return undefined;
@@ -196,13 +197,25 @@ type TelegramNotificationOrder = {
 
 @Injectable()
 export class OrdersService {
+  private readonly log = new Logger(OrdersService.name);
+
   constructor(
     private prisma: PrismaService,
     private containers: ContainersService,
     private vessels: VesselsService,
     private notify: NotifyService,
     private cloud: CloudinaryStorage,
+    @Optional() private photoNotifications?: PhotoNotificationsService,
   ) {}
+
+  private async auditStatusNotification(orderId: string, status: string, notify: NotifyResult, userId?: string) {
+    try {
+      await this.prisma.auditLog.create({ data: {
+        userId, action: 'CUSTOMER_STATUS_NOTIFICATION', entity: 'Order', entityId: orderId,
+        meta: { status, notify: safeShipmentNotifyResult(notify) } as Prisma.InputJsonValue,
+      } });
+    } catch { this.log.warn('Shipment notification result could not be audited; the saved shipment was retained.'); }
+  }
 
   private async syncCustomer(customerId: string, dto: { phone?: string; customerName?: string }) {
     const name = dto.customerName?.trim();
@@ -323,7 +336,18 @@ export class OrdersService {
       },
     });
 
-    return mapOrder(order);
+    let notify: NotifyResult;
+    try {
+      notify = await this.notify.statusChanged({
+        phone: order.customer.phone, trackingCode: order.trackingCode, status: 'PURCHASED',
+        make: order.vehicle?.make, model: order.vehicle?.model,
+      });
+    } catch {
+      this.log.warn('New-order notification failed; the saved order was retained.');
+      notify = { sent: false, error: 'notify_failed' };
+    }
+    await this.auditStatusNotification(order.id, 'PURCHASED', notify, userId);
+    return { ...mapOrder(order), notify };
   }
 
   async attachContainer(id: string, containerNumber: string, userId?: string) {
@@ -701,7 +725,9 @@ export class OrdersService {
       kind === 'photos'
         ? 'Auto Nex: maşınınıza yeni şəkillər əlavə olundu. Track linkindən baxın.'
         : dto.text?.trim() || 'Auto Nex: göndərişiniz haqqında yenilik.';
-    const notify = await this.notify.customerUpdate({
+    const notify = kind === 'photos'
+      ? this.photoNotifications ? await this.photoNotifications.flush(id, true, userId) : { sent: false, error: 'not_configured' }
+      : await this.notify.customerUpdate({
       phone: dto.phone || order.customer.phone,
       trackingCode: order.trackingCode,
       make: order.vehicle?.make,
@@ -981,10 +1007,17 @@ export class OrdersService {
     if (dto.phone !== undefined && (typeof dto.phone !== 'string' || (dto.phone.trim() && !normalizePhone(dto.phone)))) {
       throw new BadRequestException('Düzgün telefon yazın — məsələn 050 719 75 57 və ya 994705990399.');
     }
-    const existing = await this.prisma.order.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
     const status = dto.status as ShipmentStatus;
     if (!Object.values(ShipmentStatus).includes(status)) throw new BadRequestException('İzləmə mərhələsi düzgün deyil.');
+    const { existing, order, changed } = await this.prisma.$transaction(async (tx) => {
+    // Follow Telegram's User -> Order lock order before the audit's user FK.
+    if (userId) await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR KEY SHARE`;
+    // Compare under the write lock: concurrent repeated admin requests must not
+    // each notify for the same stage. Notes/events retain their existing behavior.
+    await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${id} FOR UPDATE`;
+    const existing = await tx.order.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Göndəriş tapılmadı');
+    const changed = existing.currentStatus !== status;
     const packed =
       dto.currentTransitIndex !== undefined
         ? packTransits((existing as { transitPorts?: unknown }).transitPorts, undefined, dto.currentTransitIndex)
@@ -995,7 +1028,7 @@ export class OrdersService {
       (location.currentCountry !== undefined && location.currentCountry !== existing.currentCountry),
     );
     const title = statusLabelAz(status);
-    const order = await this.prisma.order.update({
+    const order = await tx.order.update({
       where: { id },
       data: {
         currentStatus: status,
@@ -1017,19 +1050,30 @@ export class OrdersService {
       },
       include: ORDER_INCLUDE,
     });
-    await this.prisma.auditLog.create({
+    await tx.auditLog.create({
       data: { userId, action: 'STATUS_UPDATE', entity: 'Order', entityId: id, meta: { status } },
+    });
+    return { existing, order, changed };
     });
     if (dto.phone !== undefined) {
       await this.syncCustomer(existing.customerId, { phone: dto.phone });
     }
-    const notify = await this.notify.statusChanged({
-      phone: dto.phone || order.customer.phone,
-      trackingCode: order.trackingCode,
-      status,
-      make: order.vehicle?.make,
-      model: order.vehicle?.model,
-    });
+    let notify: NotifyResult = { sent: false, error: 'skipped' };
+    if (changed) {
+      try {
+        notify = await this.notify.statusChanged({
+          phone: dto.phone || order.customer.phone,
+          trackingCode: order.trackingCode,
+          status,
+          make: order.vehicle?.make,
+          model: order.vehicle?.model,
+        });
+      } catch {
+        this.log.warn('Shipment notification failed; the saved stage was retained.');
+        notify = { sent: false, error: 'notify_failed' };
+      }
+      await this.auditStatusNotification(id, status, notify, userId);
+    }
     return { ...mapOrder(order), notify };
   }
 
@@ -1128,7 +1172,15 @@ export class OrdersService {
       uploadedPhotoId = created.id;
     }
     const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: ORDER_INCLUDE });
-    return { ...mapOrder(order), uploadedPhotoId };
+    let photoNotification: PhotoNotificationQueueResult;
+    try {
+      if (!this.photoNotifications) throw new Error('Photo notification queue unavailable');
+      photoNotification = await this.photoNotifications.enqueue(orderId, uploadedPhotoId);
+    } catch {
+      this.log.warn('Saved photo could not be queued for notification; the upload was retained.');
+      photoNotification = { queued: false, error: 'enqueue_failed' };
+    }
+    return { ...mapOrder(order), uploadedPhotoId, photoNotification };
   }
 
   async prunePhotos(orderId: string, keepIds: string[] = [], keepUrls: string[] = []) {
