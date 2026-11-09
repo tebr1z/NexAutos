@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import localFont from "next/font/local";
 import { ThemeProvider, type Theme } from "@/providers/theme-provider";
 import { I18nProvider } from "@/providers/i18n-provider";
-import { CurrencyProvider } from "@/providers/currency-provider";
 import { AuthProvider } from "@/providers/auth-provider";
 import { SiteShell } from "@/components/layout/site-shell";
 import { SITE } from "@/lib/constants";
@@ -132,11 +131,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <JsonLd data={jsonLd} />
         <ThemeProvider initialTheme={theme}>
           <I18nProvider>
-            <CurrencyProvider>
-              <AuthProvider>
-                <SiteShell>{children}</SiteShell>
-              </AuthProvider>
-            </CurrencyProvider>
+            <AuthProvider>
+              <SiteShell>{children}</SiteShell>
+            </AuthProvider>
           </I18nProvider>
         </ThemeProvider>
       </body>

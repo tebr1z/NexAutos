@@ -6,7 +6,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Menu, Moon, Search, Sun, UserRound, X } from "lucide-react";
 import { useTheme } from "@/providers/theme-provider";
 import { Logo } from "@/components/brand/logo";
-import { CurrencySwitcher, LocaleSwitcher } from "@/components/layout/locale-switcher";
+import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { useI18n } from "@/providers/i18n-provider";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
@@ -126,7 +126,6 @@ export function Header() {
 
         <div className="hidden items-center gap-2 lg:flex">
           <LocaleSwitcher compact tone={tone} />
-          <CurrencySwitcher tone={tone} />
           <button
             type="button"
             onClick={() => setTheme(isDark ? "light" : "dark")}
@@ -186,7 +185,6 @@ export function Header() {
             </Link>
             <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
               <LocaleSwitcher tone="bar" />
-              <CurrencySwitcher tone="bar" />
             </div>
           </div>
         </div>

@@ -116,15 +116,6 @@ export const LOCALES = [
 
 export type Locale = (typeof LOCALES)[number]["code"];
 
-export const CURRENCIES = [
-  { code: "AZN", symbol: "₼" },
-  { code: "USD", symbol: "$" },
-  { code: "EUR", symbol: "€" },
-  { code: "TRY", symbol: "₺" },
-] as const;
-
-export type Currency = (typeof CURRENCIES)[number]["code"];
-
 export const HERO_VIDEO =
   "https://videos.pexels.com/video-files/2053100/2053100-uhd_2560_1440_30fps.mp4";
 

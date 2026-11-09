@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Globe } from "lucide-react";
-import { CURRENCIES, LOCALES, type Currency } from "@/lib/constants";
+import { LOCALES } from "@/lib/constants";
 import { useI18n } from "@/providers/i18n-provider";
-import { useCurrency } from "@/providers/currency-provider";
 import { cn } from "@/lib/utils";
 
 type Tone = "hero" | "bar";
@@ -41,33 +40,6 @@ export function LocaleSwitcher({ compact = false, tone = "bar" }: { compact?: bo
             <span>{l.name}</span>
           </span>
           {l.code === locale && <Check size={14} className="text-royal" />}
-        </button>
-      ))}
-    </Menu>
-  );
-}
-
-export function CurrencySwitcher({ tone = "bar" }: { tone?: Tone }) {
-  const { currency, setCurrency } = useCurrency();
-  const { t } = useI18n();
-
-  return (
-    <Menu tone={tone} label={<span className="tabular-nums">{currency}</span>} ariaLabel={t.pages.currency}>
-      <p className="px-3 pb-1 pt-2 text-[10px] uppercase tracking-[0.22em] text-muted">{t.pages.currency}</p>
-      {CURRENCIES.map((c) => (
-        <button
-          key={c.code}
-          type="button"
-          onClick={() => setCurrency(c.code as Currency)}
-          className={cn(
-            "flex w-full items-center justify-between gap-6 rounded-lg px-3 py-2.5 text-left text-[13px] transition hover:bg-fg/10",
-            c.code === currency ? "text-fg" : "text-muted",
-          )}
-        >
-          <span>
-            {c.symbol} {c.code}
-          </span>
-          {c.code === currency && <Check size={14} className="text-royal" />}
         </button>
       ))}
     </Menu>

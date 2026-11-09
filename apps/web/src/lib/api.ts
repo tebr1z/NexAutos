@@ -451,7 +451,6 @@ export const api = {
     request<{ name: string; role?: string; rating: number; body: string; avatarUrl?: string }[]>(
       "/testimonials",
     ),
-  rates: () => request<Record<string, number>>("/currency/rates"),
   lookupContainer: (number: string) => request<OceanLookup>(`/containers/${encodeURIComponent(number)}`),
   lookupOcean: async (number: string) => {
     try {
