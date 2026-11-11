@@ -52,6 +52,7 @@ export type TransitStop = {
 
 export type TrackingShipment = {
   id?: string;
+  lookupType?: "vin" | "lot";
   trackingCode: string;
   vin: string;
   make?: string;

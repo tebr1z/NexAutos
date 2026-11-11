@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException, Logger, Optional } from '@nestjs/common';
 import { randomBytes, timingSafeEqual } from 'crypto';
+import { isIP } from 'net';
 import { Prisma, ShipmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ContainersService } from '../containers/containers.service';
@@ -95,6 +96,127 @@ function lookupCode(raw: string) {
   return String(raw || '')
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '');
+}
+
+// VINs and auction lots are public identifiers, not the customer's private tracking key.
+// Keep their query and response separate from resolveOrderByCode (also used for reviews/insurance).
+const PUBLIC_TRACKING_SELECT = {
+  // Used only to screen embedded links/free-form logistics fields, never returned.
+  trackingCode: true,
+  vin: true,
+  auctionHouse: true,
+  currentStatus: true,
+  deliveredAt: true,
+  containerNumber: true,
+  carrierCode: true,
+  carrierName: true,
+  carrierTrackingUrl: true,
+  vesselName: true,
+  voyageNumber: true,
+  originCountry: true,
+  containerStatus: true,
+  originPort: true,
+  destinationPort: true,
+  currentCountry: true,
+  currentPort: true,
+  mapLat: true,
+  mapLng: true,
+  transitPorts: true,
+  eta: true,
+  containerOpeningDate: true,
+  vehicle: { select: { make: true, model: true, year: true, lotNumber: true } },
+  events: { orderBy: { occurredAt: 'asc' as const }, select: { status: true, occurredAt: true } },
+  photos: { select: { id: true, url: true, category: true } },
+} satisfies Prisma.OrderSelect;
+
+type PublicTrackingOrder = Prisma.OrderGetPayload<{ select: typeof PUBLIC_TRACKING_SELECT }>;
+
+function containsPrivateTrackingCode(value: string, code: string) {
+  const key = lookupCode(code);
+  if (!key) return false;
+  let inspected = value;
+  // Decode ASCII percent escapes independently, so one malformed escape cannot
+  // hide an otherwise valid encoded tracking key elsewhere in a URL.
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (lookupCode(inspected).includes(key)) return true;
+    const decoded = inspected.replace(/%([0-9a-f]{2})/gi, (_match, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)));
+    if (decoded === inspected) return false;
+    inspected = decoded;
+  }
+  // Opaque, repeatedly encoded values cannot be screened reliably; fail closed.
+  return lookupCode(inspected).includes(key) || /%[0-9a-f]{2}/i.test(inspected);
+}
+
+function publicTrackingText(value: string | null | undefined, code: string) {
+  return value && !containsPrivateTrackingCode(value, code) ? value : undefined;
+}
+
+function publicTrackingUrl(value: string | null | undefined, code: string, photo = false) {
+  if (!value || containsPrivateTrackingCode(value, code)) return undefined;
+  if (photo && /^\/api\/v1\/media\/photos\/[A-Za-z0-9_-]+$/.test(value)) return value;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || url.username || url.password) return undefined;
+    const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (isIP(host) || !host.includes('.') || /\.(localhost|local|internal)$/.test(host)) return undefined;
+    const siteHosts = ['nex.autos'];
+    try { siteHosts.push(new URL(siteBase()).hostname.toLowerCase().replace(/^www\./, '')); } catch { /* Retain the canonical host guard. */ }
+    const sameSite = siteHosts.some((siteHost) => host === siteHost || host.endsWith(`.${siteHost}`));
+    if (sameSite && (!photo || !/^\/api\/v1\/media\/photos\/[A-Za-z0-9_-]+$/.test(url.pathname) || url.search || url.hash)) return undefined;
+    return url.href;
+  } catch {
+    return undefined;
+  }
+}
+
+function publicIdentifierOrder(order: PublicTrackingOrder, identifier: string, lookupType: 'vin' | 'lot') {
+  const transits = parseTransitRoute(order.transitPorts);
+  const text = (value: string | null | undefined) => publicTrackingText(value, order.trackingCode);
+  return {
+    lookupType,
+    // This alias preserves refresh/share URLs without exposing the private tracking code.
+    trackingCode: identifier,
+    vin: order.vin,
+    make: order.vehicle?.make ?? undefined,
+    model: order.vehicle?.model ?? undefined,
+    year: order.vehicle?.year ?? undefined,
+    lotNumber: order.vehicle?.lotNumber ?? undefined,
+    auctionHouse: order.auctionHouse,
+    customerName: '',
+    currentStatus: order.currentStatus,
+    deliveredAt: order.deliveredAt?.toISOString(),
+    containerNumber: text(order.containerNumber),
+    carrierCode: text(order.carrierCode),
+    carrierName: text(order.carrierName),
+    carrierTrackingUrl: publicTrackingUrl(order.carrierTrackingUrl, order.trackingCode),
+    vesselName: text(order.vesselName),
+    voyageNumber: text(order.voyageNumber),
+    originCountry: text(order.originCountry),
+    containerStatus: text(order.containerStatus),
+    originPort: text(order.originPort),
+    destinationPort: text(order.destinationPort),
+    currentCountry: text(order.currentCountry),
+    currentPort: text(order.currentPort),
+    mapLat: order.mapLat ?? undefined,
+    mapLng: order.mapLng ?? undefined,
+    lat: order.mapLat ?? undefined,
+    lng: order.mapLng ?? undefined,
+    transitPorts: transits.stops.map((stop) => ({ place: text(stop.place) ?? '—', occurredAt: text(stop.occurredAt) })),
+    currentTransitIndex: transits.currentIndex,
+    eta: order.eta?.toISOString(),
+    containerOpeningDate: order.containerOpeningDate ?? undefined,
+    events: order.events.map((event) => ({
+      status: event.status,
+      title: statusLabelAz(event.status),
+      occurredAt: event.occurredAt.toISOString(),
+    })),
+    documents: [],
+    photos: order.photos.flatMap((photo) => {
+      const url = photo.url.startsWith('data:image/') || photo.url.startsWith('r2:')
+        ? `/api/v1/media/photos/${photo.id}` : publicTrackingUrl(photo.url, order.trackingCode, true);
+      return url ? [{ id: photo.id, url, category: text(photo.category) }] : [];
+    }),
+  };
 }
 
 function normalizeTrackingCode(raw?: string) {
@@ -443,10 +565,43 @@ export class OrdersService {
     return contract ?? null;
   }
 
+  private async findByPublicIdentifier(code: string) {
+    const identifier = code.trim().replace(/\s+/g, '').toUpperCase();
+    const isVin = /^[A-HJ-NPR-Z0-9]{17}$/.test(identifier);
+    const isLot = /^[A-Z0-9][A-Z0-9-]{2,48}[A-Z0-9]$/.test(identifier);
+    if (!isVin && !isLot) throw new NotFoundException('Göndəriş tapılmadı');
+
+    const identifiers: Prisma.OrderWhereInput[] = [];
+    // Stored VINs are normalized on write. Exact equality uses Order.vin's existing index.
+    if (isVin) identifiers.push({ vin: identifier });
+    if (isLot) identifiers.push({ vehicle: { lotNumber: { equals: identifier, mode: 'insensitive' } } });
+    const cutoff = new Date(Date.now() - ARCHIVE_MS);
+    const orders = await this.prisma.order.findMany({
+      where: {
+        AND: [
+          { OR: identifiers },
+          { OR: [{ currentStatus: { not: 'DELIVERED' } }, { deliveredAt: null }, { deliveredAt: { gte: cutoff } }] },
+        ],
+      },
+      select: PUBLIC_TRACKING_SELECT,
+      take: 2,
+    });
+    // A lot can recur across auctions, and a VIN can have more than one shipment.
+    // Cross-namespace collisions are also ambiguous: never pick a customer's record arbitrarily.
+    if (orders.length > 1) {
+      throw new ConflictException('Bu VIN və ya lot üzrə birdən çox göndəriş var. Şəxsi izləmə kodunu daxil edin.');
+    }
+    const order = orders[0];
+    if (!order) throw new NotFoundException('Göndəriş tapılmadı');
+    return publicIdentifierOrder(order, identifier, isVin && order.vin === identifier ? 'vin' : 'lot');
+  }
+
   async findByCode(code: string) {
-    await this.purgeExpiredArchive();
+    if (typeof code !== 'string' || !code.trim() || code.length > 100) throw new NotFoundException('Göndəriş tapılmadı');
+    // Existing tracking/contract codes deliberately win over public VIN/lot identifiers.
+    // Public reads must not delete archived orders as a side effect.
     const found = await this.resolveOrderByCode(code);
-    if (!found) throw new NotFoundException('Göndəriş tapılmadı');
+    if (!found) return this.findByPublicIdentifier(code);
 
     if ('customer' in found && found.customer) {
       const order = found;

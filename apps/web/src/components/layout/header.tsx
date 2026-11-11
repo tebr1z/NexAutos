@@ -10,6 +10,7 @@ import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { useI18n } from "@/providers/i18n-provider";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
+import { trackingSearchPath } from "@/lib/tracking-query";
 
 function NavTrackForm({
   compact,
@@ -29,8 +30,7 @@ function NavTrackForm({
 
   function go(e: FormEvent) {
     e.preventDefault();
-    const next = code.trim().toUpperCase();
-    router.push(next ? `/track/${next}` : "/track");
+    router.push(trackingSearchPath(code));
     onDone?.();
   }
 
@@ -44,6 +44,10 @@ function NavTrackForm({
       )}
     >
       <input
+        autoCapitalize="characters"
+        autoCorrect="off"
+        spellCheck={false}
+        maxLength={100}
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder={placeholder}

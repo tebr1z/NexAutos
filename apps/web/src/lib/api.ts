@@ -189,6 +189,13 @@ export type OceanLookup = {
   formatted: string;
 };
 
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("anx_token") : null;
   const run = (accessToken: string | null) => fetch(`${API}${path}`, {
@@ -209,7 +216,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => ({}));
     const raw = (body as { message?: string | string[] }).message;
     const message = Array.isArray(raw) ? raw.join(" ") : raw;
-    throw new Error(message ?? `Request failed: ${res.status}`);
+    throw new ApiError(res.status, message ?? `Request failed: ${res.status}`);
   }
   return res.json() as Promise<T>;
 }
@@ -224,7 +231,7 @@ async function requestLocal<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => ({}));
     const raw = (body as { message?: string | string[] }).message;
     const message = Array.isArray(raw) ? raw.join(" ") : raw;
-    throw new Error(message ?? `Request failed: ${res.status}`);
+    throw new ApiError(res.status, message ?? `Request failed: ${res.status}`);
   }
   return res.json() as Promise<T>;
 }

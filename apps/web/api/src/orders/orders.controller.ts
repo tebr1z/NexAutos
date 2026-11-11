@@ -12,6 +12,7 @@ export class OrdersController {
   constructor(private orders: OrdersService) {}
 
   @Get('tracking/:code')
+  @Header('Cache-Control', 'no-store')
   byCode(@Param('code') code: string) {
     return this.orders.findByCode(code);
   }

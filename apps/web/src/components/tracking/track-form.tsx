@@ -6,6 +6,7 @@ import { useI18n } from "@/providers/i18n-provider";
 import { ShippingNotice } from "@/components/layout/shipping-notice";
 import { MapPin, Search } from "lucide-react";
 import { ContainerTracker } from "./container-tracker";
+import { normalizeTrackingQuery, trackingSearchPath } from "@/lib/tracking-query";
 
 export function TrackForm() {
   const { t } = useI18n();
@@ -23,7 +24,7 @@ export function TrackForm() {
         className="mx-auto mt-7 flex max-w-xl flex-col gap-3 rounded-3xl border border-line bg-card p-4 sm:p-6"
         onSubmit={(e) => {
           e.preventDefault();
-          if (code.trim()) router.push(`/track/${encodeURIComponent(code.trim().toUpperCase())}`);
+          if (normalizeTrackingQuery(code)) router.push(trackingSearchPath(code));
         }}
       >
         <label htmlFor="tracking-code" className="text-sm font-medium">{t.track.placeholder}</label>
@@ -33,6 +34,7 @@ export function TrackForm() {
           autoCapitalize="characters"
           autoCorrect="off"
           spellCheck={false}
+          maxLength={100}
           value={code}
           onChange={(e) => setCode(e.target.value)}
           placeholder={t.track.placeholder}

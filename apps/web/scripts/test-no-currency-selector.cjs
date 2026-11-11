@@ -57,6 +57,7 @@ function mount(relative, dependencies = {}) {
     if (name === 'next/link') return { __esModule: true, default: 'a' };
     if (name === '@/lib/constants') return constants;
     if (name === '@/lib/utils') return { cn: (...values) => values.filter(Boolean).join(' ') };
+    if (name === '@/lib/tracking-query') return compile('lib/tracking-query.ts');
     if (Object.hasOwn(dependencies, name)) return dependencies[name];
     throw new Error(`Unexpected import ${name}; currency dependencies must not return`);
   }, { window });
